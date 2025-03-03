@@ -129,6 +129,14 @@ var rule_details_node = document.getElementById('rule_details');
     .custom-code-block .js-variable {
       color: #f8f8f2;
     }
+    
+    /* Replace with CSS that allows full display: */
+    .preview-value {
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: none;
+      overflow: visible;
+    }
   `;
   document.head.appendChild(styleElement);
 })();
@@ -633,14 +641,7 @@ function processWebSDKComponent(action, containerNode) {
 
             // Preview cell
             const previewCell = document.createElement('td');
-            previewCell.textContent =
-              value === null
-                ? 'null'
-                : typeof value === 'string'
-                ? value.length > 30
-                  ? value.substring(0, 27) + '...'
-                  : value
-                : String(value);
+            previewCell.textContent = value;
             row.appendChild(previewCell);
 
             // Actions cell

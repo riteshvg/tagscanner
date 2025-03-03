@@ -14,9 +14,9 @@ if (rule_details_node) {
       text: 'Rule Name',
       tooltip: 'Name of the rule in your Adobe Tags property',
     },
-    { text: 'Events', tooltip: 'Event types that trigger this rule' },
+    /* { text: 'Events', tooltip: 'Event types that trigger this rule' }, 
     { text: 'Conditions', tooltip: 'Whether this rule has any conditions' },
-    { text: 'Core', tooltip: 'Whether this rule uses Core extension actions' },
+    { text: 'Core', tooltip: 'Whether this rule uses Core extension actions' },*/
     {
       text: 'Adobe Analytics',
       tooltip: 'Whether this rule uses Adobe Analytics extension actions',
@@ -102,12 +102,12 @@ if (rule_details_node) {
     )}`;
     ruleLink.classList.add('rule-link');
     th_rule_name.appendChild(ruleLink);
-    var th_events = document.createElement('td');
+    /* var th_events = document.createElement('td');
     th_events.innerHTML = event_check;
-    tr.classList.add('event-' + event_check);
+    tr.classList.add('event-' + event_check); 
     var th_conditions = document.createElement('td');
     th_conditions.innerHTML = conditions_check;
-    tr.classList.add('conditions-' + conditions_check);
+    tr.classList.add('conditions-' + conditions_check);*/
     var th_aa = document.createElement('td');
     th_aa.innerHTML = aa_rule_check;
     tr.classList.add('aa-' + aa_rule_check);
@@ -120,9 +120,9 @@ if (rule_details_node) {
     var th_size = document.createElement('td');
     th_size.innerHTML = Number((size / 1000).toFixed(2));
     tr.appendChild(th_rule_name);
-    tr.appendChild(th_events);
+    /* tr.appendChild(th_events); 
     tr.appendChild(th_conditions);
-    tr.appendChild(th_core);
+    tr.appendChild(th_core);*/
     tr.appendChild(th_aa);
     tr.appendChild(th_web);
     tr.appendChild(th_size);

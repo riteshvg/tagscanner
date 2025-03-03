@@ -179,34 +179,55 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Function to populate the variable dropdown based on the current type
   function populateVariableDropdown() {
-    // Clear existing options
-    variableSelect.innerHTML =
-      '<option value="">-- Select a Variable --</option>';
+    const select = document.getElementById('variableSelect');
+    select.innerHTML = ''; // Clear existing options
 
-    let variables = [];
+    // Get the current variable type
+    const currentType = document.querySelector('.btn-group .active').id;
+    let variableList = [];
 
-    if (currentVariableType === 'eVar') {
-      variables = Object.keys(analyticsVariables.eVars);
-    } else if (currentVariableType === 'prop') {
-      variables = Object.keys(analyticsVariables.props);
-    } else if (currentVariableType === 'event') {
-      variables = Object.keys(analyticsVariables.events);
+    // Get the appropriate variable list based on type
+    if (currentType === 'eVarTypeBtn') {
+      variableList = Object.keys(analyticsVariables.eVars);
+    } else if (currentType === 'propTypeBtn') {
+      variableList = Object.keys(analyticsVariables.props);
+    } else if (currentType === 'eventTypeBtn') {
+      variableList = Object.keys(analyticsVariables.events);
     }
 
-    // Sort variables numerically
-    variables.sort((a, b) => {
-      const aNum = parseInt(a.replace(/[^\d]/g, ''));
-      const bNum = parseInt(b.replace(/[^\d]/g, ''));
-      return aNum - bNum;
-    });
-
-    // Add options for each variable
-    variables.forEach((variable) => {
+    // Check if there are any variables available
+    if (variableList.length === 0) {
+      // No variables available - disable dropdown and show prompt
       const option = document.createElement('option');
-      option.value = variable;
-      option.textContent = variable;
-      variableSelect.appendChild(option);
-    });
+      option.value = '';
+      option.textContent = 'No variables activated';
+      select.appendChild(option);
+      select.disabled = true;
+
+      // Also disable the analyze button
+      document.getElementById('analyzeButton').disabled = true;
+
+      // Hide results section if it's visible
+      document.getElementById('resultsSection').style.display = 'none';
+    } else {
+      // Variables are available - enable dropdown and populate options
+      select.disabled = false;
+      document.getElementById('analyzeButton').disabled = false;
+
+      // Add default option
+      const defaultOption = document.createElement('option');
+      defaultOption.value = '';
+      defaultOption.textContent = '-- Select a Variable --';
+      select.appendChild(defaultOption);
+
+      // Add options for each variable
+      variableList.forEach((variable) => {
+        const option = document.createElement('option');
+        option.value = variable;
+        option.textContent = variable;
+        select.appendChild(option);
+      });
+    }
   }
 
   // Function to extract Analytics variables

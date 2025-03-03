@@ -3,9 +3,46 @@
   <head>
     <title>Rule Details</title>
     <link rel="stylesheet" href="css/styles.css" />
+    <style>
+      .beta-notice {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeeba;
+        border-radius: 4px;
+        padding: 12px 20px;
+        margin: 15px 0;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+      }
+
+      .beta-notice i {
+        margin-right: 10px;
+        font-size: 18px;
+      }
+
+      .back-button {
+        display: inline-block;
+        margin-bottom: 15px;
+        text-decoration: none;
+        color: #4e73df;
+        font-weight: bold;
+      }
+
+      .back-button:hover {
+        text-decoration: underline;
+      }
+    </style>
   </head>
   <body>
     <a href="rule.html" class="back-button">← Back to Rules List</a>
+
+    <div class="beta-notice">
+      <i class="fas fa-flask"></i> Note: Rule Details is in beta right now. Some
+      functionality may change in future updates. For feedback and to report
+      bugs, please send an email to tagscannerfeedback@gmail.com
+    </div>
+
     <div id="rule_details"></div>
     <div id="set_display"></div>
     <script src="ruledetails.js"></script>

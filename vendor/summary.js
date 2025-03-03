@@ -482,9 +482,11 @@ document.addEventListener('DOMContentLoaded', function () {
     ruleSizeInfo.className = 'text-center mt-3';
     ruleSizeInfo.innerHTML = `
       <div class="unused-label">You save</div>
-      <div class="unused-count">${unusedRuleSize.toFixed(2)} KB - (${Math.round(
-      (unusedRules.length / rules.length) * 100
-    )}%)</div>
+      <div class="unused-count">${unusedRuleSize.toFixed(2)} KB - (${
+      rules.length > 0
+        ? Math.round((unusedRules.length / rules.length) * 100)
+        : 0
+    }%)</div>
       <div class="unused-label">of ${totalRuleSize.toFixed(
         2
       )} KB total if the rules are disabled.</div>
@@ -991,16 +993,22 @@ document.addEventListener('DOMContentLoaded', function () {
     } (${totalDeSize.toFixed(2)} KB)
        Unused Data Elements: ${
          unusedDataElements.length
-       } (${unusedDeSize.toFixed(2)} KB - ${Math.round(
-      (unusedDataElements.length / Object.keys(dataElements).length) * 100
-    )}%)`;
+       } (${unusedDeSize.toFixed(2)} KB - ${
+      Object.keys(dataElements).length > 0
+        ? Math.round(
+            (unusedDataElements.length / Object.keys(dataElements).length) * 100
+          )
+        : 0
+    }%)`;
 
     document.getElementById('print-rule-summary').textContent = `Total Rules: ${
       rules.length
     } (${totalRuleSize.toFixed(2)} KB)
-       Unused Rules: ${unusedRules.length} (${unusedRuleSize.toFixed(
-      2
-    )} KB - ${Math.round((unusedRules.length / rules.length) * 100)}%)`;
+       Unused Rules: ${unusedRules.length} (${unusedRuleSize.toFixed(2)} KB - ${
+      rules.length > 0
+        ? Math.round((unusedRules.length / rules.length) * 100)
+        : 0
+    }%)`;
 
     // Update print section to include extensions
     const printSection = document.getElementById('print-section');

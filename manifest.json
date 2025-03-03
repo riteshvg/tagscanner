@@ -1,0 +1,46 @@
+{
+  "name": "TagScanner",
+  "description": "Scan your Adobe Tag property and export your library output with custom code plus visualize how different components are inter-related.",
+  "version": "1.6.4",
+  "manifest_version": 3,
+
+  "permissions": ["scripting", "activeTab"],
+  "icons": {
+    "16": "./images/tagscanner_16x16.png",
+    "32": "./images/tagscanner_32x32.png",
+    "48": "./images/tagscanner_48x48.png",
+    "128": "./images/tagscanner_128x128.png"
+  },
+  "background": {
+    "service_worker": "service_worker.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["pass_satellite.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {
+    "default_title": "TagScanner",
+    "default_icon": {
+      "16": "./images/tagscanner_16x16.png",
+      "32": "./images/tagscanner_32x32.png",
+      "48": "./images/tagscanner_48x48.png",
+      "128": "./images/tagscanner_128x128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_scripts.js"]
+    }
+  ],
+  "host_permissions": ["<all_urls>"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'",
+    "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals; script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'self'"
+  },
+  "sandbox": {
+    "pages": ["satellite_sandbox.html"]
+  }
+}

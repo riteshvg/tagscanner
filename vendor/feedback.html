@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Page</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet"> -->
+    <link href="css/sb-admin-2.min.css" rel="stylesheet">
+    <link href="css/fonts.css" rel="stylesheet">
+    <!-- <link href="../css/fonts-2.css" rel="stylesheet"> -->
+
+
+    <style>
+        /* Basic table styles */
+        table {
+            font-family: arial, sans-serif;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        td, th {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        /* Spinner for loading indicator */
+        .spinner {
+            width: 64px;
+            height: 64px;
+            border: 8px solid;
+            border-color: #3d5af1 transparent #3d5af1 transparent;
+            border-radius: 50%;
+            animation: spin-anim 1.2s linear infinite;
+        }
+        @keyframes spin-anim {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Loader container */
+        .loader-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+            background: white;
+            z-index: 1;
+        }
+
+        /* Overlay styles */
+        .overlay {
+            height: 100%;
+            width: 0;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            background-color: rgba(0,0,0,0.9);
+            overflow-x: hidden;
+            transition: 0.5s;
+        }
+        .overlay-content {
+            position: relative;
+            top: 25%;
+            width: 100%;
+            text-align: center;
+            margin-top: 30px;
+        }
+        .overlay a {
+            padding: 8px;
+            text-decoration: none;
+            font-size: 36px;
+            color: #818181;
+            display: block;
+            transition: 0.3s;
+        }
+        .overlay a:hover {
+            color: #f1f1f1;
+        }
+        .overlay .closebtn {
+            position: absolute;
+            top: 20px;
+            right: 45px;
+            font-size: 60px;
+        }
+        @media screen and (max-height: 450px) {
+            .overlay a { font-size: 20px; }
+            .overlay .closebtn {
+                font-size: 40px;
+                top: 15px;
+                right: 35px;
+            }
+        }
+
+        /* Form styles */
+        .form-container {
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .form-label {
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        .form-control, .form-select, .form-textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-control:focus, .form-select:focus, .form-textarea:focus {
+            border-color: #3d5af1;
+            outline: none;
+        }
+        .btn-primary {
+            background-color: #3d5af1;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-primary:hover {
+            background-color: #2c4f8f;
+        }
+        .text-gray-400 {
+            color: #9e9e9e;
+        }
+        .text-green-500 {
+            color: #28a745;
+        }
+        .text-red-500 {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+     <!-- Main content -->
+    <div class="flex items-center min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div class="container mx-auto">
+            <div class="max-w-xl mx-auto my-10 form-container">
+                <div class="text-center">
+                    <h1 class=" bg-indigo-600  text-3xl font-semibold text-gray-700 dark:text-gray-200" style="background-color:#27c5c1">
+                        Contact Us
+                    </h1>
+                    <p class="text-gray-400 dark:text-gray-400">
+                        Fill up the form below to send us a message.
+                    </p>
+                </div>
+                <div class="m-7">
+                    <form action="https://api.web3forms.com/submit" method="POST" id="form">
+                        <input type="hidden" name="access_key" value="ab08f10f-3945-4782-b5f3-538057da804a" />
+                        <input type="hidden" name="subject" value="New Submission from Tag" />
+                        <input type="checkbox" name="botcheck" id="" style="display: none;" />
+
+                        <div class="flex mb-6 space-x-4">
+                            <div class="w-full md:w-1/2">
+                                <label for="fname" class="form-label">Full Name</label>
+                                <input type="text" name="name" id="first_name" placeholder="John Doe" required class="form-control" />
+                            </div>
+                            <!-- <div class="w-full md:w-1/2">
+                                <label for="lname" class="form-label">Last Name</label>
+                                <input type="text" name="last_name" id="lname" placeholder="Doe" required class="form-control" />
+                            </div> -->
+                        </div>
+
+                        <div class="flex mb-6 space-x-4">
+                            <div class="w-full md:w-1/2">
+                                <label for="rating" class="form-label">How do you rate this utility?</label>
+                                <select id="rating" name="rating">
+                                    <option value="helpful">Helpful</option>
+                                    <option value="not helpful">Not Helpful</option>
+                                    <option value="uninstalling">Uninstalling</option>
+                                  </select>
+                            </div>
+                            <p></p>
+                            <div class="w-full md:w-1/2">
+                                <label for="feature" class="form-label">Feature request</label>
+                                <input type="text" name="feature" id="feature" placeholder= "what feature would you like to see added to this tool?" required class="form-control" />
+                            </div>
+                        </div> 
+
+                        <div class="mb-6">
+                            <label for="message" class="form-label">Share Your Feedback</label>
+                            <textarea rows="5" name="message" id="message" class="form-textarea" required></textarea>
+                        </div>
+                        <div class="mb-6">
+                            <button type="submit" class="btn btn-primary">
+                                Send Message
+                            </button>
+                        </div>
+                        <p class="text-base text-center text-gray-400" id="result"></p>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const form = document.getElementById("form");
+        const result = document.getElementById("result");
+
+        form.addEventListener("submit", function (e) {
+            const formData = new FormData(form);
+            e.preventDefault();
+            var object = {};
+            formData.forEach((value, key) => {
+                object[key] = value;
+            });
+            var json = JSON.stringify(object);
+            result.innerHTML = "Please wait...";
+
+            fetch("https://api.web3forms.com/submit", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json"
+                },
+                body: json
+            })
+                .then(async (response) => {
+                    let json = await response.json();
+                    if (response.status == 200) {
+                        result.innerHTML = json.message;
+                        result.classList.remove("text-gray-500");
+                        result.classList.add("text-green-500");
+                    } else {
+                        console.log(response);
+                        result.innerHTML = json.message;
+                        result.classList.remove("text-gray-500");
+                        result.classList.add("text-red-500");
+                    }
+                })
+                .catch((error) => {
+                    console.log(error);
+                    result.innerHTML = "Something went wrong!";
+                })
+                .then(function () {
+                    form.reset();
+                    setTimeout(() => {
+                        result.style.display = "none";
+                    }, 5000);
+                });
+        });
+    </script>
+</body>
+</html>

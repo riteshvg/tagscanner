@@ -1,0 +1,18 @@
+/*var button = document.createElement('button');
+                    button.id = key;
+                    button.type='button';
+                    button.className='accordion';
+                    button.innerHTML = obj[key].displayName;
+                    var div_pannel = document.createElement('div');
+                    div_pannel.className = 'panel';
+                    var div_p = document.createElement('p');
+                    div_pannel.appendChild(div_p);
+                    var table = document.createElement('table');
+                    table.style.width ='100%';
+                    table.id = 'table_'+key;
+                    div_pannel.appendChild(table)
+                    var p = document.createElement('p');
+                    extension_details_node.appendChild(button);
+                    extension_details_node.appendChild(div_pannel);
+                    extension_details_node.appendChild(p);
+                    */

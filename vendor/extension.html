@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Extension Page</title>
+    <script src="intro.js"></script>
+    <link
+      href="../vendor/fontawesome-free/css/all.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+    <link href="../css/styles.css" rel="stylesheet" />
+    <link href="intro.css" rel="stylesheet" />
+    <style>
+      .icon-hide {
+        display: none;
+      }
+
+      .i-info :hover .icon-hide {
+        display: block;
+        color: red;
+      }
+
+      table {
+        font-family: arial, sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td,
+      th {
+        border: 1px solid #dddddd;
+        text-align: left;
+        padding: 8px;
+      }
+
+      tr:nth-child(even) {
+        background-color: #dddddd;
+      }
+
+      /* Modern styling matching summary.html */
+      .summary-card {
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .summary-card-header {
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+        color: white;
+      }
+      .summary-card-body {
+        padding: 20px;
+      }
+      .extension-card .summary-card-header {
+        background-color: #46a8f7;
+      }
+      .download-section {
+        margin-top: 30px;
+        margin-bottom: 40px;
+        text-align: center;
+      }
+      .description-text {
+        margin-top: 10px;
+        margin-bottom: 15px;
+      }
+
+      /* Spinner and loader */
+      .spinner {
+        width: 64px;
+        height: 64px;
+        border: 8px solid;
+        border-color: #3d5af1 transparent #3d5af1 transparent;
+        border-radius: 50%;
+        animation: spin-anim 1.2s linear infinite;
+      }
+
+      @keyframes spin-anim {
+        0% {
+          transform: rotate(0deg);
+        }
+
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loader-container {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: fixed;
+        background: rgba(255, 255, 255, 0.9);
+        z-index: 1;
+      }
+
+      .loading-message {
+        margin-top: 15px;
+        font-size: 16px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="loader-container" id="set_display">
+      <div class="spinner"></div>
+      <div class="loading-message">
+        <p>Loading extensions data...</p>
+      </div>
+    </div>
+
+    <div class="container-fluid">
+      <div
+        style="
+          background-color: #4e73df;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <h5 style="color: white; padding: 10px; margin-bottom: 0">
+          Extensions
+        </h5>
+        <button
+          id="start-tour"
+          class="btn btn-light btn-sm"
+          style="margin-right: 10px"
+        >
+          <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
+        </button>
+      </div>
+
+      <div class="description-text">
+        This page shows all extensions configured in your Adobe Tags property.
+        The table displays how each extension is used in rules and data
+        elements. You can sort the table by clicking on any column header.
+      </div>
+
+      <div class="summary-card extension-card">
+        <div class="summary-card-header">
+          <i class="fas fa-puzzle-piece mr-2"></i> Extension Details
+          <h6
+            class="download-button"
+            style="text-align: right; margin-top: -20px"
+          ></h6>
+        </div>
+        <div class="summary-card-body">
+          <table id="extension_details" style="width: 100%">
+            <tr>
+              <th
+                title="Extension Name - Activated extensions in the Adobe Tags' property"
+              >
+                Extension Name &nbsp;<i class="fas fa-info-circle"></i>
+              </th>
+              <th
+                title="Used in Rule: Actions - Extension as a part of an Action "
+              >
+                Used In Rule: Actions &nbsp;<i class="fas fa-info-circle"></i>
+              </th>
+              <th
+                title="Used in Rule: Events - Extension used to trigger an Event"
+              >
+                Used In Rule: Events &nbsp;<i class="fas fa-info-circle"></i>
+              </th>
+              <th
+                title="Used in Rule: Conditions - Extension utilized to create a Condition"
+              >
+                Used In Rule: Conditions &nbsp;<i
+                  class="fas fa-info-circle"
+                ></i>
+              </th>
+              <th
+                title="Used in Data Element - Extension used to create a Data Element"
+              >
+                Used In Data Element &nbsp;<i class="fas fa-info-circle"></i>
+              </th>
+              <th
+                title="Size in KB - Weight of the Extension that is getting added to your library Size"
+              >
+                Size in KB &nbsp;<i class="fas fa-info-circle"></i>
+              </th>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Remove the download section with tour button -->
+    <div class="container-fluid">
+      <div class="download-section"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="jquery-3.2.1.min.js"></script>
+    <script src="jquery.tablesorter.min.js"></script>
+    <script src="extension.js"></script>
+    <script src="tour-initializer.js"></script>
+    <script src="extension-tour.js"></script>
+  </body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Usage Summary</title>
+    <script src="html2canvas.min.js"></script>
+    <script src="intro.js"></script>
+    <link
+      href="../vendor/fontawesome-free/css/all.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+    <link href="../css/styles.css" rel="stylesheet" />
+    <link href="intro.css" rel="stylesheet" />
+    <style>
+      .summary-card {
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .summary-card-header {
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+        color: white;
+      }
+      .summary-card-body {
+        padding: 20px;
+      }
+      .unused-count {
+        font-size: 26px;
+        font-weight: bold;
+      }
+      .unused-label {
+        font-size: 14px;
+        color: #666;
+      }
+      .data-element-card .summary-card-header {
+        background-color: #27c5c1;
+      }
+      .rule-card .summary-card-header {
+        background-color: #f68d2e;
+      }
+      .download-section {
+        margin-top: 30px;
+        margin-bottom: 40px;
+        text-align: center;
+      }
+      .component-list {
+        max-height: 200px;
+        overflow-y: auto;
+        margin-top: 15px;
+      }
+      .component-list ul {
+        padding-left: 20px;
+      }
+      .component-list li {
+        margin-bottom: 5px;
+      }
+      .description-text {
+        margin-top: 10px;
+        margin-bottom: 15px;
+      }
+
+      /* Print-friendly styles */
+      #print-section {
+        display: none;
+      }
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        #print-section,
+        #print-section * {
+          visibility: visible;
+        }
+        #print-section {
+          display: block;
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+        }
+        .print-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+        }
+        .print-table th,
+        .print-table td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        .print-table th {
+          background-color: #f2f2f2;
+        }
+        .print-header {
+          color: #4e73df;
+          margin-top: 20px;
+          margin-bottom: 10px;
+        }
+      }
+    </style>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  </head>
+  <body>
+    <div class="loader-container" id="set_display">
+      <div class="spinner"></div>
+      <div class="loading-message">
+        <p>Analyzing component usage...</p>
+      </div>
+    </div>
+
+    <div class="container-fluid">
+      <div
+        style="
+          background-color: #4e73df;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <h5 style="color: white; padding: 10px; margin-bottom: 0">Summary</h5>
+        <button
+          id="start-tour"
+          class="btn btn-light btn-sm"
+          style="margin-right: 10px"
+        >
+          <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
+        </button>
+      </div>
+      <div class="description-text">
+        This page provides an easier way to summarize the entire implementation
+        There is a provision to see the necessary details of your property, as
+        well as the size of each component type - rules, data elements and
+        extensions. You can then You can download the summary as an attachment
+        and attach it to your audit report, or copy the table component wise and
+        paste it into a email for quick discussions
+      </div>
+      <div class="row mt-4">
+        <div class="col-md-6">
+          <div
+            class="summary-card data-element-card"
+            data-intro="This section shows unsued data elements"
+            data-step="1"
+          >
+            <div class="summary-card-header">
+              <i class="fas fa-database mr-2"></i> Data Elements
+            </div>
+            <div class="summary-card-body">
+              <div class="row">
+                <div class="col-md-6 text-center">
+                  <div class="unused-count" id="unused-de-count">0</div>
+                  <div class="unused-label">Unused</div>
+                </div>
+                <div class="col-md-6 text-center">
+                  <div class="unused-count" id="total-de-count">0</div>
+                  <div class="unused-label">Total</div>
+                </div>
+              </div>
+              <div class="component-list">
+                <h6 class="mt-3">Unused Data Elements:</h6>
+                <ul id="unused-de-list"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="summary-card rule-card">
+            <div class="summary-card-header">
+              <i class="fas fa-wrench mr-2"></i> Rules
+            </div>
+            <div class="summary-card-body">
+              <div class="row">
+                <div class="col-md-6 text-center">
+                  <div class="unused-count" id="unused-rule-count">0</div>
+                  <div class="unused-label">Unused</div>
+                </div>
+                <div class="col-md-6 text-center">
+                  <div class="unused-count" id="total-rule-count">0</div>
+                  <div class="unused-label">Total</div>
+                </div>
+              </div>
+              <div class="component-list">
+                <h6 class="mt-3">Unused Rules:</h6>
+                <ul id="unused-rule-list"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- The download button will now appear after all cards -->
+      <!-- The second row with extension card and property details card is dynamically added by JavaScript -->
+    </div>
+
+    <!-- Download section moved to the bottom of the container -->
+    <div class="container-fluid">
+      <div class="download-section">
+        <button id="download-pdf" class="btn btn-primary">
+          <i class="fas fa-file-pdf mr-2"></i> Download PDF Summary
+        </button>
+      </div>
+    </div>
+
+    <!-- Print-friendly section that will be visible only when printing -->
+    <div id="print-section">
+      <h1 id="print-title">Adobe Tags Component Usage Summary</h1>
+      <p id="print-property">Property:</p>
+      <p id="print-date">Generated:</p>
+
+      <h2 class="print-header">Usage Summary</h2>
+      <p id="print-de-summary"></p>
+      <p id="print-rule-summary"></p>
+      <p id="print-total-savings"></p>
+
+      <h2 class="print-header">Unused Data Elements</h2>
+      <table class="print-table" id="print-de-table">
+        <thead>
+          <tr>
+            <th>Data Element Name</th>
+            <th>Size (KB)</th>
+          </tr>
+        </thead>
+        <tbody id="print-de-tbody"></tbody>
+      </table>
+
+      <h2 class="print-header">Unused Rules</h2>
+      <table class="print-table" id="print-rule-table">
+        <thead>
+          <tr>
+            <th>Rule Name</th>
+            <th>Size (KB)</th>
+          </tr>
+        </thead>
+        <tbody id="print-rule-tbody"></tbody>
+      </table>
+
+      <h2 class="print-header">Recommendations</h2>
+      <ol id="print-recommendations"></ol>
+    </div>
+
+    <script src="jquery-3.2.1.min.js"></script>
+    <script src="jquery.tablesorter.min.js"></script>
+    <script src="summary.js"></script>
+    <script src="tour-initializer.js"></script>
+    <script src="summary-tour.js"></script>
+  </body>
+</html>

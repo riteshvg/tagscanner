@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Display Page</title>
+  <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
+  <!-- <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet"> -->
+           <!-- Custom styles for this template-->
+           <link href="css/sb-admin-2.min.css" rel="stylesheet"> 
+           <link href="css/fonts.css" rel="stylesheet">
+
+<style>
+       table {
+  font-family: arial, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
+}
+td, th {
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 8px;
+}
+
+tr:nth-child(even) {
+  background-color: #dddddd;
+}
+button.accordion {
+    background-color: #777;
+    color: white;
+    cursor: pointer;
+    padding: 18px;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: 15px;
+}
+
+button.accordion.active, button.accordion:hover {
+    background-color: #555;
+}
+
+button.accordion:after {
+    content: '\002B';
+    color: white;
+    font-weight: bold;
+    float: right;
+    margin-left: 5px;
+}
+
+button.accordion.active:after {
+    content: "\2212";
+}
+div.panel {
+    padding: 0 18px;
+    background-color: #f1f1f1;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.2s ease-out;
+    color:black;
+}
+.spinner {
+        width: 64px;
+        height: 64px;
+        border: 8px solid;
+        border-color: #3d5af1 transparent #3d5af1 transparent;
+        border-radius: 50%;
+        animation: spin-anim 1.2s linear infinite;
+      }
+
+      @keyframes spin-anim {
+        0% {
+          transform: rotate(0deg);
+        }
+
+        100% {
+          transform: rotate(360deg)
+        }
+      }
+
+      .loader-container {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: fixed;
+        background: white;
+        z-index: 1;
+      }
+</style>
+</head>
+<body>
+    <div class="loader-container" id="set_display">
+        <div class="spinner"></div>
+      </div>
+      <p></p>
+
+      <div class="container-fluid">
+    
+        <div class="row row-cols-2">
+          <div class="col"><h5> TagScanner is a utility designed by Adobe Consulting Services for Adobe Tags. Get information about your active Adobe Tags Property 
+            and answers queries such as: </h5>
+            
+          <ul class="list-group">
+            <li class="list-group-item">How do I ascertain the size of my library impacting my website?</li>
+            <li class="list-group-item">Where can I get a list of elements that are significantly larger in size? </li>
+            <li class="list-group-item">How many data elements are active and not used even once in any of my rules, extensions or data elements? </li>
+            <li class="list-group-item">How are different data elements mapped to multiple rules?</li>
+            <li class="list-group-item">How can I determine the relationships between different elements of my library?</li>
+            <li class="list-group-item">and more...</li>    
+          </ul> 
+        </div>
+
+          <div class="col">
+            <h5>Features activated in this release:</h5>
+          <p></p>
+          <ul class="list-group">
+            <li class="list-group-item list-group-item-secondary">CSV export of environment components and custom code.</li>
+            <li class="list-group-item list-group-item-secondary">A component view of Data Elements, Rules and Extensions</li>
+            <li class="list-group-item list-group-item-secondary">Filtering Data Elements and Rules based on logic</li>
+            <li class="list-group-item list-group-item-secondary">Searching for variables and Events</li>
+            <li class="list-group-item list-group-item-secondary">Size snapshot at overall element and individual component level</li>
+            <li class="list-group-item list-group-item-secondary">Exporting the output as CSV</li>
+          </ul>
+          <!-- <ul class="list-group">
+            <li class="list-group-item active" aria-current="true">Credits</li>
+            <li class="list-group-item">Agastya Edullakanti - Developer</li>
+            <li class="list-group-item">Ritesh Gupta - Technical Architect</li>
+            <li class="list-group-item">Michael Chen - Associate Consulting Intern</li>
+            <li class="list-group-item">Icon by Shital Patel from The Noun Project</li>
+          </ul>  -->
+          </div>
+        </div>
+      </div>
+  <script src="property.js"></script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Search Results</title>
+  <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
+  <!-- <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet"> -->
+  <link href="css/sb-admin-2.min.css" rel="stylesheet">
+  <link href="css/fonts.css" rel="stylesheet">
+<style>
+       table {
+  font-family: arial, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
+}
+td, th {
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 8px;
+}
+
+tr:nth-child(even) {
+  background-color: #dddddd;
+}
+button.accordion {
+    background-color: #777;
+    color: white;
+    cursor: pointer;
+    padding: 18px;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: 15px;
+}
+
+button.accordion.active, button.accordion:hover {
+    background-color: #555;
+}
+
+button.accordion:after {
+    content: '\002B';
+    color: white;
+    font-weight: bold;
+    float: right;
+    margin-left: 5px;
+}
+
+button.accordion.active:after {
+    content: "\2212";
+}
+div.panel {
+    padding: 0 18px;
+    background-color: #f1f1f1;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.2s ease-out;
+    color:black;
+}
+.spinner {
+        width: 64px;
+        height: 64px;
+        border: 8px solid;
+        border-color: #3d5af1 transparent #3d5af1 transparent;
+        border-radius: 50%;
+        animation: spin-anim 1.2s linear infinite;
+      }
+
+      @keyframes spin-anim {
+        0% {
+          transform: rotate(0deg);
+        }
+
+        100% {
+          transform: rotate(360deg)
+        }
+      }
+
+      .loader-container {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: fixed;
+        background: white;
+        z-index: 1;
+      }
+</style>
+</head>
+<body>
+    <div class="loader-container" id="set_display">
+        <div class="spinner"></div>
+      </div>
+    
+    <div class = "container-fluid">
+      <div>&nbsp;</div>
+      <div style="background-color: #27c5c1;" > 
+        <h5 style="color: black">Search for variables:</h5>
+        <div>&nbsp;</div>
+      </div>    
+    
+    <br>
+
+    <div class="row align-items-center">
+      <div class="col">
+        <div class = "table">     
+          <form action="search.html" class="row">
+             <div class="col-sm-8">
+               <input type="text" placeholder = "Search..." name = "search" class="form-control">          
+             </div>
+     
+             <div class="col-sm-4">
+               <button target = "iframe2" type="submit" class="btn btn-primary"><i class="fa fa-search"></i></button>
+             </div>
+           </form> 
+         </div>
+      </div>
+      <div class="col">
+        <div class = "col">      
+          <h6 id="h2_header">Search Result Displayed for : Null </h6> 
+        </div>
+      </div>
+      <div class="col">
+        <h6>Note:
+        Search for actual variable name and not a generic term or number. E.g. eVar4, event4, prop4 and not var4 or 0. 
+      </h6>
+      </div>
+    </div>
+    <br>
+        
+    <div id="search_details" >
+      <button type="button" id= "rule_collapse" class="accordion">Rules</button>
+       <div class="panel">
+           <p></p>
+      <table id="search_detail_table" style="width:100%">
+          <tr>
+              <th>Rule Name</th>
+              <th>Rule Action</th>
+              <th>Rule Condition</th>
+              <th>Rule Event</th>
+          </tr>
+      </table>
+      </div>
+      <p></p>
+      <button type="button" id= 'de_collapse' class="accordion">Data Elements</button>
+       <div class="panel">
+           <p></p>
+      <table id="search_detail_table2" style="width:100%">
+          <tr>
+              <th>Data Element Name</th>
+              <th>Extension</th>
+              <th>Type</th>
+          </tr>
+      </table>
+      </div>
+      <p></p>
+      <button type="button" id= 'exe_collapse' class="accordion">Extensions</button>
+       <div class="panel">
+           <p></p>
+      <table id="search_detail_table3" style="width:100%">
+          <tr>
+              <th>Extension Name</th>
+          </tr>
+      </table>
+      </div>
+      <br>
+</div>
+  <script src="search.js"></script>
+</body>
+</html>

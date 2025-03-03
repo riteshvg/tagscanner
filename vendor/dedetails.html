@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Data Element Details</title>
+    <link
+      href="../vendor/fontawesome-free/css/all.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+    <link href="../css/styles.css" rel="stylesheet" />
+    <style>
+      .summary-card {
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .summary-card-header {
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+        color: white;
+        background-color: #27c5c1;
+      }
+      .summary-card-body {
+        padding: 20px;
+        background-color: white;
+      }
+      .back-button {
+        display: inline-flex;
+        align-items: center;
+        color: #4e73df;
+        text-decoration: none;
+        margin: 20px;
+        font-weight: 500;
+      }
+      .back-button:hover {
+        text-decoration: none;
+        color: #2e59d9;
+      }
+      .back-button i {
+        margin-right: 8px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+      }
+      th,
+      td {
+        padding: 12px;
+        border: 1px solid #e3e6f0;
+      }
+      th {
+        background-color: #f8f9fc;
+        font-weight: bold;
+      }
+      .accordion {
+        background-color: #f8f9fc;
+        color: #4e73df;
+        cursor: pointer;
+        padding: 15px;
+        width: 100%;
+        border: none;
+        text-align: left;
+        outline: none;
+        font-size: 15px;
+        font-weight: 500;
+        border-radius: 4px;
+        margin-bottom: 10px;
+        transition: background-color 0.2s;
+      }
+      .accordion:hover {
+        background-color: #eaecf4;
+      }
+      .accordion.active {
+        background-color: #4e73df;
+        color: white;
+      }
+      .accordion:after {
+        font-family: 'Font Awesome 5 Free';
+        content: '\f067';
+        font-weight: 900;
+        float: right;
+      }
+      .accordion.active:after {
+        content: '\f068';
+      }
+      .panel {
+        padding: 0;
+        background-color: white;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.2s ease-out;
+        margin-bottom: 10px;
+      }
+      .loader-container {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: fixed;
+        background: rgba(255, 255, 255, 0.9);
+        z-index: 1;
+      }
+      .spinner {
+        width: 64px;
+        height: 64px;
+        border: 8px solid;
+        border-color: #3d5af1 transparent #3d5af1 transparent;
+        border-radius: 50%;
+        animation: spin-anim 1.2s linear infinite;
+      }
+      .loading-message {
+        margin-top: 15px;
+        font-size: 16px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body class="bg-light">
+    <div class="loader-container" id="set_display">
+      <div class="spinner"></div>
+      <div class="loading-message">Loading data element details...</div>
+    </div>
+
+    <div class="container-fluid">
+      <a href="dataelement.html" class="back-button">
+        <i class="fas fa-arrow-left"></i> Back to Data Elements List
+      </a>
+
+      <div class="summary-card">
+        <div class="summary-card-header">
+          <i class="fas fa-database mr-2"></i>
+          <span id="h2_header">Data Element Details</span>
+          <h6
+            class="download-button"
+            style="text-align: right; margin-top: -20px"
+          ></h6>
+        </div>
+        <div class="summary-card-body">
+          <div id="de_details">
+            <button type="button" id="rule_collapse" class="accordion">
+              <i class="fas fa-wrench mr-2"></i> Rules
+            </button>
+            <div class="panel">
+              <table id="de_detail_table">
+                <thead>
+                  <tr>
+                    <th>Rule Name</th>
+                    <th>Rule Action</th>
+                    <th>Rule Condition</th>
+                    <th>Rule Event</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <button type="button" id="de_collapse" class="accordion">
+              <i class="fas fa-database mr-2"></i> Data Elements
+            </button>
+            <div class="panel">
+              <table id="de_detail_table2">
+                <thead>
+                  <tr>
+                    <th>Data Element Name</th>
+                    <th>Extension</th>
+                    <th>Type</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            <button type="button" id="exe_collapse" class="accordion">
+              <i class="fas fa-puzzle-piece mr-2"></i> Extensions
+            </button>
+            <div class="panel">
+              <table id="de_detail_table3">
+                <thead>
+                  <tr>
+                    <th>Extension Name</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="jquery.js"></script>
+    <script src="dedetails.js"></script>
+    <script src="accordion.js"></script>
+  </body>
+</html>

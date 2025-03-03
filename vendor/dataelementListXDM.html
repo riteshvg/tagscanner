@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XDM Analytics Variable Mapping</title>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background-color: #f8f9fa;
+      }
+      .header {
+        background-color: #343a40;
+        color: white;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+      .card {
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      .badge {
+        font-size: 90%;
+        margin-right: 5px;
+      }
+      .variable-path {
+        font-family: monospace;
+        color: #6c757d;
+      }
+      .rule-list {
+        max-height: 100px;
+        overflow-y: auto;
+      }
+      .rule-item {
+        display: inline-block;
+        margin: 2px;
+      }
+      #set_display {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      .spinner {
+        border: 16px solid #f3f3f3;
+        border-top: 16px solid #3498db;
+        border-radius: 50%;
+        width: 80px;
+        height: 80px;
+        animation: spin 2s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      .btn-group .btn.active {
+        background-color: #007bff;
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Loading spinner -->
+    <div id="set_display">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="container">
+      <!-- Header -->
+      <!-- Variable Selection Card -->
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4>Select Variable Type and Variable # to see the XDM mapping</h4>
+        </div>
+        <div class="card-body">
+          <div class="btn-group mb-3" role="group">
+            <button
+              type="button"
+              id="eVarTypeBtn"
+              class="btn btn-outline-primary active"
+            >
+              eVars
+            </button>
+            <button
+              type="button"
+              id="propTypeBtn"
+              class="btn btn-outline-primary"
+            >
+              Props
+            </button>
+            <button
+              type="button"
+              id="eventTypeBtn"
+              class="btn btn-outline-primary"
+            >
+              Events
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label for="variableSelect">Select a Variable:</label>
+            <select id="variableSelect" class="form-control">
+              <option value="">-- Select a Variable --</option>
+            </select>
+          </div>
+
+          <button id="analyzeButton" class="btn btn-success">
+            Analyze Mappings
+          </button>
+        </div>
+      </div>
+
+      <!-- Results Section -->
+      <div id="resultsSection" class="card" style="display: none">
+        <div class="card-header bg-success text-white">
+          <h4>Data Element Mappings <span id="mappingCount">(0)</span></h4>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="mappingsTable" class="table table-bordered">
+              <thead>
+                <tr>
+                  <th>Data Element</th>
+                  <th>Rules</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <div id="noMappingsMessage" class="alert alert-info">
+              No mappings found for this variable.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="dataElementListXDM.js"></script>
+  </body>
+</html>

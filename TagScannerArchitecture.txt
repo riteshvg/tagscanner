@@ -1,0 +1,220 @@
+1. Overall Architecture: TagScanner is a browser extension designed to analyze Adobe Tags (Adobe Launch) implementations. The application follows a Chrome extension architecture with these primary components:
+
+┌─────────────────────────────────────────────────────────────┐
+│                    TagScanner Extension                     │
+│                                                             │
+│  ┌─────────────┐    ┌──────────────┐    ┌────────────────┐  │
+│  │ Background  │    │ Popup/UI     │    │ Content Script │  │
+│  │ Scripts     │◄───┤ Components   │◄───┤                │  │
+│  │             │    │              │    │                │  │
+│  └─────────────┘    └──────────────┘    └────────────────┘  │
+│         │                  ▲                   ▲            │
+│         │                  │                   │            │
+│         ▼                  │                   │            │
+│  ┌─────────────┐           │                   │            │
+│  │ Local       │           │                   │            │
+│  │ Storage     │           │                   │            │
+│  │             │           │                   │            │
+│  └─────────────┘           │                   │            │
+│                            │                   │            │
+└────────────────────────────┼───────────────────┼────────────┘
+                             │                   │
+                             │                   │
+              ┌──────────────┘                   │
+              │                                  │
+┌─────────────▼──────────────┐     ┌─────────────▼─────────────┐
+│                            │     │                           │
+│ User's Browser Interface   │     │ Adobe Tags on Web Page    │
+│                            │     │                           │
+└────────────────────────────┘     └───────────────────────────┘
+
+2. Component Structure
+
+2a. Content Script
+        Injects into web pages to detect Adobe Tags implementations
+        Extracts Launch data from the page's _satellite object
+        Communicates findings back to the extension
+2b. Popup Interface (popup.js/html)
+        Entry point for user interaction
+        Displays initial property information
+        Provides navigation to detailed analysis views
+        Stores extracted data in sessionStorage
+2c. Summary View (summary.js/html)
+        Detailed analysis of Adobe Tags implementation
+        Displays unused components and optimization opportunities
+        Provides visualization and export functionality
+        Reads data from sessionStorage
+2d. Satellite Sandbox (satellite_sandbox.html)
+        Isolated environment for script analysis
+        Processes unminified Launch scripts
+        Extracts container configuration
+
+3. Data Flow Diagram
+
+┌──────────────┐    ┌─────────────────┐    ┌───────────────┐    ┌───────────────┐
+│ Web Page     │    │ Content Script  │    │ Popup.js      │    │ Summary.js    │
+│ with Adobe   │───►│ Extracts Adobe  │───►│ Processes &   │───►│ Analyzes &    │
+│ Tags         │    │ Tags data       │    │ Stores data   │    │ Displays data │
+└──────────────┘    └─────────────────┘    └───────────────┘    └───────────────┘
+                                                  │
+                                                  ▼
+                                           ┌───────────────┐
+                                           │ SessionStorage│
+                                           │ Cache Layer   │
+                                           └───────────────┘
+
+Key Data Objects:
+3a. Property Information
+        Property name, environment, scan date
+        Component counts and version information
+3b. Data Elements
+    Name, type, usage information
+    Custom code contents
+    Size and performance impact
+3c. Rules
+    Event triggers, conditions, actions
+    Usage information and dependencies
+    Size and performance impact
+3d. Extensions
+    Type, version, dependencies
+    Usage across data elements and rules
+    Size and performance impact                                           
+
+4. User Interface Layout
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Extension Popup                                                          │
+├─────────────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────┐                             │
+│ │ Property Name & Environment Information  │                             │
+│ └─────────────────────────────────────────┘                             │
+│ ┌─────────────────────────────────────────┐                             │
+│ │ Component Count Summary                  │                             │
+│ │ (Data Elements, Rules, Extensions)       │                             │
+│ └─────────────────────────────────────────┘                             │
+│ ┌─────────────────────────────────────────┐                             │
+│ │ View Summary / Download CSV              │                             │
+│ └─────────────────────────────────────────┘                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Summary Page                                                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────┐  ┌─────────────────────────────────┐    │
+│ │ Property Details Card        │  │ Data Elements Card              │    │
+│ │ - Property info              │  │ - Usage counts                  │    │
+│ │ - Environment                │  │ - Size information              │    │
+│ │ - Version                    │  │ - Table of unused elements      │    │
+│ │ - Component counts           │  │ - Copy functionality            │    │
+│ └─────────────────────────────┘  └─────────────────────────────────┘    │
+│                                                                          │
+│ ┌─────────────────────────────┐  ┌─────────────────────────────────┐    │
+│ │ Rules Card                   │  │ Extensions Card                 │    │
+│ │ - Usage counts               │  │ - Usage counts                  │    │
+│ │ - Size information           │  │ - Size information              │    │
+│ │ - Table of unused rules      │  │ - Table of unused extensions    │    │
+│ │ - Copy functionality         │  │ - Copy functionality            │    │
+│ └─────────────────────────────┘  └─────────────────────────────────┘    │
+│                                                                          │
+│ ┌─────────────────────────────────────────────────────────────────┐     │
+│ │ Download PDF Summary Button                                      │     │
+│ └─────────────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PDF Report (Print View)                                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Title and Property Information                                           │
+│ ├─ Component Usage Summary                                               │
+│ │  ├─ Data Elements Summary                                              │
+│ │  ├─ Rules Summary                                                      │
+│ │  └─ Extensions Summary                                                 │
+│ │                                                                         │
+│ ├─ Table of Unused Data Elements                                         │
+│ ├─ Table of Unused Rules                                                 │
+│ ├─ Table of Unused Extensions                                            │
+│ │                                                                         │
+│ └─ Recommendations                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+5. Key functionality
+
+5a. Property Scanning
+    Detect Adobe Tags implementation
+    Extract property details and components
+    Parse unminified script for deeper analysis
+5b. Usage Analysis
+    Identify unused data elements, rules, and extensions
+    Calculate size/performance impact
+    Detect dependencies between components
+5c. Data Visualization
+    Present component counts and usage statistics
+    Display tables of unused components
+    Allow sorting and filtering of components
+5d. Export & Sharing
+    Generate PDF reports for stakeholders
+    Copy component tables as images
+    Export full data as CSV
+5e. User Experience
+    Guided tour for first-time users
+    Copy functionality for sharing specific sections
+    Responsive design for different screen sizes
+
+6. File Organization
+
+TagScanner Extension/
+├── manifest.json               # Extension configuration
+├── background.js               # Background service worker
+├── content.js                  # Content script for web page injection
+├── popup.html                  # Main extension popup UI
+├── popup.js                    # Popup functionality
+├── vendor/                     # 3rd party and utility scripts
+│   ├── summary.html            # Summary page template
+│   ├── summary.js              # Summary page functionality
+│   ├── html2canvas.min.js      # Screenshot/export utility
+│   ├── intro.js                # Tour guide functionality
+│   ├── jquery.js               # UI manipulation library
+│   ├── tablesorter.js          # Table sorting functionality
+│   └── initTableSorter.js      # Table sorting initialization
+├── css/                        # Stylesheets
+│   ├── sb-admin-2.min.css      # Admin theme styles
+│   └── styles.css              # Custom styles
+└── satellite_sandbox.html      # Sandbox for script analysis
+
+7. Data Storage
+
+7a. SessionStorage Keys
+    launch_property_name: Name of the Adobe Tags property
+    launch_property_environment: Environment (Production/Development)
+    tagScanner_version: Version of the TagScanner tool
+    _satellite._container.dataElements: Cached data elements
+    _satellite._container.rules: Cached rules data
+    _satellite._container.extension: Cached extensions data
+7b. LocalStorage Keys
+    tagScannerTourShown: Track if guided tour was shown
+
+
+
+    Optimized WebSDK Component Display
+The new implementation provides:
+Hierarchical Table View:
+XDM data is displayed in a clean, organized table with clear columns
+Each property in the XDM object is shown with its full path
+You can see nested objects properly structured with parent-child relationships
+Four Information Columns:
+XDM Path: Shows the complete dot-notation path to each property
+Value Type: Displays whether the value is a string, number, object, array, etc.
+Preview: Shows a short preview of the value (truncated for longer values)
+Actions: Interactive buttons for each field
+Interactive Features:
+Copy Path Button: For leaf nodes, you can copy the full XDM path with one click
+View Full Path Button: For complex objects/arrays, opens a modal to see the complete subtree
+Path copying provides visual feedback when copied to clipboard
+Modal Dialogs:
+When you click "View Full Path", a modal dialog appears
+The dialog shows the complete JSON structure with syntax highlighting
+Includes a close button and clear title showing which path you're viewing
+Contents are scrollable for large objects
+Better Error Handling:
+Graceful error handling with clear error messages
+Console logging for debugging issues

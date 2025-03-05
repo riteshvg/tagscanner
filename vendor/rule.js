@@ -137,7 +137,7 @@ if (rule_details_node) {
   const rowsPerPage = 15;
   let currentPage = parseInt(sessionStorage.getItem('rulesCurrentPage')) || 1;
   const rows = Array.from(tbody.getElementsByTagName('tr'));
-  const totalPages = Math.ceil(rows.length / rowsPerPage);
+  let totalPages = Math.ceil(rows.length / rowsPerPage);
 
   // Update page info
   const updatePageInfo = () => {
@@ -154,12 +154,23 @@ if (rule_details_node) {
     const start = (page - 1) * rowsPerPage;
     const end = start + rowsPerPage;
 
-    rows.forEach((row, index) => {
-      if (index >= start && index < end) {
-        row.style.display = '';
-      } else {
-        row.style.display = 'none';
-      }
+    // Get all rows and hide them first
+    const allRows = Array.from(tbody.getElementsByTagName('tr'));
+    allRows.forEach((row) => {
+      row.style.display = 'none';
+    });
+
+    // Get visible rows (not hidden by search)
+    const visibleRows = allRows.filter(
+      (row) => !row.classList.contains('search-hidden')
+    );
+
+    // Update total pages based on visible rows
+    totalPages = Math.ceil(visibleRows.length / rowsPerPage);
+
+    // Show only the rows for current page
+    visibleRows.slice(start, end).forEach((row) => {
+      row.style.display = '';
     });
 
     updatePageInfo();
@@ -182,6 +193,30 @@ if (rule_details_node) {
 
   // Initialize with saved page or first page
   showPage(currentPage);
+
+  // Add search functionality
+  const searchInput = document.getElementById('ruleSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      const searchTerm = this.value.toLowerCase().trim();
+      const allRows = Array.from(tbody.getElementsByTagName('tr'));
+
+      allRows.forEach((row) => {
+        const ruleName = row
+          .querySelector('td:first-child')
+          .textContent.toLowerCase();
+        if (ruleName.includes(searchTerm)) {
+          row.classList.remove('search-hidden');
+        } else {
+          row.classList.add('search-hidden');
+        }
+      });
+
+      // Reset to first page when searching
+      currentPage = 1;
+      showPage(1);
+    });
+  }
 }
 
 // Add proper null checks for the download button

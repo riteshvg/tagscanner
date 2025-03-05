@@ -223,7 +223,7 @@ if (de_details_node) {
   let currentPage =
     parseInt(sessionStorage.getItem('dataElementsCurrentPage')) || 1;
   const rows = Array.from(tbody.getElementsByTagName('tr'));
-  const totalPages = Math.ceil(rows.length / rowsPerPage);
+  let totalPages = Math.ceil(rows.length / rowsPerPage);
 
   // Update page info
   const updatePageInfo = () => {
@@ -240,8 +240,23 @@ if (de_details_node) {
     const start = (page - 1) * rowsPerPage;
     const end = start + rowsPerPage;
 
-    rows.forEach((row, index) => {
-      row.style.display = index >= start && index < end ? '' : 'none';
+    // Get all rows and hide them first
+    const allRows = Array.from(tbody.getElementsByTagName('tr'));
+    allRows.forEach((row) => {
+      row.style.display = 'none';
+    });
+
+    // Get visible rows (not hidden by search)
+    const visibleRows = allRows.filter(
+      (row) => !row.classList.contains('search-hidden')
+    );
+
+    // Update total pages based on visible rows
+    totalPages = Math.ceil(visibleRows.length / rowsPerPage);
+
+    // Show only the rows for current page
+    visibleRows.slice(start, end).forEach((row) => {
+      row.style.display = '';
     });
 
     updatePageInfo();
@@ -264,6 +279,30 @@ if (de_details_node) {
 
   // Initialize with saved page or first page
   showPage(currentPage);
+
+  // Add search functionality
+  const searchInput = document.getElementById('dataElementSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      const searchTerm = this.value.toLowerCase().trim();
+      const allRows = Array.from(tbody.getElementsByTagName('tr'));
+
+      allRows.forEach((row) => {
+        const dataElementName = row
+          .querySelector('td:first-child')
+          .textContent.toLowerCase();
+        if (dataElementName.includes(searchTerm)) {
+          row.classList.remove('search-hidden');
+        } else {
+          row.classList.add('search-hidden');
+        }
+      });
+
+      // Reset to first page when searching
+      currentPage = 1;
+      showPage(1);
+    });
+  }
 }
 
 var download_button = document.getElementsByClassName('download-button');

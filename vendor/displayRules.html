@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rules Viewer</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        line-height: 1.6;
+      }
+      h1,
+      h2 {
+        color: #333;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 10px;
+      }
+      #status {
+        margin: 20px 0;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .success {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      pre {
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+        overflow: auto;
+        max-height: 70vh;
+        white-space: pre-wrap;
+      }
+      .controls {
+        margin-bottom: 20px;
+      }
+      button {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+        position: sticky;
+        top: 0;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      tr:hover {
+        background-color: #f1f1f1;
+      }
+      .table-container {
+        max-height: 70vh;
+        overflow: auto;
+        margin-bottom: 20px;
+      }
+      .view-toggle {
+        margin-bottom: 15px;
+      }
+      .view-toggle button {
+        background-color: #6c757d;
+      }
+      .view-toggle button.active {
+        background-color: #4caf50;
+      }
+      .hidden {
+        display: none;
+      }
+      .rule-details {
+        margin-top: 5px;
+        padding: 8px;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+      #debug {
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Rules from SessionStorage</h1>
+
+    <div class="controls">
+      <button id="refreshBtn">Refresh Rules</button>
+      <button id="mockDataBtn">Use Mock Data</button>
+      <button id="toggleDebugBtn">Toggle Debug Panel</button>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="view-toggle">
+      <button id="tableViewBtn" class="active">Table View</button>
+      <button id="jsonViewBtn">JSON View</button>
+    </div>
+
+    <div id="tableView" class="table-container">
+      <table id="rulesTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="rulesTableBody"></tbody>
+      </table>
+    </div>
+
+    <div id="jsonView" class="hidden">
+      <pre id="rulesOutput"></pre>
+    </div>
+
+    <div id="debug">
+      <h2>Debug Information</h2>
+      <div id="debugContent"></div>
+    </div>
+
+    <!-- Include the external JavaScript file -->
+    <script src="rulesViewer.js"></script>
+  </body>
+</html>

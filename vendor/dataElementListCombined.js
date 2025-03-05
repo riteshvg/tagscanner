@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', function () {
             foundAnalyticsRules = true;
 
             if (action.settings) {
-              processAnalyticsRuleAction(rule.name, action);
+              processAnalyticsRuleAction(rule.name, action, rule.id);
             }
           }
         });
@@ -344,8 +344,11 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
-    // Process rules to find data element references
+    // Process rules to find data element references and sendEvent actions
     processRules(rules, dataElements);
+
+    // Process rules with sendEvent actions
+    processSendEventRules(rules);
 
     // Populate the dropdown with the initial variable type (eVars)
     populateVariableDropdown();
@@ -355,7 +358,7 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // Function to process an Analytics rule action
-  function processAnalyticsRuleAction(ruleName, action) {
+  function processAnalyticsRuleAction(ruleName, action, ruleId) {
     try {
       if (!action.settings.trackerProperties) {
         return;
@@ -376,11 +379,17 @@ document.addEventListener('DOMContentLoaded', function () {
             typeof value === 'string' ? value : JSON.stringify(value);
 
           if (
-            !entryExists(analyticsVariables.eVars[eVarName], ruleName, valueStr)
+            !entryExists(
+              analyticsVariables.eVars[eVarName],
+              ruleName,
+              valueStr,
+              ruleId
+            )
           ) {
             analyticsVariables.eVars[eVarName].push({
               ruleName: ruleName,
               value: valueStr,
+              ruleId: ruleId,
             });
           }
         }
@@ -401,11 +410,17 @@ document.addEventListener('DOMContentLoaded', function () {
             typeof value === 'string' ? value : JSON.stringify(value);
 
           if (
-            !entryExists(analyticsVariables.props[propName], ruleName, valueStr)
+            !entryExists(
+              analyticsVariables.props[propName],
+              ruleName,
+              valueStr,
+              ruleId
+            )
           ) {
             analyticsVariables.props[propName].push({
               ruleName: ruleName,
               value: valueStr,
+              ruleId: ruleId,
             });
           }
         }
@@ -413,68 +428,37 @@ document.addEventListener('DOMContentLoaded', function () {
 
       // Process events
       if (action.settings.trackerProperties.events) {
-        let eventsValue = action.settings.trackerProperties.events;
+        for (const eventKey in action.settings.trackerProperties.events) {
+          const eventObj = action.settings.trackerProperties.events[eventKey];
+          const eventName =
+            eventObj.name || eventKey.replace(/^event/i, 'event');
 
-        if (typeof eventsValue === 'string') {
-          const eventList = eventsValue.split(',').map((e) => e.trim());
+          if (!analyticsVariables.events[eventName]) {
+            analyticsVariables.events[eventName] = [];
+          }
 
-          eventList.forEach((eventItem) => {
-            const eventParts = eventItem.split('=');
-            const eventName = eventParts[0].trim();
+          let value = eventObj.value || '';
+          const valueStr =
+            typeof value === 'string' ? value : JSON.stringify(value);
 
-            if (eventName.match(/^event\d+$/)) {
-              if (!analyticsVariables.events[eventName]) {
-                analyticsVariables.events[eventName] = [];
-              }
-
-              let value = eventParts.length > 1 ? eventParts[1] : '';
-
-              if (
-                !entryExists(
-                  analyticsVariables.events[eventName],
-                  ruleName,
-                  value
-                )
-              ) {
-                analyticsVariables.events[eventName].push({
-                  ruleName: ruleName,
-                  value: value,
-                });
-              }
-            }
-          });
-        } else if (typeof eventsValue === 'object') {
-          for (const eventKey in eventsValue) {
-            const eventObj = eventsValue[eventKey];
-            const eventName = eventObj.name || eventKey;
-
-            if (eventName.match(/^event\d+$/)) {
-              if (!analyticsVariables.events[eventName]) {
-                analyticsVariables.events[eventName] = [];
-              }
-
-              let value = eventObj.value || '';
-              const valueStr =
-                typeof value === 'string' ? value : JSON.stringify(value);
-
-              if (
-                !entryExists(
-                  analyticsVariables.events[eventName],
-                  ruleName,
-                  valueStr
-                )
-              ) {
-                analyticsVariables.events[eventName].push({
-                  ruleName: ruleName,
-                  value: valueStr,
-                });
-              }
-            }
+          if (
+            !entryExists(
+              analyticsVariables.events[eventName],
+              ruleName,
+              valueStr,
+              ruleId
+            )
+          ) {
+            analyticsVariables.events[eventName].push({
+              ruleName: ruleName,
+              value: valueStr,
+              ruleId: ruleId,
+            });
           }
         }
       }
     } catch (error) {
-      console.error(`Error processing rule ${ruleName}:`, error);
+      console.error(`Error processing rule action for ${ruleName}:`, error);
     }
   }
 
@@ -492,6 +476,19 @@ document.addEventListener('DOMContentLoaded', function () {
   function processXDMPath(deName, obj, currentPath) {
     if (!obj || typeof obj !== 'object') return;
 
+    // Get rules from sessionStorage
+    const rulesValue = sessionStorage.getItem('_satellite._container.rules');
+    const rules = rulesValue ? JSON.parse(rulesValue) : [];
+
+    // Find rules that reference this data element
+    const referencingRules = rules.filter((rule) => {
+      const ruleStr = JSON.stringify(rule);
+      return (
+        ruleStr.includes(`%${deName}%`) ||
+        ruleStr.includes(`_satellite.getVar("${deName}")`)
+      );
+    });
+
     for (const key in obj) {
       if (!obj.hasOwnProperty(key)) continue;
 
@@ -504,7 +501,29 @@ document.addEventListener('DOMContentLoaded', function () {
           analyticsVariables.eVars[key] = [];
         }
 
-        if (!entryExists(analyticsVariables.eVars[key], deName, valueStr)) {
+        // Add an entry for each rule that references this data element
+        referencingRules.forEach((rule) => {
+          if (
+            !entryExists(
+              analyticsVariables.eVars[key],
+              rule.name,
+              valueStr,
+              rule.id
+            )
+          ) {
+            analyticsVariables.eVars[key].push({
+              ruleName: rule.name,
+              value: valueStr,
+              ruleId: rule.id,
+            });
+          }
+        });
+
+        // If no referencing rules found, fall back to data element name
+        if (
+          referencingRules.length === 0 &&
+          !entryExists(analyticsVariables.eVars[key], deName, valueStr, null)
+        ) {
           analyticsVariables.eVars[key].push({
             ruleName: deName,
             value: valueStr,
@@ -517,7 +536,29 @@ document.addEventListener('DOMContentLoaded', function () {
           analyticsVariables.props[key] = [];
         }
 
-        if (!entryExists(analyticsVariables.props[key], deName, valueStr)) {
+        // Add an entry for each rule that references this data element
+        referencingRules.forEach((rule) => {
+          if (
+            !entryExists(
+              analyticsVariables.props[key],
+              rule.name,
+              valueStr,
+              rule.id
+            )
+          ) {
+            analyticsVariables.props[key].push({
+              ruleName: rule.name,
+              value: valueStr,
+              ruleId: rule.id,
+            });
+          }
+        });
+
+        // If no referencing rules found, fall back to data element name
+        if (
+          referencingRules.length === 0 &&
+          !entryExists(analyticsVariables.props[key], deName, valueStr, null)
+        ) {
           analyticsVariables.props[key].push({
             ruleName: deName,
             value: valueStr,
@@ -530,7 +571,29 @@ document.addEventListener('DOMContentLoaded', function () {
           analyticsVariables.events[key] = [];
         }
 
-        if (!entryExists(analyticsVariables.events[key], deName, valueStr)) {
+        // Add an entry for each rule that references this data element
+        referencingRules.forEach((rule) => {
+          if (
+            !entryExists(
+              analyticsVariables.events[key],
+              rule.name,
+              valueStr,
+              rule.id
+            )
+          ) {
+            analyticsVariables.events[key].push({
+              ruleName: rule.name,
+              value: valueStr,
+              ruleId: rule.id,
+            });
+          }
+        });
+
+        // If no referencing rules found, fall back to data element name
+        if (
+          referencingRules.length === 0 &&
+          !entryExists(analyticsVariables.events[key], deName, valueStr, null)
+        ) {
           analyticsVariables.events[key].push({
             ruleName: deName,
             value: valueStr,
@@ -558,12 +621,20 @@ document.addEventListener('DOMContentLoaded', function () {
         path: 'xdm._experience.analytics.customDimensions.props',
         type: 'props',
       },
-      { path: 'analytics.customDimensions.eVars', type: 'eVars' },
-      { path: 'analytics.customDimensions.props', type: 'props' },
-      { path: '_experience.analytics.event1to100', type: 'events' },
-      { path: 'xdm._experience.analytics.event1to100', type: 'events' },
-      { path: 'analytics.event1to100', type: 'events' },
     ];
+
+    // Get rules from sessionStorage
+    const rulesValue = sessionStorage.getItem('_satellite._container.rules');
+    const rules = rulesValue ? JSON.parse(rulesValue) : [];
+
+    // Find rules that reference this data element
+    const referencingRules = rules.filter((rule) => {
+      const ruleStr = JSON.stringify(rule);
+      return (
+        ruleStr.includes(`%${deName}%`) ||
+        ruleStr.includes(`_satellite.getVar("${deName}")`)
+      );
+    });
 
     xdmPaths.forEach((pathObj) => {
       const pathParts = pathObj.path.split('.');
@@ -591,7 +662,34 @@ document.addEventListener('DOMContentLoaded', function () {
               analyticsVariables.eVars[key] = [];
             }
 
-            if (!entryExists(analyticsVariables.eVars[key], deName, valueStr)) {
+            // Add an entry for each rule that references this data element
+            referencingRules.forEach((rule) => {
+              if (
+                !entryExists(
+                  analyticsVariables.eVars[key],
+                  rule.name,
+                  valueStr,
+                  rule.id
+                )
+              ) {
+                analyticsVariables.eVars[key].push({
+                  ruleName: rule.name,
+                  value: valueStr,
+                  ruleId: rule.id,
+                });
+              }
+            });
+
+            // If no referencing rules found, fall back to data element name
+            if (
+              referencingRules.length === 0 &&
+              !entryExists(
+                analyticsVariables.eVars[key],
+                deName,
+                valueStr,
+                null
+              )
+            ) {
               analyticsVariables.eVars[key].push({
                 ruleName: deName,
                 value: valueStr,
@@ -602,21 +700,35 @@ document.addEventListener('DOMContentLoaded', function () {
               analyticsVariables.props[key] = [];
             }
 
-            if (!entryExists(analyticsVariables.props[key], deName, valueStr)) {
-              analyticsVariables.props[key].push({
-                ruleName: deName,
-                value: valueStr,
-              });
-            }
-          } else if (pathObj.type === 'events' && key.match(/^event\d+$/)) {
-            if (!analyticsVariables.events[key]) {
-              analyticsVariables.events[key] = [];
-            }
+            // Add an entry for each rule that references this data element
+            referencingRules.forEach((rule) => {
+              if (
+                !entryExists(
+                  analyticsVariables.props[key],
+                  rule.name,
+                  valueStr,
+                  rule.id
+                )
+              ) {
+                analyticsVariables.props[key].push({
+                  ruleName: rule.name,
+                  value: valueStr,
+                  ruleId: rule.id,
+                });
+              }
+            });
 
+            // If no referencing rules found, fall back to data element name
             if (
-              !entryExists(analyticsVariables.events[key], deName, valueStr)
+              referencingRules.length === 0 &&
+              !entryExists(
+                analyticsVariables.props[key],
+                deName,
+                valueStr,
+                null
+              )
             ) {
-              analyticsVariables.events[key].push({
+              analyticsVariables.props[key].push({
                 ruleName: deName,
                 value: valueStr,
               });
@@ -681,9 +793,12 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // Function to check if an entry already exists
-  function entryExists(mappings, ruleName, value) {
+  function entryExists(mappings, ruleName, value, ruleId) {
     return mappings.some(
-      (entry) => entry.ruleName === ruleName && entry.value === value
+      (item) =>
+        item.ruleName === ruleName &&
+        item.value === value &&
+        (ruleId ? item.ruleId === ruleId : true)
     );
   }
 
@@ -753,8 +868,26 @@ document.addEventListener('DOMContentLoaded', function () {
       // Create a map to track unique combinations
       const processedEntries = new Set();
 
+      // Get rules from sessionStorage for the Rule Name column
+      const rulesValue = sessionStorage.getItem('_satellite._container.rules');
+      const rules = rulesValue ? JSON.parse(rulesValue) : [];
+
+      // Create a map of rule IDs to rule names
+      const ruleNameMap = {};
+      rules.forEach((rule) => {
+        ruleNameMap[rule.id] = rule.name;
+        // Debug log to check each rule
+        console.log(`Adding rule to map: ${rule.name}, ID: ${rule.id}`);
+      });
+
+      // Debug log to check the rule IDs in the map
+      console.log('Rule ID to Name Map:', ruleNameMap);
+
       // Add rows to table
       mappings.forEach((item) => {
+        // Debug log to check each mapping item
+        console.log('Mapping item:', item);
+
         // Create unique key for this entry
         const entryKey = `${item.ruleName}|${item.value}`;
 
@@ -768,16 +901,219 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const row = mappingsTable.insertRow();
 
-        // Rule Name column
-        const cellRule = row.insertCell(0);
-        cellRule.innerHTML = `<span class="badge badge-success">${item.ruleName}</span>`;
+        // Column #1: Rule Name
+        const cellRuleName = row.insertCell(0);
 
-        // Data Element Value column
+        // For Column #1, use the rule name directly from the rule object
+        let displayRuleName = item.ruleName;
+
+        // If we have a rule ID and it exists in the map, use that name
+        if (item.ruleId && ruleNameMap[item.ruleId]) {
+          // Use the rule name from the rule object (e.g., "[AA-WebSDK] Flight Schedule Form Start")
+          displayRuleName = ruleNameMap[item.ruleId];
+          console.log(
+            `Using rule name for Column #1: ${displayRuleName}, ID: ${item.ruleId}`
+          );
+        } else {
+          console.log(
+            `No rule ID found or not in map, using: ${displayRuleName}, ID: ${item.ruleId}`
+          );
+
+          // Try to find the rule by name in the rules array
+          const matchingRule = rules.find(
+            (rule) => rule.name === item.ruleName
+          );
+          if (matchingRule) {
+            displayRuleName = matchingRule.name;
+            console.log(`Found rule by name: ${displayRuleName}`);
+          }
+        }
+
+        cellRuleName.innerHTML = `<span class="badge badge-primary">${displayRuleName}</span>`;
+
+        // Column #2: Data Element Value
         const cellDataElement = row.insertCell(1);
         cellDataElement.textContent = item.value;
+
+        // Column #3: View Details Button
+        const cellViewDetails = row.insertCell(2);
+
+        if (item.ruleId) {
+          // Create a button to view rule details
+          const viewButton = document.createElement('button');
+          viewButton.className = 'btn btn-sm btn-primary';
+          viewButton.textContent = 'View Details';
+
+          // Get the rule name for the link
+          let ruleName = item.ruleName;
+          if (ruleNameMap[item.ruleId]) {
+            ruleName = ruleNameMap[item.ruleId];
+          }
+
+          // Set up the click event to navigate to the rule details page
+          viewButton.onclick = function () {
+            // Navigate to the rule details page using the rule name parameter
+            window.location.href = `ruleforVariable.html?rulename=${encodeURIComponent(
+              ruleName
+            )}&variableName=${encodeURIComponent(
+              selectedVariable
+            )}&variableType=${encodeURIComponent(currentVariableType)}`;
+
+            // Log for debugging
+            console.log(`Navigating to rule details for rule: ${ruleName}`);
+          };
+
+          cellViewDetails.appendChild(viewButton);
+        } else {
+          // If we have the rule name but not the ID, try to find the rule
+          const matchingRule = rules.find(
+            (rule) => rule.name === item.ruleName
+          );
+          if (matchingRule) {
+            // Create a button to view rule details
+            const viewButton = document.createElement('button');
+            viewButton.className = 'btn btn-sm btn-primary';
+            viewButton.textContent = 'View Details';
+
+            // Set up the click event to navigate to the rule details page
+            viewButton.onclick = function () {
+              // Navigate to the rule details page using the rule name parameter
+              window.location.href = `ruleforVariable.html?rulename=${encodeURIComponent(
+                matchingRule.name
+              )}&variableName=${encodeURIComponent(
+                selectedVariable
+              )}&variableType=${encodeURIComponent(currentVariableType)}`;
+
+              // Log for debugging
+              console.log(
+                `Navigating to rule details for rule: ${matchingRule.name}`
+              );
+            };
+
+            cellViewDetails.appendChild(viewButton);
+          } else {
+            // If no rule is available
+            cellViewDetails.textContent = 'No details available';
+          }
+        }
       });
     } else {
       mappingCount.textContent = '(0)';
+      noMappingsMessage.style.display = 'block';
+      mappingsTable.innerHTML = '';
+    }
+  }
+
+  // Function to process rules with sendEvent actions
+  function processSendEventRules(rules) {
+    rules.forEach((rule) => {
+      // Debug log to check each rule
+      console.log('Processing rule:', rule.name, 'ID:', rule.id);
+
+      if (rule.actions) {
+        rule.actions.forEach((action) => {
+          if (
+            action.modulePath &&
+            action.modulePath.includes(
+              'adobe-alloy/dist/lib/actions/sendEvent/index.js'
+            )
+          ) {
+            console.log(
+              `Found sendEvent action in rule: ${rule.name}, ID: ${rule.id}`
+            );
+
+            // Process the sendEvent action - pass the actual rule name and ID from the rule object
+            // The rule name will be used for Column #1 in the UI
+            processSendEventAction(rule.name, action, rule.id);
+          }
+        });
+      }
+    });
+  }
+
+  // Function to process a sendEvent action
+  function processSendEventAction(ruleName, action, ruleId) {
+    try {
+      if (!action.settings || !action.settings.xdm) {
+        return;
+      }
+
+      // Debug log to check the ruleId
+      console.log(
+        `Processing sendEvent action for rule: ${ruleName}, ID: ${ruleId}`
+      );
+
+      // The XDM object can be a data element reference or an object
+      let xdmValue = action.settings.xdm;
+
+      if (
+        typeof xdmValue === 'string' &&
+        xdmValue.startsWith('%') &&
+        xdmValue.endsWith('%')
+      ) {
+        // This is a data element reference
+        const deName = xdmValue.substring(1, xdmValue.length - 1);
+
+        // Add this to eVars for now (we can refine this later)
+        const eVarName = 'XDM: ' + deName;
+
+        if (!analyticsVariables.eVars[eVarName]) {
+          analyticsVariables.eVars[eVarName] = [];
+        }
+
+        if (
+          !entryExists(
+            analyticsVariables.eVars[eVarName],
+            ruleName,
+            deName,
+            ruleId
+          )
+        ) {
+          // Store the rule ID to be used for looking up the actual rule name in updateUI
+          analyticsVariables.eVars[eVarName].push({
+            ruleName: ruleName, // This is the actual rule name from the rule object
+            value: deName,
+            ruleId: ruleId,
+          });
+        }
+      } else if (typeof xdmValue === 'object') {
+        // This is an inline XDM object
+        // Process each property in the XDM object
+        for (const key in xdmValue) {
+          if (xdmValue.hasOwnProperty(key)) {
+            const value = xdmValue[key];
+            const eVarName = 'XDM: ' + key;
+
+            if (!analyticsVariables.eVars[eVarName]) {
+              analyticsVariables.eVars[eVarName] = [];
+            }
+
+            const valueStr =
+              typeof value === 'string' ? value : JSON.stringify(value);
+
+            if (
+              !entryExists(
+                analyticsVariables.eVars[eVarName],
+                ruleName,
+                valueStr,
+                ruleId
+              )
+            ) {
+              // Store the rule ID to be used for looking up the actual rule name in updateUI
+              analyticsVariables.eVars[eVarName].push({
+                ruleName: ruleName, // This is the actual rule name from the rule object
+                value: valueStr,
+                ruleId: ruleId,
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error(
+        `Error processing sendEvent action for ${ruleName}:`,
+        error
+      );
     }
   }
 });

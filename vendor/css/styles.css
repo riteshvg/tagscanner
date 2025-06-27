@@ -1,0 +1,136 @@
+/* Common styles */
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background-color: #f5f5f5;
+}
+
+/* Table styles */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+}
+
+th,
+td {
+  padding: 10px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+th {
+  background-color: #f8f9fa;
+  position: relative;
+}
+
+/* Sorting styles */
+.sortable {
+  cursor: pointer;
+}
+
+.sortable:hover {
+  background-color: #f0f0f0;
+}
+
+.sorted-asc::after {
+  content: ' ↑';
+  color: #0066cc;
+}
+
+.sorted-desc::after {
+  content: ' ↓';
+  color: #0066cc;
+}
+
+/* Link styles */
+a {
+  color: #0066cc;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Rule details specific styles */
+#rule_details {
+  background-color: white;
+  padding: 20px;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.back-button {
+  display: inline-block;
+  padding: 8px 16px;
+  background-color: #0066cc;
+  color: white !important;
+  text-decoration: none;
+  border-radius: 4px;
+  margin-bottom: 20px;
+}
+
+.back-button:hover {
+  background-color: #0052a3;
+  text-decoration: none !important;
+}
+
+/* Headings */
+h2 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+h3,
+h4 {
+  color: #666;
+  margin-top: 15px;
+}
+
+/* Syntax highlighting */
+.string {
+  color: #008000;
+}
+.number {
+  color: #0000ff;
+}
+.boolean {
+  color: #b22222;
+}
+.null {
+  color: #808080;
+}
+.key {
+  color: #a52a2a;
+}
+
+/* Loading and error states */
+.loading,
+.error {
+  text-align: center;
+  padding: 20px;
+}
+
+.error {
+  color: red;
+}
+
+/* Breadcrumb styles */
+.breadcrumb {
+  margin-bottom: 20px;
+  color: #666;
+}
+
+.breadcrumb .separator {
+  margin: 0 5px;
+  color: #999;
+}
+
+.breadcrumb .current {
+  color: #333;
+  font-weight: bold;
+}

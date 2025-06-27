@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+    <title>Analytics Variable Dispaly Page</title>
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"> -->
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet">
+    <link href="../css/fonts-2.css" rel="stylesheet">
+
+    <style>
+.spinner {
+        width: 64px;
+        height: 64px;
+        border: 8px solid;
+        border-color: #3d5af1 transparent #3d5af1 transparent;
+        border-radius: 50%;
+        animation: spin-anim 1.2s linear infinite;
+      }
+
+      @keyframes spin-anim {
+        0% {
+          transform: rotate(0deg);
+        }
+
+        100% {
+          transform: rotate(360deg)
+        }
+      }
+
+      .loader-container {
+        width: 100%;
+        height: 100vh;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        position: fixed;
+        background: white;
+        z-index: 1;
+      }
+    table {
+        font-family: arial, sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td, th {
+        border: 1px solid #dddddd;
+        text-align: left;
+        padding: 8px;
+      }
+      
+      tr:nth-child(even) {
+        background-color: #dddddd;
+      }
+    </style>
+<head>
+</head>
+<body>
+ <div class="loader-container" id="set_display">
+    <div class="spinner"></div>
+  </div>
+
+  <div class = "container-fluid">
+    <div>&nbsp;</div>
+    <div style="float: left;width: 4%;"><a href="rule.html" style="display: inline-block;text-decoration: none;padding: 2px 2px;" target="iframe2"><img style = 'height: 24px;'src="../img/left-arrow.png"></a></div>
+    <button type = "button" class = "view_analytics_variables btn btn-primary" id = "aabutton"></button>
+    <p></p>
+    <div style="background-color: #f68d2e;">       
+      <h5 style="color: black">Adobe Analytics Variables Details</h5>
+            <h6 class="download-button" style = "text-align: right;"></h6></div>
+    
+      <table id="general_page_aa" style="width:100%">
+      <tr>
+          <th title="Rule Name: Activated Rules in the Adobe Tags' property">Rule Name &nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th>
+          <th title="Evars: evars set with help of UI">eVars&nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th>
+          <th title="Custom Evars: evars set in custom coding">Custom eVars&nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th>
+          <th title="Props: props set with help of UI">Props &nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th>
+          <th title="Custom Props: evars set in custom coding">Custom Props &nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th>
+          <th title="events: events set with help of UI">Events &nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th> 
+          <th title="Custom events: events set in custom coding">Custom Events &nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th> 
+      </tr>
+  </table>
+</div>
+
+  </script>
+
+    <script src="generalPage.js"></script>
+</body>
+</html>

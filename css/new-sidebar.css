@@ -1,0 +1,245 @@
+/* Wrapper for the header */
+#wrapper .header {
+  display: flex;
+  /* flex-direction: column; */
+  align-items: center;
+  /* padding: 20px; */
+  background-color: #080808;
+}
+
+/* Sidebar brand link */
+.sidebar-brand {
+  text-align: center;
+  text-decoration: none;
+  color: white;
+  padding-top: 10px;
+}
+.sidebar-icon {
+  margin: 10px;
+  background: #c1b9b94a;
+  color: white;
+  border-radius: 5px;
+}
+
+#head-tag {
+  text-decoration: none;
+}
+
+/* Sidebar brand content */
+.sidebar-brand-content {
+  display: flex;
+  align-items: center;
+  /* margin-bottom: 10px; */
+  font-size: 25px;
+}
+
+/* Sidebar brand icon */
+.sidebar-brand-icon {
+  margin-right: 10px;
+}
+
+.sidebar-brand-icon.rotate-n-15 {
+  transform: rotate(-15deg);
+  margin: 6px;
+}
+
+/* Sidebar brand text */
+.sidebar-brand-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  /* margin-left: 10px; Adding left margin to the icon */
+}
+#home-menu-link,
+#extension-menu-link,
+#rule-menu-link,
+#dataelements-menu-link {
+  text-decoration: none;
+}
+/* Sidebar brand description */
+.sidebar-brand-description {
+  font-size: 0.875rem;
+  color: #858796;
+  text-align: center;
+  margin-top: 5px;
+  margin-left: 70px;
+  margin-top: 0;
+}
+
+/* Sidebar container */
+.flex-shrink-0 {
+  width: 250px;
+  background-color: #2f2d2d;
+  border-right: 1px solid #dee2e6;
+  padding: 1rem;
+  /* left: -250px; Initially hidden */
+  transition: left 0.3s ease; /* Smooth transition */
+}
+
+/* List styling */
+ul.list-unstyled {
+  padding-left: 0;
+  list-style: none;
+}
+
+/* List items */
+li.mb-1 {
+  margin-bottom: 0.5rem;
+}
+
+/* Links */
+a {
+  text-decoration: none;
+}
+.content-container {
+  display: flex;
+}
+
+/* Reduce sidebar width */
+#sidebar-click {
+  width: 200px; /* Reduced from default (likely 250px) */
+  min-width: 200px;
+  transition: all 0.3s;
+}
+
+/* Adjust content wrapper to match new sidebar width */
+#content-wrapper {
+  width: calc(100% - 200px);
+  margin-left: 0;
+  transition: all 0.3s;
+}
+
+/* Adjust sidebar elements to fit narrower space */
+.btn-toggle {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+}
+
+.sidebar-brand-text {
+  font-size: 0.9rem;
+}
+
+/* Adjust padding for sidebar items */
+.list-unstyled li {
+  padding: 0.25rem 0;
+}
+
+/* Make icons slightly smaller */
+.sidebar-brand-icon i,
+.btn-toggle i {
+  font-size: 0.9rem;
+}
+
+/* Adjust content container to use the additional space */
+.content-container {
+  display: flex;
+}
+
+.other-options {
+  display: flex;
+  color: white;
+  align-items: center;
+}
+
+/* Buttons */
+.btn.btn-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  background-color: transparent;
+  border: none;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.btn.btn-toggle:hover,
+.btn.btn-toggle:focus {
+  color: #007bff;
+  background-color: #e9ecef;
+  text-decoration: none;
+}
+
+.btn.btn-toggle.collapsed {
+  color: white;
+}
+
+.btn.btn-toggle.collapsed:hover,
+.btn.btn-toggle.collapsed:focus {
+  color: #007bff;
+}
+
+.btn-toggle-nav a {
+  padding: 0.25rem 1.5rem;
+  font-weight: 400;
+  color: #333;
+}
+
+.btn-toggle-nav a:hover,
+.btn-toggle-nav a:focus {
+  background-color: #e9ecef;
+  color: #007bff;
+}
+.other-options .btn-toggle {
+  /* background-color: aqua; Background color when hovered */
+  color: white; /* Text color when hovered (optional) */
+}
+/* Target the button inside .other-options on hover */
+.other-options .btn-toggle:hover {
+  /* background-color: aqua; Background color when hovered */
+  color: #007bff; /* Text color when hovered (optional) */
+}
+
+/* #collapse-click {
+    position: relative; 
+  } */
+
+#collapse-click #collapse-click-left {
+  position: absolute;
+  bottom: 150px;
+  left: 235px;
+  /* padding: 10px; */
+  font-size: 22px;
+  background-color: #544e4e;
+}
+#collapse-click #collapse-click-right {
+  position: absolute;
+  bottom: 150px;
+  left: 70px;
+  /* padding: 10px; */
+  font-size: 22px;
+  background-color: #544e4e;
+}
+
+/* Collapsed content */
+.collapse {
+  display: none;
+}
+
+.collapse.show {
+  display: block;
+}
+
+/* Divider */
+.border-top {
+  border-top: 1px solid #dee2e6;
+  margin: 1.5rem 0;
+}
+
+/* Miscellaneous */
+#account-collapse ul {
+  padding-left: 1rem;
+}
+
+#account-collapse a {
+  display: block;
+  padding: 0.25rem 0;
+  color: #007bff;
+}
+
+#account-collapse a:hover,
+#account-collapse a:focus {
+  color: #0056b3;
+  text-decoration: underline;
+}

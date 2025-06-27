@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analytics Variable Mapping</title>
+    <!-- Add CSP meta tag -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' https://stackpath.bootstrapcdn.com; style-src 'self' 'unsafe-inline' https://stackpath.bootstrapcdn.com; script-src 'self' https://stackpath.bootstrapcdn.com;"
+    />
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <!-- Move styles to external file -->
+    <link rel="stylesheet" href="css/dataElementListCombined.css" />
+  </head>
+  <body>
+    <!-- Loading spinner -->
+    <div id="set_display">
+      <div class="spinner"></div>
+    </div>
+
+    <div class="container">
+      <!-- Header
+      <div class="header text-center">
+        <h1>Analytics Variable Mapping</h1>
+        <p class="lead">View eVars, props, and events mappings</p>
+      </div> -->
+      <!-- Variable Selection Card -->
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4>Select Variable Type and Variable</h4>
+        </div>
+        <div class="card-body">
+          <div class="btn-group mb-3" role="group">
+            <button
+              type="button"
+              id="eVarTypeBtn"
+              class="btn btn-outline-primary active"
+            >
+              eVars
+            </button>
+            <button
+              type="button"
+              id="propTypeBtn"
+              class="btn btn-outline-primary"
+            >
+              Props
+            </button>
+            <button
+              type="button"
+              id="eventTypeBtn"
+              class="btn btn-outline-primary"
+            >
+              Events
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label for="variableSelect">Select a Variable:</label>
+            <select id="variableSelect" class="form-control">
+              <option value="">-- Select a Variable --</option>
+            </select>
+          </div>
+
+          <button id="analyzeButton" class="btn btn-success">
+            Analyze Mappings
+          </button>
+        </div>
+      </div>
+
+      <!-- Results Section -->
+      <div id="resultsSection" class="card" style="display: none">
+        <div class="card-header bg-success text-white">
+          <h4>Variable Mappings <span id="mappingCount">(0)</span></h4>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table id="mappingsTable" class="table table-bordered">
+              <thead>
+                <tr>
+                  <th>Rule</th>
+                  <th>Data Element</th>
+                  <th>View Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Mappings will be added here dynamically -->
+              </tbody>
+            </table>
+            <div id="noMappingsMessage" class="alert alert-info">
+              No mappings found for this variable.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- External JavaScript -->
+    <script src="dataElementListCombined.js"></script>
+  </body>
+</html>

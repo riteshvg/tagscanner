@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rule Details for Variable</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+      .beta-notice {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeeba;
+        border-radius: 4px;
+        padding: 12px 20px;
+        margin: 15px 0;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+      }
+
+      .beta-notice i {
+        margin-right: 10px;
+        font-size: 18px;
+      }
+
+      .back-button {
+        display: inline-block;
+        margin-bottom: 15px;
+        text-decoration: none;
+        color: #4e73df;
+        font-weight: bold;
+      }
+
+      .back-button:hover {
+        text-decoration: underline;
+      }
+
+      /* Tab Styles */
+      .tab-container {
+        margin: 20px 0;
+      }
+
+      .tab-navigation {
+        display: flex;
+        border-bottom: 1px solid #ddd;
+        margin-bottom: 15px;
+      }
+
+      .tab-button {
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-bottom: none;
+        border-radius: 4px 4px 0 0;
+        padding: 10px 20px;
+        margin-right: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        position: relative;
+        bottom: -1px;
+      }
+
+      .tab-button.active {
+        background-color: white;
+        border-bottom: 1px solid white;
+      }
+
+      .tab-content {
+        display: none;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        background-color: white;
+      }
+
+      .tab-content.active {
+        display: block !important;
+      }
+
+      /* Remove zebra stripes from Actions tab */
+      #actions-tab tr:nth-child(even) {
+        background-color: transparent !important;
+      }
+    </style>
+  </head>
+  <body>
+    <a href="dataElementListCombined.html" class="back-button"
+      >← Back to Variable Mappings</a
+    >
+
+    <div class="beta-notice">
+      <i class="fas fa-flask"></i> Note: Rule Details is in beta right now. Some
+      functionality may change in future updates. For feedback and to report
+      bugs, please send an email to tagscannerfeedback@gmail.com
+    </div>
+
+    <div id="rule_title"></div>
+
+    <div class="tab-container">
+      <div class="tab-navigation">
+        <button class="tab-button active" data-tab="summary">
+          Rule Summary
+        </button>
+        <button class="tab-button" data-tab="events">Events</button>
+        <button class="tab-button" data-tab="actions">Actions</button>
+      </div>
+
+      <div id="summary-tab" class="tab-content active">
+        <!-- Rule Summary content will be inserted here -->
+      </div>
+
+      <div id="events-tab" class="tab-content">
+        <!-- Events content will be inserted here -->
+      </div>
+
+      <div id="actions-tab" class="tab-content">
+        <!-- Actions content will be inserted here -->
+      </div>
+    </div>
+
+    <div id="rule_details" style="display: none"></div>
+    <div id="set_display"></div>
+
+    <script src="ruleforVariable.js"></script>
+  </body>
+</html>

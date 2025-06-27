@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Rule & Data Element Relationships</title>
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+    <link href="../css/fonts-2.css" rel="stylesheet" />
+    <link href="intro.css" rel="stylesheet" />
+    <style>
+      .container-fluid {
+        margin-top: 20px;
+      }
+
+      .header-section {
+        background-color: #4e73df;
+        padding: 10px;
+        margin-bottom: 20px;
+      }
+
+      .header-section h5 {
+        color: white;
+        margin: 0;
+      }
+
+      .relationship-container {
+        display: flex;
+        gap: 20px;
+      }
+
+      .list-section {
+        flex: 1;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+        background-color: #f8f9fc;
+        max-height: 600px;
+        overflow-y: auto;
+      }
+
+      .details-section {
+        flex: 2;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+        background-color: #f8f9fc;
+        min-height: 600px;
+      }
+
+      .list-item {
+        padding: 8px 12px;
+        margin-bottom: 5px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .list-item:hover {
+        background-color: #eaecf4;
+      }
+
+      .list-item.active {
+        background-color: #4e73df;
+        color: white;
+      }
+
+      .list-header {
+        font-weight: bold;
+        margin-bottom: 10px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #ddd;
+      }
+
+      .search-box {
+        margin-bottom: 15px;
+      }
+
+      .relationship-diagram {
+        width: 100%;
+        height: 400px;
+        border: 1px solid #ddd;
+        margin-top: 15px;
+        background-color: #f9f9f9;
+      }
+
+      .connection-item {
+        padding: 8px;
+        margin-bottom: 5px;
+        border-radius: 4px;
+        background-color: #eaecf4;
+      }
+
+      .rule-node {
+        color: #4e73df;
+      }
+
+      .data-element-node {
+        color: #1cc88a;
+      }
+
+      .custom-code-node {
+        color: #f6c23e;
+      }
+
+      .loader-container {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: fixed;
+        background: rgba(255, 255, 255, 0.9);
+        z-index: 1;
+      }
+
+      .spinner {
+        width: 64px;
+        height: 64px;
+        border: 8px solid;
+        border-color: #3d5af1 transparent #3d5af1 transparent;
+        border-radius: 50%;
+        animation: spin-anim 1.2s linear infinite;
+      }
+
+      @keyframes spin-anim {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .tab-buttons {
+        margin-bottom: 15px;
+      }
+
+      .tab-button {
+        padding: 8px 15px;
+        background-color: #f8f9fc;
+        border: 1px solid #ddd;
+        border-radius: 4px 4px 0 0;
+        cursor: pointer;
+      }
+
+      .tab-button.active {
+        background-color: #4e73df;
+        color: white;
+        border-color: #4e73df;
+      }
+
+      .no-data-message {
+        text-align: center;
+        padding: 20px;
+        color: #888;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="loader-container" id="set_display">
+      <div class="spinner"></div>
+      <div class="loading-message">
+        <p>Loading relationship data...</p>
+      </div>
+    </div>
+
+    <div class="container-fluid">
+      <div>&nbsp;</div>
+      <div style="float: left; width: 4%">
+        <a
+          href="rule.html"
+          style="display: inline-block; text-decoration: none; padding: 2px 2px"
+          target="iframe2"
+        >
+          <img style="height: 24px" src="../img/left-arrow.png" />
+        </a>
+      </div>
+      <div class="header-section">
+        <h5>Rule & Data Element Relationships</h5>
+      </div>
+
+      <div class="tab-buttons">
+        <button class="tab-button active" id="rulesTab">Rules</button>
+        <button class="tab-button" id="dataElementsTab">Data Elements</button>
+      </div>
+
+      <div class="relationship-container">
+        <div class="list-section">
+          <div class="search-box">
+            <input
+              type="text"
+              id="searchInput"
+              class="form-control"
+              placeholder="Search..."
+            />
+          </div>
+          <div class="list-header" id="listHeader">Rules</div>
+          <div id="itemsList"></div>
+        </div>
+        <div class="details-section">
+          <h4 id="detailsTitle">Select a rule to see its relationships</h4>
+          <div id="detailsContent">
+            <div class="no-data-message">
+              <p>
+                Click on a rule from the list to view its relationships with
+                data elements.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="d3.js"></script>
+    <script src="intro.js"></script>
+    <script src="relationship-diagram.js"></script>
+    <script src="tour-initializer.js"></script>
+    <script src="mapping-tour.js"></script>
+  </body>
+</html>

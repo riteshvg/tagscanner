@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+  <title>Web SDK Dispaly Page</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet">
+    <!-- <link href="../css/fonts-2.css" rel="stylesheet"> -->
+    <style>
+.spinner {
+        width: 64px;
+        height: 64px;
+        border: 8px solid;
+        border-color: #3d5af1 transparent #3d5af1 transparent;
+        border-radius: 50%;
+        animation: spin-anim 1.2s linear infinite;
+      }
+
+      @keyframes spin-anim {
+        0% {
+          transform: rotate(0deg);
+        }
+
+        100% {
+          transform: rotate(360deg)
+        }
+      }
+      .loader-container {
+        width: 100%;
+        height: 100vh;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        position: fixed;
+        background: white;
+        z-index: 1;
+      }
+    table {
+        font-family: arial, sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td, th {
+        border: 1px solid #dddddd;
+        text-align: left;
+        padding: 8px;
+      }
+    </style>
+<head>
+</head>
+<body>
+  <div class="loader-container" id="set_display">
+    <div class="spinner"></div>
+  </div>
+
+  <div class = "row" style="float: right;width: 30%;">
+    <input type="text" id="myInput" placeholder="Search for names.." title="Type in a name" class = "form-control">
+    <button type="submit" id="search-filter-button" class = "btn btn-primary">Search</button></div>
+
+  <div class = "container-fluid">
+    <div>&nbsp;</div>
+    <a href="rule.html" style="display: inline-block;text-decoration: none;padding: 8px 16px;" target="iframe2"><img style = 'height: 24px;'src="../img/left-arrow.png"></a>
+    <p></p>
+    <div style="background-color: #27c5c1;" > 
+      <h5 style="color: black">Web SDK Display Details </h5>
+      <h6 class="download-button" style = "text-align: right;"></h6>
+    </div>
+  
+  <hr>
+      <table id="aep_variables_websdk" style="width:100%">
+        <tr>
+            <th title="Rule Name: Activated Rules in the Adobe Tags' property">Rule Name&nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th>
+            <th title="Evars: evars set with help of UI">Rule XDM Object &nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th>
+            <th title="Custom Evars: evars set in custom coding">Schema Path&nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th>
+            <th title="Props: props set with help of UI">Schema Path value&nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th> 
+            <th title="Custom Code: View the custom code for this data element">Custom Code&nbsp;<i class="fa fa-info-circle" style="font: size 16px;"></i></th>
+        </tr>
+    </table>
+    <script src="apevariables.js"></script>
+</body>
+</html>

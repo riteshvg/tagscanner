@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, shrink-to-fit=no"
+    />
+    <title>Global Search - TagScanner</title>
+
+    <!-- Custom fonts for this template-->
+    <link
+      href="fontawesome-free/css/all.min.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link href="../css/fonts.css" rel="stylesheet" />
+
+    <!-- Custom styles for this template-->
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+
+    <style>
+      /* Global search styles */
+      .search-container {
+        position: relative;
+        margin-bottom: 20px;
+      }
+
+      .search-input {
+        padding-right: 40px;
+        border-radius: 20px;
+      }
+
+      .search-icon {
+        position: absolute;
+        right: 15px;
+        top: 10px;
+        color: #4e73df;
+      }
+
+      .filter-section {
+        background-color: #f8f9fc;
+        border: 1px solid #e3e6f0;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+      }
+
+      .result-count {
+        margin-bottom: 15px;
+        font-weight: 600;
+        color: #4e73df;
+      }
+
+      .result-item {
+        border-left: 4px solid #4e73df;
+        background-color: #f8f9fc;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+      }
+
+      .result-item:hover {
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+        transform: translateY(-2px);
+      }
+
+      .result-type {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #6c757d;
+        margin-bottom: 5px;
+      }
+
+      .result-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 5px;
+      }
+
+      .result-details {
+        font-size: 0.9rem;
+        color: #5a5c69;
+      }
+
+      .highlight {
+        background-color: #fff59d;
+        padding: 0px 2px;
+        border-radius: 2px;
+      }
+
+      .no-results {
+        text-align: center;
+        padding: 30px;
+        color: #6c757d;
+      }
+
+      .search-shortcut {
+        display: inline-block;
+        background-color: #f1f1f1;
+        color: #5a5c69;
+        border-radius: 3px;
+        padding: 2px 6px;
+        font-size: 12px;
+        margin-left: 10px;
+      }
+
+      .history-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        z-index: 100;
+        background-color: white;
+        border: 1px solid #d1d3e2;
+        border-radius: 0 0 6px 6px;
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+        display: none;
+      }
+
+      .history-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f1f1;
+      }
+
+      .history-item:hover {
+        background-color: #f8f9fc;
+      }
+
+      .history-item:last-child {
+        border-bottom: none;
+      }
+
+      .clear-history {
+        text-align: center;
+        padding: 8px;
+        font-size: 12px;
+        background-color: #f8f9fc;
+        color: #6c757d;
+        cursor: pointer;
+      }
+
+      .clear-history:hover {
+        background-color: #eaecf4;
+        color: #e74a3b;
+      }
+
+      .loader {
+        border: 3px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 3px solid #4e73df;
+        width: 20px;
+        height: 20px;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+        margin-right: 10px;
+        vertical-align: middle;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Responsive adjustments */
+      @media (max-width: 768px) {
+        .filter-section .form-group {
+          margin-bottom: 10px;
+        }
+      }
+    </style>
+  </head>
+
+  <body id="page-top">
+    <!-- Page Wrapper -->
+    <div id="wrapper">
+      <!-- Content Wrapper -->
+      <div id="content-wrapper" class="d-flex flex-column">
+        <!-- Main Content -->
+        <div id="content">
+          <!-- Topbar -->
+          <nav
+            class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow"
+          >
+            <div class="navbar-brand">
+              <i class="fas fa-search mr-2"></i> Global Search
+            </div>
+            <button
+              id="back-button"
+              class="btn btn-sm btn-outline-secondary ml-auto"
+            >
+              <i class="fas fa-arrow-left"></i> Back to Summary
+            </button>
+          </nav>
+
+          <!-- Begin Page Content -->
+          <div class="container-fluid">
+            <!-- Global Search Section -->
+            <div class="card shadow mb-4">
+              <div
+                class="card-header py-3 d-flex flex-row align-items-center justify-content-between"
+              >
+                <h6 class="m-0 font-weight-bold text-primary">
+                  Search Across All Components
+                </h6>
+                <div>
+                  <span class="search-shortcut">Press / to search</span>
+                </div>
+              </div>
+              <div class="card-body">
+                <!-- Search Input -->
+                <div class="search-container">
+                  <input
+                    type="text"
+                    id="global-search-input"
+                    class="form-control search-input"
+                    placeholder="Search for rules, data elements, extensions, or any component..."
+                  />
+                  <i class="fas fa-search search-icon"></i>
+
+                  <!-- Search History Dropdown -->
+                  <div class="history-dropdown" id="search-history">
+                    <!-- History items will be added here dynamically -->
+                    <div class="clear-history" id="clear-history">
+                      Clear Search History
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Filters Section -->
+                <div class="filter-section">
+                  <div class="row">
+                    <div class="col-md-3">
+                      <div class="form-group">
+                        <label for="component-type">Component Type</label>
+                        <select class="form-control" id="component-type">
+                          <option value="all">All Types</option>
+                          <option value="rule">Rules</option>
+                          <option value="dataElement">Data Elements</option>
+                          <option value="extension">Extensions</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <div class="form-group">
+                        <label for="sort-by">Sort By</label>
+                        <select class="form-control" id="sort-by">
+                          <option value="relevance">Relevance</option>
+                          <option value="nameAsc">Name (A-Z)</option>
+                          <option value="nameDesc">Name (Z-A)</option>
+                          <option value="newest">Newest</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <div class="form-group">
+                        <label for="search-in">Search In</label>
+                        <select class="form-control" id="search-in">
+                          <option value="all">All Fields</option>
+                          <option value="name">Names Only</option>
+                          <option value="settings">Settings Only</option>
+                          <option value="code">Custom Code Only</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-3">
+                      <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button
+                          id="search-button"
+                          class="btn btn-primary form-control"
+                        >
+                          <i class="fas fa-search mr-1"></i> Search
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="search-results-container">
+                  <div class="result-count" id="result-count">
+                    0 results found
+                  </div>
+                  <div id="results-list">
+                    <!-- Search results will be added here dynamically -->
+                    <div class="no-results">
+                      <i class="fas fa-search fa-3x mb-3 text-gray-300"></i>
+                      <p>
+                        Search for components across your Adobe Tags property
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- /.container-fluid -->
+        </div>
+        <!-- End of Main Content -->
+
+        <!-- Footer -->
+        <footer class="sticky-footer bg-white">
+          <div class="container my-auto">
+            <div class="copyright text-center my-auto">
+              <span>Copyright &copy; Adobe 2025</span>
+            </div>
+          </div>
+        </footer>
+        <!-- End of Footer -->
+      </div>
+      <!-- End of Content Wrapper -->
+    </div>
+    <!-- End of Page Wrapper -->
+
+    <!-- Bootstrap core JavaScript-->
+    <script src="jquery/jquery.min.js"></script>
+    <script src="bootstrap/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Core plugin JavaScript-->
+    <script src="jquery-easing/jquery.easing.min.js"></script>
+
+    <!-- Custom scripts -->
+    <script src="global-search.js"></script>
+  </body>
+</html>

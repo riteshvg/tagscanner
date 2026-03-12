@@ -18,6 +18,9 @@
         font-family: arial, sans-serif;
         border-collapse: collapse;
         width: 100%;
+        min-width: 1200px;
+        font-size: 0.85rem;
+        margin: 0;
       }
 
       th {
@@ -25,12 +28,18 @@
         top: 0;
         background: #f1f1f1;
         z-index: 2;
+        font-size: 0.85rem;
+        font-weight: 600;
       }
       td,
       th {
         border: 1px solid #dddddd;
         text-align: left;
-        padding: 8px;
+        padding: 6px 4px;
+        max-width: 180px;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: break-word;
       }
 
       /* Remove zebra striping */
@@ -66,12 +75,32 @@
         margin-bottom: 15px;
       }
 
-      /* Spinner and loader */
+      /* Page header – same style as Rules / display landing */
+      .de-page-header {
+        background-color: #4e73df;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .de-page-header h5 {
+        color: white;
+        padding: 10px;
+        margin-bottom: 0;
+      }
+      .de-page-header h5 i {
+        margin-right: 8px;
+      }
+      .de-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      /* Spinner – same blue as main color scheme */
       .spinner {
         width: 64px;
         height: 64px;
         border: 8px solid;
-        border-color: #3d5af1 transparent #3d5af1 transparent;
+        border-color: #4e73df transparent #4e73df transparent;
         border-radius: 50%;
         animation: spin-anim 1.2s linear infinite;
       }
@@ -101,7 +130,274 @@
       .loading-message {
         margin-top: 15px;
         font-size: 16px;
-        color: #666;
+        color: #5a5c69;
+      }
+
+      .table-container {
+        overflow-x: auto;
+        max-width: 100%;
+        margin-bottom: 20px;
+      }
+      /* Shrink ID column */
+      #dataelement_details th.de-col-id,
+      #dataelement_details td.de-col-id {
+        width: 1%;
+        max-width: 52px;
+        white-space: nowrap;
+      }
+      /* Table header icons – same style as Rules page */
+      .de-th-icon {
+        margin-right: 6px;
+        color: #4e73df;
+        font-size: 14px;
+      }
+      /* Cell with leading icon (Type, Extension, Size) */
+      .de-cell-with-icon {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .de-cell-icon {
+        color: #27c5c1;
+        font-size: 13px;
+        width: 1.1em;
+      }
+      /* Icon + count columns (Used in Rules, Extensions, Data Elements) – like Rules Events/Conditions/Actions */
+      .de-col-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 13px;
+      }
+      .de-col-icon-has {
+        color: #27c5c1;
+      }
+      .de-col-icon-has:hover {
+        background-color: rgba(39, 197, 193, 0.12);
+      }
+      .de-col-icon-empty {
+        color: #ccc;
+      }
+      .de-col-icon-empty:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+      }
+      .de-col-icon-count {
+        font-size: 13px;
+        font-weight: 600;
+        color: #5a5c69;
+      }
+      .expand-icon {
+        cursor: pointer;
+        margin-right: 8px;
+        display: inline-block;
+        transition: transform 0.3s ease;
+      }
+      .expand-icon.expanded {
+        transform: rotate(90deg);
+      }
+      .expandable-row {
+        display: none;
+      }
+      .expandable-row.active {
+        display: table-row;
+      }
+
+      /* Expanded row – same display style as Rules tab */
+      .expanded-content-columns {
+        display: flex;
+        flex-direction: row;
+        gap: 24px;
+      }
+      .expanded-section {
+        margin-bottom: 15px;
+      }
+      .expanded-section-column {
+        flex: 1;
+        min-width: 0;
+        padding-right: 20px;
+        border-right: 1px solid #e3e6f0;
+      }
+      .expanded-section-column:last-child {
+        padding-right: 0;
+        border-right: none;
+      }
+      .expanded-section h4 {
+        color: #555;
+        font-size: 13px;
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .expanded-section h4 .section-icon {
+        color: #4e73df;
+        font-size: 14px;
+        width: 1.25em;
+      }
+      .expanded-detail-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .expanded-detail-list li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 0;
+        font-size: 13px;
+        color: #5a5c69;
+        border-bottom: 1px solid #eee;
+      }
+      .expanded-detail-list li:last-child {
+        border-bottom: none;
+      }
+      .expanded-detail-list .item-icon {
+        color: #858796;
+        font-size: 10px;
+        width: 1em;
+        flex-shrink: 0;
+      }
+
+      /* Rule usage modal (same pattern as Rules tab) */
+      .de-modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+      }
+      .de-modal.show {
+        display: block;
+      }
+      .de-modal-content {
+        background: white;
+        margin: 3vh auto;
+        padding: 0;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 960px;
+        max-height: 94vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      }
+      .de-modal-header {
+        background: #27c5c1;
+        color: white;
+        padding: 16px 24px;
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .de-modal-header h2 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+      }
+      .de-modal-close {
+        color: white;
+        font-size: 28px;
+        cursor: pointer;
+        line-height: 1;
+        background: none;
+        border: none;
+        padding: 0 4px;
+      }
+      .de-modal-close:hover {
+        opacity: 0.9;
+      }
+      .de-modal-body {
+        padding: 20px 24px;
+        overflow: auto;
+        min-height: 0;
+        flex: 1;
+      }
+      .de-modal-body .usage-section {
+        margin-bottom: 20px;
+      }
+      .de-modal-body .usage-section h4 {
+        font-size: 14px;
+        margin: 0 0 10px 0;
+        color: #333;
+      }
+      .de-modal-body .usage-section h4 i {
+        margin-right: 8px;
+        color: #27c5c1;
+      }
+      .de-usage-block {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin-bottom: 8px;
+      }
+      .de-usage-block .label {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .de-usage-block .detail {
+        font-size: 13px;
+        color: #555;
+        margin-bottom: 8px;
+      }
+      .de-usage-block button.btn-view {
+        padding: 4px 10px;
+        font-size: 12px;
+        background: #27c5c1;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .de-usage-block button.btn-view:hover {
+        background: #1fb3af;
+      }
+      .rule-usage-link {
+        background: none;
+        border: none;
+        color: #27c5c1;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+        font-size: inherit;
+      }
+      .rule-usage-link:hover {
+        color: #1fb3af;
+      }
+      .de-name-cell-clickable {
+        color: #27c5c1;
+        font-weight: 500;
+      }
+      .de-name-cell-clickable:hover {
+        color: #1fb3af;
+        text-decoration: underline;
+      }
+      .code-block {
+        background: #f8f9fa;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 16px;
+        font-family: monospace;
+        font-size: 13px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin: 0;
+      }
+      .de-highlight {
+        background: #fff3cd;
+        color: #856404;
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-weight: 600;
       }
     </style>
   </head>
@@ -114,24 +410,14 @@
     </div>
 
     <div class="container-fluid">
-      <div
-        style="
-          background-color: #4e73df;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <h5 style="color: white; padding: 10px; margin-bottom: 0">
-          Data Elements
-        </h5>
-        <button
-          id="start-tour"
-          class="btn btn-light btn-sm"
-          style="margin-right: 10px"
-        >
-          <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
-        </button>
+      <div class="de-page-header">
+        <h5><i class="fas fa-database mr-2"></i> Data Elements</h5>
+        <div class="de-header-actions">
+          <button id="start-tour" class="btn btn-light btn-sm" style="margin-right: 10px">
+            <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
+          </button>
+          <div class="download-button"></div>
+        </div>
       </div>
 
       <div class="description-text">
@@ -140,13 +426,6 @@
       </div>
 
       <div class="summary-card data-element-card">
-        <div class="summary-card-header">
-          <i class="fas fa-database mr-2"></i> Data Element Details
-          <h6
-            class="download-button"
-            style="text-align: right; margin-top: -20px"
-          ></h6>
-        </div>
         <div class="summary-card-body">
           <div class="search-container" style="margin-bottom: 20px">
             <div class="input-group">
@@ -163,7 +442,9 @@
               </div>
             </div>
           </div>
-          <table id="dataelement_details" style="width: 100%"></table>
+          <div class="table-container">
+            <table id="dataelement_details" style="width: 100%; min-width: 900px"></table>
+          </div>
           <div
             class="pagination-container"
             style="margin-top: 20px; text-align: center"
@@ -183,9 +464,42 @@
       </div>
     </div>
 
-    <!-- Remove the download section with tour button -->
-    <div class="container-fluid">
-      <div class="download-section"></div>
+    <!-- Modal: How data element is used in a rule -->
+    <div id="ruleUsageModal" class="de-modal" onclick="if(event.target===this) window.closeDERuleUsageModal()">
+      <div class="de-modal-content" onclick="event.stopPropagation()">
+        <div class="de-modal-header">
+          <h2 id="ruleUsageModalTitle">Data element used in rule</h2>
+          <button type="button" class="de-modal-close" onclick="window.closeDERuleUsageModal()" aria-label="Close">&times;</button>
+        </div>
+        <div class="de-modal-body" id="ruleUsageModalBody"></div>
+      </div>
+    </div>
+
+    <!-- Modal: How data element is used in another data element -->
+    <div id="deUsageModal" class="de-modal" onclick="if(event.target===this) window.closeDEDeUsageModal()">
+      <div class="de-modal-content" onclick="event.stopPropagation()">
+        <div class="de-modal-header">
+          <h2 id="deUsageModalTitle">Data element used in data element</h2>
+          <button type="button" class="de-modal-close" onclick="window.closeDEDeUsageModal()" aria-label="Close">&times;</button>
+        </div>
+        <div class="de-modal-body" id="deUsageModalBody"></div>
+      </div>
+    </div>
+
+    <!-- Modal: View code/settings (like Rules tab) -->
+    <div id="deCodeModal" class="de-modal" onclick="if(event.target===this) window.closeDECodeModal()">
+      <div class="de-modal-content" onclick="event.stopPropagation()">
+        <div class="de-modal-header">
+          <h2 id="deCodeModalTitle">Code</h2>
+          <button type="button" class="de-modal-close" onclick="window.closeDECodeModal()" aria-label="Close">&times;</button>
+        </div>
+        <div class="de-modal-body">
+          <pre class="code-block" id="deCodeModalContent"></pre>
+        </div>
+        <div style="padding:12px 24px; border-top:1px solid #e9ecef; display:flex; justify-content:flex-end;">
+          <button type="button" id="deCodeModalCopyBtn" class="btn-view" title="Copy to clipboard"><i class="fas fa-copy"></i> Copy</button>
+        </div>
+      </div>
     </div>
 
     <!-- Scripts -->

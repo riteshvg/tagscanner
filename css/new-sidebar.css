@@ -96,16 +96,133 @@ a {
 
 /* Reduce sidebar width */
 #sidebar-click {
-  width: 200px; /* Reduced from default (likely 250px) */
-  min-width: 200px;
-  transition: all 0.3s;
+  width: 250px;
+  min-width: 60px;
+  transition: all 0.3s ease;
+  overflow-x: hidden;
+  background-color: #252525;
+  border-right: 1px solid #dee2e6;
+  padding: 1rem;
+}
+
+#sidebar-click:not(.active) {
+  width: 60px !important;
 }
 
 /* Adjust content wrapper to match new sidebar width */
 #content-wrapper {
-  width: calc(100% - 200px);
+  width: calc(100% - 250px);
   margin-left: 0;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  flex: 1;
+}
+
+#sidebar-click:not(.active) + #content-wrapper {
+  width: unset;
+  height: unset;
+}
+
+/* Ensure content container uses flexbox properly */
+.content-container {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+
+/* Hide text elements when sidebar is collapsed */
+#sidebar-click:not(.active) .sidebar-brand-text,
+#sidebar-click:not(.active) .btn-toggle span,
+#sidebar-click:not(.active) #sidebar-toggle-label {
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  width: 0;
+  overflow: hidden;
+}
+
+/* Show text elements when sidebar is expanded */
+#sidebar-click.active .sidebar-brand-text,
+#sidebar-click.active .btn-toggle span,
+#sidebar-click.active #sidebar-toggle-label {
+  opacity: 1;
+  visibility: visible;
+  transition: all 0.3s ease;
+  width: auto;
+}
+
+/* Hover effect for collapsed sidebar - show text on hover */
+#sidebar-click:not(.active) .btn-toggle:hover span {
+  opacity: 1;
+  visibility: visible;
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #333;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 1000;
+  margin-left: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  width: auto;
+}
+
+/* Add a small arrow to the tooltip */
+#sidebar-click:not(.active) .btn-toggle:hover span::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #333;
+}
+
+/* Ensure proper positioning for hover effect */
+#sidebar-click:not(.active) .btn-toggle {
+  position: relative;
+}
+
+/* Show only icons when collapsed */
+#sidebar-click:not(.active) .btn-toggle {
+  justify-content: center;
+  padding: 0.5rem 0.25rem;
+}
+
+#sidebar-click:not(.active) .btn-toggle i {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+/* Adjust toggle button for collapsed state */
+#sidebar-click:not(.active) #sidebar-toggle-btn {
+  justify-content: center;
+  padding: 0.5rem 0.25rem;
+}
+
+#sidebar-click:not(.active) #sidebar-toggle-icon {
+  margin: 0;
+}
+
+/* Ensure proper spacing for expanded state */
+#sidebar-click.active .btn-toggle {
+  justify-content: flex-start;
+  padding: 0.5rem 1rem;
+}
+
+#sidebar-click.active .btn-toggle i {
+  margin-right: 0.5rem;
+}
+
+#sidebar-click.active #sidebar-toggle-btn {
+  justify-content: flex-start;
+  padding: 0.5rem 1rem;
+}
+
+#sidebar-click.active #sidebar-toggle-icon {
+  margin-right: 8px;
 }
 
 /* Adjust sidebar elements to fit narrower space */
@@ -152,6 +269,17 @@ a {
   font-size: 1rem;
   font-weight: 500;
   color: #333;
+}
+
+/* Sidebar: light text on dark background */
+#sidebar-click .btn-toggle {
+  color: #e4e4e4;
+}
+#sidebar-click .btn-toggle:hover,
+#sidebar-click .btn-toggle:focus {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.12);
+  text-decoration: none;
 }
 
 .btn.btn-toggle:hover,
@@ -242,4 +370,23 @@ a {
 #account-collapse a:focus {
   color: #0056b3;
   text-decoration: underline;
+}
+
+#sidebar-toggle-btn {
+  width: 100%;
+  margin-bottom: 10px;
+  background: #252525;
+  color: white;
+  border: none;
+  font-size: 1.2em;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  transition: background 0.2s;
+}
+#sidebar-toggle-btn:hover {
+  background: #333;
+}
+#sidebar-toggle-icon {
+  margin-right: 8px;
 }

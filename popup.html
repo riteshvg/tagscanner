@@ -1,246 +1,281 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, shrink-to-fit=no"
-    />
-    <meta name="description" content="" />
-    <meta name="author" content="" />
-    <title>TagScanner: Scan and Optimize your Adobe Tag property!</title>
 
-    <!-- Custom fonts for this template-->
-    <link
-      href="vendor/fontawesome-free/css/all.min.css"
-      rel="stylesheet"
-      type="text/css"
-    />
-    <!-- <link
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <meta name="description" content="" />
+  <meta name="author" content="" />
+  <title>TagScanner: Scan and Optimize your Adobe Tag property!</title>
+
+  <!-- Custom fonts for this template-->
+  <link href="vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
+  <!-- <link
     href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
     rel="stylesheet"> -->
-    <link href="css/new-sidebar.css" rel="stylesheet" />
-    <link href="css/fonts.css" rel="stylesheet" />
+  <link href="css/new-sidebar.css" rel="stylesheet" />
+  <link href="css/fonts.css" rel="stylesheet" />
 
-    <!-- Custom styles for this template-->
-    <link href="css/sb-admin-2.min.css" rel="stylesheet" />
-    <!-- <link href="css/sidebars.css" rel="stylesheet"> -->
-    <!-- <html style="height: 600px;">
+  <!-- Custom styles for this template-->
+  <link href="css/sb-admin-2.min.css" rel="stylesheet" />
+  <!-- <link href="css/sidebars.css" rel="stylesheet"> -->
+  <!-- <html style="height: 600px;">
         <body style="width: 800px;">
         <html style="height: 600px;">
         <body style="width: 800px;">     -->
 
-    <!-- Quick Hack to expand view and remove scrollbars - just shrinking window size-->
-    <style>
-      body {
-        transform: scale(1);
-        transform-origin: 0 0;
-        /* width: 800px; */
-        /* height: 800px; */
-        margin: 0;
-      }
+  <!-- Quick Hack to expand view and remove scrollbars - just shrinking window size-->
+  <style>
+    body {
+      transform: scale(1);
+      transform-origin: 0 0;
+      margin: 0;
+      min-height: 100vh;
+      min-width: 100vw;
+    }
 
-      .window-card-body {
-        display: block;
-        height: 470px;
-        overflow: hidden;
-      }
-    </style>
-    <!-- Custom Style for the loader -->
-    <style>
-      .login-success {
-        display: none;
-      }
+    .window-card-body {
+      display: block;
+      height: 700px;
+      overflow: hidden;
+    }
 
-      /* Full-width input fields */
-      input[type='text'],
-      input[type='password'] {
-        width: 100%;
-        padding: 15px;
-        margin: 5px 0 22px 0;
-        display: inline-block;
-        border: none;
-        background: #f1f1f1;
-      }
+    /* Increase overall container size */
+    .parent-container {
+      min-height: 100vh;
+      min-width: 100vw;
+    }
 
-      /* Drag and drop table view */
+    /* Ensure content wrapper takes full available space */
+    #content-wrapper {
+      min-height: calc(100vh - 100px);
+    }
 
-      /* Add a background color when the inputs get focus */
-      input[type='text']:focus,
-      input[type='password']:focus {
-        background-color: #ddd;
-        outline: none;
-      }
+    /* Make the main content area larger */
+    .container-fluid {
+      padding: 2rem;
+    }
 
-      /* Set a style for all buttons */
+    .topbar-summary-strip {
+      white-space: nowrap;
+    }
+
+    /* Components overview: expand horizontal width, keep aligned with content */
+    #components-overview {
+      max-width: 100%;
+      margin-left: -2rem;
+      margin-right: -2rem;
+      width: calc(100% + 4rem);
+      box-sizing: border-box;
+    }
+    #components-overview .row {
+      margin-left: 0;
+      margin-right: 0;
+    }
+    #components-overview .card {
+      max-width: none;
+      margin-left: 0;
+      margin-right: 0;
+    }
+    #components-overview .window-card-body {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  </style>
+  <!-- Custom Style for the loader -->
+  <style>
+    .login-success {
+      display: none;
+    }
+
+    /* Full-width input fields */
+    input[type='text'],
+    input[type='password'] {
+      width: 100%;
+      padding: 15px;
+      margin: 5px 0 22px 0;
+      display: inline-block;
+      border: none;
+      background: #f1f1f1;
+    }
+
+    /* Drag and drop table view */
+
+    /* Add a background color when the inputs get focus */
+    input[type='text']:focus,
+    input[type='password']:focus {
+      background-color: #ddd;
+      outline: none;
+    }
+
+    /* Set a style for all buttons */
+    .signupbtn {
+      background-color: #1473e6;
+      color: white;
+      padding: 14px 20px;
+      margin: 8px 0;
+      border: none;
+      cursor: pointer;
+      width: 100%;
+      opacity: 0.9;
+    }
+
+    button:hover {
+      opacity: 1;
+    }
+
+    /* Extra styles for the cancel button */
+    .cancelbtn {
+      padding: 14px 20px;
+      background-color: #f44336;
+    }
+
+    /* Add padding to container elements */
+    .container {
+      padding: 16px;
+    }
+
+    /* The Modal (background) */
+    .modal {
+      display: none;
+      /* Hidden by default */
+      position: fixed;
+      /* Stay in place */
+      z-index: 1;
+      /* Sit on top */
+      left: 0;
+      top: 0;
+      width: 100%;
+      /* Full width */
+      height: 100%;
+      /* Full height */
+      overflow: auto;
+      /* Enable scroll if needed */
+      background-color: darkgrey;
+      padding-top: 50px;
+    }
+
+    /* Modal Content/Box */
+    .modal-content {
+      background-color: #fefefe;
+      margin: 5% auto 15% auto;
+      /* 5% from the top, 15% from the bottom and centered */
+      border: 1px solid #888;
+      width: 40%;
+      /* Could be more or less, depending on screen size */
+    }
+
+    /* Style the horizontal ruler */
+    hr {
+      border: 1px solid #f1f1f1;
+      margin-bottom: 25px;
+    }
+
+    /* The Close Button (x) */
+    .close {
+      position: absolute;
+      right: 35px;
+      top: 15px;
+      font-size: 40px;
+      font-weight: bold;
+      color: #f1f1f1;
+    }
+
+    .close:hover,
+    .close:focus {
+      color: #f44336;
+      cursor: pointer;
+    }
+
+    /* Clear floats */
+    .clearfix::after {
+      content: '';
+      clear: both;
+      display: table;
+    }
+
+    /* Change styles for cancel button and signup button on extra small screens */
+    @media screen and (max-width: 300px) {
+
+      .cancelbtn,
       .signupbtn {
-        background-color: #1473e6;
-        color: white;
-        padding: 14px 20px;
-        margin: 8px 0;
-        border: none;
-        cursor: pointer;
         width: 100%;
-        opacity: 0.9;
+      }
+    }
+
+    .spinner {
+      width: 64px;
+      height: 64px;
+      border: 8px solid;
+      border-color: #3d5af1 transparent #3d5af1 transparent;
+      border-radius: 50%;
+      animation: spin-anim 1.2s linear infinite;
+    }
+
+    @keyframes spin-anim {
+      0% {
+        transform: rotate(0deg);
       }
 
-      button:hover {
-        opacity: 1;
+      100% {
+        transform: rotate(360deg);
       }
+    }
 
-      /* Extra styles for the cancel button */
-      .cancelbtn {
-        padding: 14px 20px;
-        background-color: #f44336;
-      }
+    .loader-container {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: fixed;
+      background: rgba(255, 255, 255, 0.9);
+      z-index: 1;
+    }
 
-      /* Add padding to container elements */
-      .container {
-        padding: 16px;
-      }
+    .loading-message {
+      margin-top: 20px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #3d5af1;
+      text-align: center;
+    }
 
-      /* The Modal (background) */
-      .modal {
-        display: none;
-        /* Hidden by default */
-        position: fixed;
-        /* Stay in place */
-        z-index: 1;
-        /* Sit on top */
-        left: 0;
-        top: 0;
-        width: 100%;
-        /* Full width */
-        height: 100%;
-        /* Full height */
-        overflow: auto;
-        /* Enable scroll if needed */
-        background-color: darkgrey;
-        padding-top: 50px;
-      }
+    .loader-container-hidden {
+      display: none;
+    }
 
-      /* Modal Content/Box */
-      .modal-content {
-        background-color: #fefefe;
-        margin: 5% auto 15% auto;
-        /* 5% from the top, 15% from the bottom and centered */
-        border: 1px solid #888;
-        width: 40%;
-        /* Could be more or less, depending on screen size */
-      }
+    .floating-btn {
+      width: 140px;
+      height: 40px;
+      background-color: red;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      color: white;
+      font-size: 10px;
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      border-radius: 10px;
+      border-style: none;
+    }
+  </style>
+</head>
 
-      /* Style the horizontal ruler */
-      hr {
-        border: 1px solid #f1f1f1;
-        margin-bottom: 25px;
-      }
-
-      /* The Close Button (x) */
-      .close {
-        position: absolute;
-        right: 35px;
-        top: 15px;
-        font-size: 40px;
-        font-weight: bold;
-        color: #f1f1f1;
-      }
-
-      .close:hover,
-      .close:focus {
-        color: #f44336;
-        cursor: pointer;
-      }
-
-      /* Clear floats */
-      .clearfix::after {
-        content: '';
-        clear: both;
-        display: table;
-      }
-
-      /* Change styles for cancel button and signup button on extra small screens */
-      @media screen and (max-width: 300px) {
-        .cancelbtn,
-        .signupbtn {
-          width: 100%;
-        }
-      }
-
-      .spinner {
-        width: 64px;
-        height: 64px;
-        border: 8px solid;
-        border-color: #3d5af1 transparent #3d5af1 transparent;
-        border-radius: 50%;
-        animation: spin-anim 1.2s linear infinite;
-      }
-
-      @keyframes spin-anim {
-        0% {
-          transform: rotate(0deg);
-        }
-
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-
-      .loader-container {
-        width: 100%;
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        position: fixed;
-        background: rgba(255, 255, 255, 0.9);
-        z-index: 1;
-      }
-
-      .loading-message {
-        margin-top: 20px;
-        font-size: 18px;
-        font-weight: bold;
-        color: #3d5af1;
-        text-align: center;
-      }
-
-      .loader-container-hidden {
-        display: none;
-      }
-
-      .floating-btn {
-        width: 140px;
-        height: 40px;
-        background-color: red;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-decoration: none;
-        color: white;
-        font-size: 10px;
-        position: fixed;
-        right: 20px;
-        bottom: 20px;
-        border-radius: 10px;
-        border-style: none;
-      }
-    </style>
-  </head>
-
-  <body id="page-top">
-    <div class="loader-container" id="set_display">
-      <div class="spinner"></div>
-      <div class="loading-message">
-        <p>Please wait while we analyze your configuration...</p>
-      </div>
+<body id="page-top">
+  <div class="loader-container" id="set_display">
+    <div class="spinner"></div>
+    <div class="loading-message">
+      <p>Please wait while we analyze your configuration...</p>
     </div>
+  </div>
 
-    <!-- Add error message element -->
-    <div
-      id="error-message"
-      style="
+  <!-- Add error message element -->
+  <div id="error-message" style="
         display: none;
         color: #f44336;
         background-color: #ffebee;
@@ -249,351 +284,246 @@
         border-radius: 5px;
         text-align: center;
         font-weight: bold;
-      "
-    >
-      Connection error: Please refresh the page and try again.
-    </div>
+      ">
+    Connection error: Please refresh the page and try again.
+  </div>
 
-    <div id="id01" class="modal">
-      <span class="close" id="close" title="Close Modal">&times;</span>
-    </div>
+  <div id="id01" class="modal">
+    <span class="close" id="close" title="Close Modal">&times;</span>
+  </div>
 
-    <!-- Page Wrapper -->
-    <div class="parent-container">
-      <div id="wrapper">
-        <!-- Sidebar -->
-        <!-- Sidebar - Brand -->
-        <div class="header">
-          <a
-            id="head-tag"
-            class="sidebar-brand"
-            href="property.html"
-            target="iframe2"
-          >
-            <div class="sidebar-brand-content">
-              <div class="sidebar-brand-icon">
-                <img src="./images/tagscanner_32x32.png" />
-              </div>
-              <div class="sidebar-brand-text">TagScanner | 1.6.4</div>
+  <!-- Page Wrapper -->
+  <div class="parent-container">
+    <div id="wrapper">
+      <!-- Sidebar -->
+      <!-- Sidebar - Brand -->
+      <div class="header">
+        <a id="head-tag" class="sidebar-brand" href="property.html" target="iframe2">
+          <div class="sidebar-brand-content">
+            <div class="sidebar-brand-icon">
+              <img src="./images/tagscanner_32x32.png" />
             </div>
-            <!-- <p class="sidebar-brand-description"> A tool to understand the structure and components of your Adobe Tags
+            <div class="sidebar-brand-text">TagScanner | 2.0.0</div>
+          </div>
+          <!-- <p class="sidebar-brand-description"> A tool to understand the structure and components of your Adobe Tags
             property!</p> -->
-          </a>
-        </div>
+        </a>
       </div>
-      <!-- Sidebar Menu -->
-      <div class="content-container">
-        <div id="sidebar-click" class="flex-shrink-0 p-3 active">
-          <ul class="list-unstyled ps-0">
-            <li class="mb-1">
-              <a id="home-menu-link" href="display.html" target="iframe2"
-                ><button
-                  id="home-button-sidebar"
-                  class="btn btn-toggle align-items-center rounded collapsed"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#home-collapse"
-                  aria-expanded="false"
-                >
-                  <i class="px-1 fas fa-home"></i>
-                  Home
-                </button></a
-              >
-            </li>
-            <li class="mb-1">
-              <a
-                id="extension-menu-link"
-                href="vendor/extension.html"
-                target="iframe2"
-                ><button
-                  id="ext-button-sidebar"
-                  class="btn btn-toggle align-items-center rounded collapsed"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#home-collapse"
-                  aria-expanded="false"
-                >
-                  <i class="px-1 fas fa-plug"></i>
+    </div>
+    <!-- Sidebar Menu -->
+    <div class="content-container">
+      <div id="sidebar-click" class="flex-shrink-0 p-3 active" style="position: relative;">
+        <button id="sidebar-toggle-btn"
+          style="width: 100%; margin-bottom: 10px; background: #252525; color: white; border: none; font-size: 1.2em; display: flex; align-items: center; justify-content: flex-start;">
+          <i id="sidebar-toggle-icon" class="fas fa-angle-left" style="margin-right: 8px;"></i> <span
+            id="sidebar-toggle-label">Collapse</span>
+        </button>
+        <ul class="list-unstyled ps-0">
+          <li class="mb-1">
+            <a id="home-menu-link" href="display.html" target="iframe2"><button id="home-button-sidebar"
+                class="btn btn-toggle align-items-center rounded" type="button">
+                <i class="px-1 fas fa-home"></i>
+                <span>Home</span>
+              </button></a>
+          </li>
+          <li class="mb-1">
+            <a id="extension-menu-link" href="vendor/extension.html" target="iframe2"><button id="ext-button-sidebar"
+                class="btn btn-toggle align-items-center rounded" type="button">
+                <i class="px-1 fas fa-plug"></i>
+                <span>Extensions</span>
+              </button></a>
+          </li>
+          <li class="mb-1">
+            <a id="rule-menu-link" href="vendor/rule.html" target="iframe2"><button id="rule-button-sidebar"
+                class="btn btn-toggle align-items-center rounded" type="button">
+                <i class="px-1 fas fa-wrench"></i>
+                <span>Rules</span>
+              </button></a>
+          </li>
+          <li class="mb-1">
+            <a id="dataelements-menu-link" href="vendor/dataelement.html" target="iframe2">
+              <button id="de-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button">
+                <i class="px-1 fas fa-database"></i>
+                <span>Data Elements</span>
+              </button>
+            </a>
+          </li>
 
-                  Extensions
-                </button></a
-              >
-            </li>
-            <li class="mb-1">
-              <a id="rule-menu-link" href="vendor/rule.html" target="iframe2"
-                ><button
-                  id="rule-button-sidebar"
-                  class="btn btn-toggle align-items-center rounded collapsed"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#dashboard-collapse"
-                  aria-expanded="false"
-                >
-                  <i class="px-1 fas fa-wrench"></i>
-                  Rules
-                </button></a
-              >
-            </li>
-            <li class="mb-1">
-              <a
-                id="dataelements-menu-link"
-                href="vendor/dataelement.html"
-                target="iframe2"
-              >
-                <button
-                  id="de-button-sidebar"
-                  class="btn btn-toggle align-items-center rounded collapsed"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#orders-collapse"
-                  aria-expanded="false"
-                >
-                  <i class="px-1 fas fa-database"></i>
-                  Data Elements
-                </button>
-              </a>
-            </li>
-            <li class="mb-1">
-              <a
-                id="summary-menu-link"
-                href="vendor/dataelementListCombined.html"
-                target="iframe2"
-              >
-                <button
-                  id="summary-button-sidebar"
-                  class="btn btn-toggle align-items-center rounded collapsed"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#summary-collapse"
-                  aria-expanded="false"
-                >
-                  <i class="px-1 fas fa-project-diagram"></i>
-                  Mapping
-                </button>
-              </a>
-            </li>
+          <li class="mb-1">
+            <a id="flow-menu-link" href="vendor/flow.html" target="iframe2">
+              <button id="flow-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button">
+                <i class="px-1 fas fa-project-diagram"></i>
+                <span>Flow</span>
+              </button>
+            </a>
+          </li>
 
-            <li class="mb-1">
-              <a
-                id="summary-menu-link"
-                href="vendor/summary.html"
-                target="iframe2"
-              >
-                <button
-                  id="summary-button-sidebar"
-                  class="btn btn-toggle align-items-center rounded collapsed"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#summary-collapse"
-                  aria-expanded="false"
-                >
-                  <i class="px-1 fas fa-chart-pie"></i>
-                  Summary
-                </button>
-              </a>
-            </li>
+          <li class="mb-1">
+            <a id="summary-menu-link" href="vendor/summary.html" target="iframe2">
+              <button id="summary-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button">
+                <i class="px-1 fas fa-chart-pie"></i>
+                <span>Summary</span>
+              </button>
+            </a>
+          </li>
 
-            <li class="mb-1">
-              <a
-                id="dataelements-menu-link"
-                href="https://forms.gle/vLfcbqYn8XLMjUA4A"
-                target="iframe2"
-              >
-                <button
-                  id="feedback-button-sidebar"
-                  class="btn btn-toggle align-items-center rounded collapsed"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#feedback-collapse"
-                  aria-expanded="false"
-                >
-                  <i class="px-1 fas fa-envelope"></i>
-                  Feedback
-                </button>
-              </a>
-            </li>
-          </ul>
-        </div>
-        <!-- End of Sidebar -->
+          <li class="mb-1">
+            <a id="feedback-menu-link" href="https://forms.gle/vLfcbqYn8XLMjUA4A" target="_blank">
+              <button id="feedback-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button">
+                <i class="px-1 fas fa-envelope"></i>
+                <span>Feedback</span>
+              </button>
+            </a>
+          </li>
+        </ul>
+      </div>
+      <!-- End of Sidebar -->
 
-        <!-- Content Wrapper -->
-        <div id="content-wrapper" class="d-flex flex-column">
-          <!-- Main Content -->
-          <div id="content">
-            <!-- Topbar -->
-            <nav
-              class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow"
-            >
-              <!-- Topbar Search -->
+      <!-- Content Wrapper -->
+      <div id="content-wrapper" class="d-flex flex-column">
+        <!-- Main Content -->
+        <div id="content">
+          <!-- Topbar -->
+          <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
+            <!-- Topbar Navbar -->
+            <ul class="navbar-nav ml-auto">
+              <div class="topbar-divider d-none d-sm-block"></div>
+              <li class="nav-item no-arrow d-flex align-items-center">
+                <div id="topbar-components-summary" class="text-xs font-weight-bold text-primary text-uppercase topbar-summary-strip">
+                  <span id="topbar-env"><i class="fas fa-cloud mr-1"></i>Env: —</span>
+                  <span id="topbar-ext" class="ml-3"><i class="fas fa-puzzle-piece mr-1"></i>Extensions: —</span>
+                  <span id="topbar-rules" class="ml-3"><i class="fas fa-wrench mr-1"></i>Rules: —</span>
+                  <span id="topbar-de" class="ml-3"><i class="fas fa-database mr-1"></i>Data Elements: —</span>
+                </div>
+              </li>
 
-              <!-- Topbar Navbar -->
-              <ul class="navbar-nav ml-auto">
-                <div class="topbar-divider d-none d-sm-block"></div>
-                <li class="nav-item dropdown no-arrow">
-                  <a
-                    class="nav-link dropdown-toggle"
-                    href="#"
-                    id="userDropdown"
-                    role="button"
-                    data-toggle="dropdown"
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                  >
-                    <div class="col mr-2">
-                      <div
-                        id="property_name"
-                        class="text-xs font-weight-bold text-primary text-uppercase mb-1"
-                      >
-                        Property Name
-                      </div>
-                      <div class="h5 mb-0 font-weight-bold text-gray-800"></div>
+              <div class="topbar-divider d-none d-sm-block"></div>
+              <li class="nav-item dropdown no-arrow">
+                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-toggle="dropdown"
+                  aria-haspopup="true" aria-expanded="false">
+                  <div class="col mr-2">
+                    <div id="property_name" class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                      Property Name
                     </div>
-                  </a>
-                </li>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800"></div>
+                  </div>
+                </a>
+              </li>
 
-                <div class="topbar-divider d-none d-sm-block"></div>
-                <li class="nav-item dropdown no-arrow">
-                  <a
-                    class="nav-link dropdown-toggle"
-                    href="#"
-                    id="csv_link"
-                    role="button"
-                    data-toggle="dropdown"
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                  >
-                    <div class="col mr-2">
-                      <div
-                        id="download_text"
-                        class="text-xs font-weight-bold text-primary text-uppercase mb-1"
-                        style="
+              <div class="topbar-divider d-none d-sm-block"></div>
+              <li class="nav-item dropdown no-arrow">
+                <a class="nav-link dropdown-toggle" href="#" id="csv_link" role="button" data-toggle="dropdown"
+                  aria-haspopup="true" aria-expanded="false">
+                  <div class="col mr-2">
+                    <div id="download_text" class="text-xs font-weight-bold text-primary text-uppercase mb-1" style="
                           background: linear-gradient(
                             45deg,
                             hsla(168, 85%, 52%, 0.5),
                             hsla(263, 88%, 45%, 0.5) 100%
                           );
-                        "
-                      >
-                        Export CSV Output of your setup
-                      </div>
-                      <div class="h5 mb-0 font-weight-bold text-gray-800"></div>
+                        ">
+                      Export CSV Output of your setup
                     </div>
-                  </a>
-                </li>
-              </ul>
-            </nav>
-            <!-- End of Topbar -->
-
-            <!-- Begin Page Content -->
-
-            <div class="container-fluid">
-              <!-- Content Row -->
-              <div class="row" id="property-row">
-                <!-- Environment -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                  <div class="card border-left-primary shadow h-100 py-2">
-                    <div class="card-body">
-                      <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                          <div
-                            class="text-xs font-weight-bold text-success text-uppercase mb-1"
-                          ></div>
-                          <div
-                            id="environment_name"
-                            class="text-xs font-weight-bold text-primary text-uppercase mb-1"
-                          >
-                            Environment
-                          </div>
-                          <div id="container_size"></div>
-                        </div>
-                      </div>
-                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800"></div>
                   </div>
-                </div>
+                </a>
+              </li>
+            </ul>
+          </nav>
+          <!-- End of Topbar -->
 
-                <!-- Extensions -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                  <div class="card border-left-success shadow h-100 py-2">
-                    <div class="card-body">
-                      <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                          <div
-                            id="extension_iframe2"
-                            class="text-xs font-weight-bold text-success text-uppercase mb-1"
-                          >
-                            Extensions
-                          </div>
-                          <div id="extension_size"></div>
-                        </div>
-                        <div class="col-auto">
-                          <div
-                            id="extensions"
-                            class="h4 mb-0 font-weight-normal text-gray-800"
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+          <!-- Begin Page Content -->
 
-                <!-- Rules -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                  <div class="card border-left-info shadow h-100 py-2">
-                    <div class="card-body">
-                      <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                          <div
-                            id="rule_iframe2"
-                            class="text-xs font-weight-bold text-info text-uppercase mb-1"
-                          >
-                            Rules
-                          </div>
-                          <div id="rule_size"></div>
-                          <div></div>
+          <div class="container-fluid">
+            <!-- Content Row (summary moved to topbar) -->
+            <div class="row" id="property-row" style="display: none;">
+              <!-- Environment -->
+              <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-primary shadow h-100 py-2">
+                  <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                      <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1"></div>
+                        <div id="environment_name" class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                          Environment
                         </div>
-                        <div class="col-auto">
-                          <div
-                            id="rule_details"
-                            class="h5 mb-0 mr-3 font-weight-normal text-gray-800"
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Data Elements -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                  <div class="card border-left-warning shadow h-100 py-2">
-                    <div class="card-body">
-                      <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                          <div
-                            id="dataelement_iframe2"
-                            class="text-xs font-weight-bold text-warning text-uppercase mb-1"
-                          >
-                            Data Elements
-                          </div>
-                          <div id="de_size"></div>
-                        </div>
-                        <div class="col-auto">
-                          <div
-                            id="dataelement"
-                            class="h5 mb-0 font-weight-normal text-gray-800"
-                          ></div>
-                        </div>
+                        <div id="container_size"></div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-              <!-- Content Row -->
 
-              <div class="component-container" id="components-overview">
-                <!-- Area Chart -->
-                <div class="col-xl-12 col-lg-7">
-                  <div class="card shadow mb-4">
-                    <!-- Card Header - Dropdown -->
-                    <div
-                      class="card-header py-3 d-flex flex-row align-items-center justify-content-between"
-                    >
-                      <h6 class="m-0 font-weight-bold text-primary">
-                        Components Overview
-                      </h6>
-                      <!-- <h6 class="m-0 font-weight-bold text-primary">
+              <!-- Extensions -->
+              <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-success shadow h-100 py-2">
+                  <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                      <div class="col mr-2">
+                        <div id="extension_iframe2" class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                          Extensions
+                        </div>
+                        <div id="extension_size"></div>
+                      </div>
+                      <div class="col-auto">
+                        <div id="extensions" class="h4 mb-0 font-weight-normal text-gray-800"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Rules -->
+              <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-info shadow h-100 py-2">
+                  <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                      <div class="col mr-2">
+                        <div id="rule_iframe2" class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                          Rules
+                        </div>
+                        <div id="rule_size"></div>
+                        <div></div>
+                      </div>
+                      <div class="col-auto">
+                        <div id="rule_details" class="h5 mb-0 mr-3 font-weight-normal text-gray-800"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data Elements -->
+              <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-warning shadow h-100 py-2">
+                  <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                      <div class="col mr-2">
+                        <div id="dataelement_iframe2" class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                          Data Elements
+                        </div>
+                        <div id="de_size"></div>
+                      </div>
+                      <div class="col-auto">
+                        <div id="dataelement" class="h5 mb-0 font-weight-normal text-gray-800"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Content Row -->
+
+            <div class="component-container" id="components-overview">
+              <!-- Area Chart -->
+              <div class="col-xl-12 col-lg-7">
+                <div class="card shadow mb-4">
+                  <!-- Card Header - Dropdown -->
+                  <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                      Components Overview
+                    </h6>
+                    <!-- <h6 class="m-0 font-weight-bold text-primary">
                         <a
                           id="general_search"
                           href="search.html"
@@ -601,61 +531,56 @@
                           >Search Variables</a
                         >
                       </h6> -->
-                    </div>
-                    <!-- Card Body -->
-                    <!-- TODO: Adjust this dynamically according to content size. Seems like it would need some additional scripting. -->
-                    <div class="window-card-body">
-                      <div>
-                        <iframe
-                          id="component-iframe"
-                          class="embed-responsive-item"
-                          src="display.html"
-                          name="iframe2"
-                          width="100%"
-                          height="470"
-                        ></iframe>
-                      </div>
+                  </div>
+                  <!-- Card Body -->
+                  <!-- TODO: Adjust this dynamically according to content size. Seems like it would need some additional scripting. -->
+                  <div class="window-card-body">
+                    <div>
+                      <iframe id="component-iframe" class="embed-responsive-item" name="iframe2"
+                        width="100%" height="700"></iframe>
                     </div>
                   </div>
                 </div>
               </div>
-              <!-- /.container-fluid -->
             </div>
-            <!-- End of Main Content -->
-
-            <!-- Footer -->
-            <footer class="sticky-footer bg-white">
-              <div class="container my-auto">
-                <div class="copyright text-center my-auto">
-                  <span>Copyright &copy; Adobe 2025</span>
-                </div>
-              </div>
-            </footer>
-            <!-- End of Footer -->
+            <!-- /.container-fluid -->
           </div>
-          <!-- End of Content Wrapper -->
+          <!-- End of Main Content -->
+
+          <!-- Footer -->
+          <footer class="sticky-footer bg-white">
+            <div class="container my-auto">
+              <div class="copyright text-center my-auto">
+                <span>TagScanner</span>
+              </div>
+            </div>
+          </footer>
+          <!-- End of Footer -->
         </div>
+        <!-- End of Content Wrapper -->
       </div>
     </div>
-    <!-- End of Page Wrapper 
+  </div>
+  <!-- End of Page Wrapper 
         <button id="request_new_feature" style="color: white;" class="text-xs font-weight-bold text-uppercase mb-1 floating-btn">
             Request new Feature </button> -->
-    <div id="rule_code" style="display: none"></div>
-    <!-- Bootstrap core JavaScript-->
-    <script src="vendor/jquery/jquery.min.js"></script>
-    <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <div id="rule_code" style="display: none"></div>
+  <!-- Bootstrap core JavaScript-->
+  <script src="vendor/jquery/jquery.min.js"></script>
+  <script src="vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Core plugin JavaScript-->
-    <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
+  <!-- Core plugin JavaScript-->
+  <script src="vendor/jquery-easing/jquery.easing.min.js"></script>
 
-    <!-- Custom scripts for all pages-->
-    <script src="js/sb-admin-2.min.js"></script>
+  <!-- Custom scripts for all pages-->
+  <script src="js/sb-admin-2.min.js"></script>
 
-    <script src="popup.js"></script>
-    <script src="sidebar.js"></script>
-    <!-- <script src="sform.js"></script> -->
-    <script src="js/sidebars.js"></script>
-    <script src="js/bootstrap.bundle.min.js"></script>
-    <!-- <script src="satellite_sandbox.js"></script> -->
-  </body>
+  <script src="popup.js"></script>
+  <script src="sidebar.js"></script>
+  <!-- <script src="sform.js"></script> -->
+  <script src="js/sidebars.js"></script>
+  <script src="js/bootstrap.bundle.min.js"></script>
+  <!-- <script src="satellite_sandbox.js"></script> -->
+</body>
+
 </html>

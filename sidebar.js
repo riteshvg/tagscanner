@@ -4,63 +4,67 @@ document.addEventListener('DOMContentLoaded', function () {
     if (sidebar.classList.contains('active')) {
       sidebar.classList.remove('active');
       document.getElementById('home-button-sidebar').innerHTML =
-        '<i class="px-1 fas fa-home"></i>';
+        '<i class="px-1 fas fa-home"></i><span>Home</span>';
       document.getElementById('ext-button-sidebar').innerHTML =
-        '<i class="px-1 fas fa-plug"></i>';
+        '<i class="px-1 fas fa-plug"></i><span>Extensions</span>';
       document.getElementById('rule-button-sidebar').innerHTML =
-        '<i class="px-1 fas fa-wrench"></i>';
+        '<i class="px-1 fas fa-wrench"></i><span>Rules</span>';
       document.getElementById('de-button-sidebar').innerHTML =
-        ' <i class="px-1 fas fa-database"></i>';
-      // document.getElementById('misc-click').remove();
+        '<i class="px-1 fas fa-database"></i><span>Data Elements</span>';
       document.getElementById(
         'feedback-button-sidebar'
-      ).innerHTML = `<i class="px-1 fas fa-envelope"></i>`;
+      ).innerHTML = `<i class="px-1 fas fa-envelope"></i><span>Feedback</span>`;
       document.getElementById('code-button-sidebar').innerHTML =
-        '<i class="px-1 fas fa-code"></i>';
-
-      // document.getElementById('request_new_feature').innerHTML='<i class="px-1 fas fa-pen text-white"></i>'
-      // document.getElementById('feed_back_form').innerHTML='<i class="px-1 fas fa-share text-white"></i>'
-
-      // document.getElementById('git_share_link').innerHTML='<i class="px-1 fas fa-share-alt text-white"></i>'
+        '<i class="px-1 fas fa-code"></i><span>Custom Code</span>';
 
       document.getElementById(
         'collapse-click'
       ).innerHTML = `<i id="collapse-click-right" class="fas fa-angle-right text-white"></i>`;
-
-      sidebar.style =
-        'display: block; width: 100px; background-color: #252525;border-right: 1px solid #dee2e6;padding: 1rem;';
     } else {
       sidebar.classList.add('active');
       document.getElementById(
         'home-button-sidebar'
-      ).innerHTML = `<i class="px-1 fas fa-home"></i>Home`;
+      ).innerHTML = `<i class="px-1 fas fa-home"></i><span>Home</span>`;
       document.getElementById(
         'ext-button-sidebar'
-      ).innerHTML = `<i class="px-1 fas fa-plug"></i>Extensions`;
+      ).innerHTML = `<i class="px-1 fas fa-plug"></i><span>Extensions</span>`;
       document.getElementById(
         'rule-button-sidebar'
-      ).innerHTML = `<i class="px-1 fas fa-wrench"></i>Rules`;
+      ).innerHTML = `<i class="px-1 fas fa-wrench"></i><span>Rules</span>`;
       document.getElementById(
         'de-button-sidebar'
-      ).innerHTML = `<i class="px-1 fas fa-database"></i>Data Elements`;
+      ).innerHTML = `<i class="px-1 fas fa-database"></i><span>Data Elements</span>`;
       document.getElementById(
         'code-button-sidebar'
-      ).innerHTML = `<i class="px-1 fas fa-code"></i>Custom Code`;
-
-      // document.getElementById('misc').insertAdjacentHTML('afterbegin', '<p id="misc-click" class="m-0 py-2 px-3">Miscellaneous</p>');
+      ).innerHTML = `<i class="px-1 fas fa-code"></i><span>Custom Code</span>`;
 
       document.getElementById(
         'feedback-button-sidebar'
-      ).innerHTML = `<i class="px-1 fas fa-envelope"></i>Feedback`;
-      // document.getElementById('request_new_feature').innerHTML='<i class="px-1 fas fa-pen text-white"></i>Request New Feature'
-      // document.getElementById('feed_back_form').innerHTML='<i class="px-1 fas fa-share text-white"></i>Share your Feedback'
-
-      // document.getElementById('git_share_link').innerHTML='<i class="px-1 fas fa-share-alt text-white"></i>Share the Tool'
+      ).innerHTML = `<i class="px-1 fas fa-envelope"></i><span>Feedback</span>`;
       document.getElementById(
         'collapse-click'
       ).innerHTML = `<i id="collapse-click-left" class="fas fa-angle-left text-white"></i>`;
-      sidebar.style =
-        'display: block; width: 250px; background-color: #252525;border-right: 1px solid #dee2e6;padding: 1rem;';
     }
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar-click');
+    const icon = document.getElementById('sidebar-toggle-icon');
+    const label = document.getElementById('sidebar-toggle-label');
+    
+    if (sidebar.classList.contains('active')) {
+      sidebar.classList.remove('active');
+      if (icon) icon.className = 'fas fa-angle-right';
+      if (label) label.textContent = 'Expand';
+    } else {
+      sidebar.classList.add('active');
+      if (icon) icon.className = 'fas fa-angle-left';
+      if (label) label.textContent = 'Collapse';
+    }
+  }
+
+  const btn = document.getElementById('sidebar-toggle-btn');
+  if (btn) {
+    btn.addEventListener('click', toggleSidebar);
   }
 });

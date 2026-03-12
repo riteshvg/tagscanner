@@ -118,7 +118,6 @@
     <h1>Rules from SessionStorage</h1>
 
     <div class="controls">
-      <button id="refreshBtn">Refresh Rules</button>
       <button id="mockDataBtn">Use Mock Data</button>
       <button id="toggleDebugBtn">Toggle Debug Panel</button>
     </div>
@@ -134,8 +133,13 @@
       <table id="rulesTable">
         <thead>
           <tr>
-            <th>Name</th>
-            <th>Details</th>
+            <th>Rule Name</th>
+            <th>Rule Event(s)</th>
+            <th>Rule Condition(s)</th>
+            <th>Rule Action(s)</th>
+            <th>Action Extension</th>
+            <th>Custom Code in Condition</th>
+            <th>Custom Code in Action</th>
           </tr>
         </thead>
         <tbody id="rulesTableBody"></tbody>

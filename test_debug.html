@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web SDK Debug Test</title>
+</head>
+<body>
+    <h1>Web SDK Debug Test</h1>
+    <div id="debug-output"></div>
+    
+    <script>
+        // Simulate the Web SDK action data structure
+        function testWebSDKData() {
+            const debugOutput = document.getElementById('debug-output');
+            
+            // Simulate what the action data might look like
+            const mockAction = {
+                modulePath: 'adobe-alloy/dist/lib/actions/sendEvent/index.js',
+                name: 'Web SDK - Update Variable (Data)',
+                settings: {
+                    data: {
+                        // This should be the data configuration
+                        testProperty: 'testValue',
+                        anotherProperty: 'anotherValue'
+                    },
+                    xdm: null, // This should be null for the first action
+                    customCode: null
+                }
+            };
+            
+            console.log('Mock Web SDK Action:', mockAction);
+            console.log('Action settings:', mockAction.settings);
+            console.log('Action settings.data:', mockAction.settings.data);
+            console.log('Action settings.xdm:', mockAction.settings.xdm);
+            console.log('Action settings keys:', Object.keys(mockAction.settings));
+            
+            // Test the logic from our function
+            let extractedData = null;
+            const actionNumber = 1; // First WebSDK action
+            
+            if (actionNumber === 1) {
+                // First WebSDK action - use 'data' property
+                let dataData = mockAction.settings.data;
+                console.log('Data action - data property:', dataData);
+                console.log('Data action - data property type:', typeof dataData);
+                console.log('Data action - data property truthy check:', !!dataData);
+                
+                if (dataData) {
+                    extractedData = dataData;
+                    console.log('Data action - using direct data property:', extractedData);
+                } else {
+                    console.log('Data action - no data property found or falsy');
+                }
+            }
+            
+            console.log('Final extractedData:', extractedData);
+            
+            // Display results
+            debugOutput.innerHTML = `
+                <h2>Debug Results:</h2>
+                <p><strong>Action Number:</strong> ${actionNumber}</p>
+                <p><strong>Has settings.data:</strong> ${!!mockAction.settings.data}</p>
+                <p><strong>settings.data type:</strong> ${typeof mockAction.settings.data}</p>
+                <p><strong>settings.data truthy:</strong> ${!!mockAction.settings.data}</p>
+                <p><strong>Extracted Data:</strong> ${extractedData ? JSON.stringify(extractedData) : 'null'}</p>
+                <p><strong>All settings keys:</strong> ${Object.keys(mockAction.settings).join(', ')}</p>
+            `;
+        }
+        
+        // Run the test when page loads
+        window.onload = testWebSDKData;
+    </script>
+</body>
+</html> 

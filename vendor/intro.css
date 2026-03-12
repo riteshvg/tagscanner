@@ -513,3 +513,36 @@ tr.introjs-showElement > th {
   z-index: 1;
   opacity: 0;
 }
+
+/* Custom tour styling for TagScanner */
+.customTooltip {
+  max-width: 400px !important;
+  min-width: 300px !important;
+}
+
+.customHighlight {
+  max-width: 300px !important;
+  max-height: 200px !important;
+  overflow: hidden !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 4px rgba(33, 150, 243, 0.3) !important;
+}
+
+/* Fix for long table header selections */
+.introjs-helperLayer.introjs-helperLayer {
+  max-width: 300px !important;
+  max-height: 200px !important;
+  overflow: hidden !important;
+}
+
+/* Improve tooltip readability */
+.introjs-tooltip {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+.introjs-tooltiptext {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  color: #333 !important;
+}

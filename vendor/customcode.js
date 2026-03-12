@@ -7,6 +7,45 @@ document.addEventListener('DOMContentLoaded', function () {
     const dataElements = JSON.parse(de_value);
     const customCodeElements = [];
 
+    // Helper function to clean up URLs (remove .min from .min.js files)
+    function cleanCustomCodeUrl(url) {
+      if (typeof url === 'string' && url.includes('.min.js')) {
+        return url.replace('.min.js', '.js');
+      }
+      return url;
+    }
+
+    // Helper function to search for specific names in JavaScript content
+    function searchForNamesInCode(code, searchNames) {
+      if (!code || !searchNames || searchNames.length === 0) return [];
+      
+      const foundNames = [];
+      const codeLower = code.toLowerCase();
+      
+      searchNames.forEach(name => {
+        const nameLower = name.toLowerCase();
+        if (codeLower.includes(nameLower)) {
+          foundNames.push(name);
+        }
+      });
+      
+      return foundNames;
+    }
+
+    // Define specific names to search for
+    const searchNames = [
+      "Target | Base Call | all AEM pages",
+      "Adobe Target",
+      "AEM pages",
+      "Base Call",
+      "Target Call",
+      "Adobe Analytics",
+      "Google Analytics",
+      "Facebook Pixel",
+      "Google Tag Manager",
+      "Data Layer"
+    ];
+
     // Find all data elements with custom code
     for (const key in dataElements) {
       if (dataElements.hasOwnProperty(key)) {
@@ -19,14 +58,24 @@ document.addEventListener('DOMContentLoaded', function () {
             'core/modules/data-element/custom-code.js' ||
             dataElement.modulePath.includes('custom-code'))
         ) {
+          let code = dataElement.settings && dataElement.settings.source
+            ? dataElement.settings.source
+            : 'No code found';
+          
+          // Clean URLs in the code
+          if (code.includes('.min.js')) {
+            code = cleanCustomCodeUrl(code);
+          }
+          
+          // Search for specific names in the code
+          const foundNames = searchForNamesInCode(code, searchNames);
+          
           customCodeElements.push({
             name: key,
-            code:
-              dataElement.settings && dataElement.settings.source
-                ? dataElement.settings.source
-                : 'No code found',
+            code: code,
             type: 'Custom Code',
             extension: dataElement.modulePath.split('/')[0],
+            foundNames: foundNames
           });
         }
 
@@ -35,14 +84,24 @@ document.addEventListener('DOMContentLoaded', function () {
           dataElement.modulePath &&
           dataElement.modulePath.includes('javascript-variable')
         ) {
+          let code = dataElement.settings && dataElement.settings.path
+            ? dataElement.settings.path
+            : 'No path found';
+          
+          // Clean URLs in the code
+          if (code.includes('.min.js')) {
+            code = cleanCustomCodeUrl(code);
+          }
+          
+          // Search for specific names in the code
+          const foundNames = searchForNamesInCode(code, searchNames);
+          
           customCodeElements.push({
             name: key,
-            code:
-              dataElement.settings && dataElement.settings.path
-                ? dataElement.settings.path
-                : 'No path found',
+            code: code,
             type: 'JavaScript Variable',
             extension: dataElement.modulePath.split('/')[0],
+            foundNames: foundNames
           });
         }
       }
@@ -76,7 +135,8 @@ document.addEventListener('DOMContentLoaded', function () {
       ? elements.filter(
           (el) =>
             el.name.toLowerCase().includes(searchTerm) ||
-            el.code.toLowerCase().includes(searchTerm)
+            el.code.toLowerCase().includes(searchTerm) ||
+            el.foundNames.some(name => name.toLowerCase().includes(searchTerm))
         )
       : elements;
 
@@ -98,8 +158,17 @@ document.addEventListener('DOMContentLoaded', function () {
       codeTitle.textContent =
         element.name + ' (' + element.type + ' - ' + element.extension + ')';
 
+      // Add found names display if any
+      if (element.foundNames && element.foundNames.length > 0) {
+        const foundNamesDiv = document.createElement('div');
+        foundNamesDiv.style.cssText = 'margin-top: 5px; font-size: 12px; color: #28a745;';
+        foundNamesDiv.innerHTML = '<strong>Found:</strong> ' + element.foundNames.join(', ');
+        codeTitle.appendChild(foundNamesDiv);
+      }
+
       const copyButton = document.createElement('button');
       copyButton.className = 'btn btn-sm btn-primary';
+      copyButton.style.marginLeft = '8px';
       copyButton.innerHTML = '<i class="fa fa-copy"></i> Copy Code';
       copyButton.onclick = function () {
         navigator.clipboard
@@ -115,7 +184,40 @@ document.addEventListener('DOMContentLoaded', function () {
           });
       };
 
+      const explainButton = document.createElement('button');
+      explainButton.className = 'btn btn-sm btn-secondary';
+      explainButton.style.marginLeft = '8px';
+      explainButton.textContent = 'Explain with AI';
+
+      const explanationDiv = document.createElement('div');
+      explanationDiv.style.cssText =
+        'margin-top: 10px; font-size: 14px; color: #343a40; display: none;';
+
+      explainButton.onclick = async function () {
+        if (explainButton.disabled) {
+          return;
+        }
+
+        explainButton.disabled = true;
+        const originalText = explainButton.textContent;
+        explainButton.textContent = 'Explaining...';
+
+        const explanation = await explainCustomCodeWithAI(element.code, {
+          name: element.name,
+          type: element.type,
+          extension: element.extension,
+          source: 'data-element-custom-code',
+        });
+
+        explanationDiv.textContent = explanation;
+        explanationDiv.style.display = 'block';
+
+        explainButton.textContent = originalText;
+        explainButton.disabled = false;
+      };
+
       codeHeader.appendChild(codeTitle);
+      codeHeader.appendChild(explainButton);
       codeHeader.appendChild(copyButton);
 
       const pre = document.createElement('pre');
@@ -123,6 +225,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       codeContainer.appendChild(codeHeader);
       codeContainer.appendChild(pre);
+      codeContainer.appendChild(explanationDiv);
 
       customCodeContainer.appendChild(codeContainer);
     });
@@ -136,11 +239,12 @@ document.addEventListener('DOMContentLoaded', function () {
       downloadLink.download = 'custom_code_data_elements.csv';
 
       // Create CSV content
-      let csvContent = 'Data Element Name,Type,Extension,Code\n';
+      let csvContent = 'Data Element Name,Type,Extension,Found Names,Code\n';
       filteredElements.forEach((element) => {
         // Escape quotes in the code
         const escapedCode = element.code.replace(/"/g, '""');
-        csvContent += `"${element.name}","${element.type}","${element.extension}","${escapedCode}"\n`;
+        const foundNames = element.foundNames ? element.foundNames.join('; ') : '';
+        csvContent += `"${element.name}","${element.type}","${element.extension}","${foundNames}","${escapedCode}"\n`;
       });
 
       const blob = new Blob([csvContent], { type: 'text/csv' });

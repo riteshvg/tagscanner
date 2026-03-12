@@ -1,222 +1,465 @@
-var extension_details_node = document.getElementById('extension_details');
-//console.log("in extension script");
-if (extension_details_node) {
-  //console.log("in extension script");
-  var extension = sessionStorage.getItem('_satellite._container.extension');
-  const obj = JSON.parse(extension);
-  for (var key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      const byte = (str) => {
-        let size = new Blob([str]).size;
-        return size;
+(function () {
+  'use strict';
+
+  var ROWS_PER_PAGE = 9999;
+  var currentPage = 1;
+  var builtExtensionCount = 0; // set in buildTable so footer count is correct regardless of DOM
+  var value_obj = {}; // extension key -> { [ruleName]: { rule, events, conditions }, dataelement?: [{ name, path }] }
+
+  function getExtensionObject() {
+    var raw = sessionStorage.getItem('_satellite._container.extension');
+    if (!raw || raw.trim() === '') return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function getRulesArray() {
+    var raw = sessionStorage.getItem('_satellite._container.rules');
+    if (!raw || raw.trim() === '') return [];
+    try {
+      var o = JSON.parse(raw);
+      return Array.isArray(o) ? o : (o && o.rules && Array.isArray(o.rules) ? o.rules : []);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function getDataElementsObject() {
+    var raw = sessionStorage.getItem('_satellite._container.dataElements');
+    if (!raw || raw.trim() === '') return {};
+    try {
+      var o = JSON.parse(raw);
+      return typeof o === 'object' && o !== null ? o : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function buildUsageMap() {
+    var rules = getRulesArray();
+    var de_obj = getDataElementsObject();
+
+    function getEventDisplayName(ev) {
+      if (!ev) return 'Event';
+      if (ev.type) return ev.type;
+      if (ev.name) return ev.name;
+      if (ev.modulePath) return ev.modulePath.split('/').pop().replace(/\.js$/, '') || 'Event';
+      return 'Event';
+    }
+
+    // Per extension: track which RULES use it (by rule name) in action/event/condition.
+    // Structure: value_obj[extKey][ruleName] = { rule, events: [names], conditions }; value_obj[extKey].dataelement = [ { name, path } ]
+    rules.forEach(function (rule) {
+      var ruleName = rule.name || rule.id || 'Unnamed Rule';
+      if (rule.actions) {
+        rule.actions.forEach(function (action) {
+          if (action.modulePath) {
+            var extKey = action.modulePath.split('/')[0];
+            value_obj[extKey] = value_obj[extKey] || {};
+            if (!value_obj[extKey][ruleName]) value_obj[extKey][ruleName] = { rule: false, events: [], conditions: false };
+            value_obj[extKey][ruleName].rule = true;
+          }
+        });
+      }
+      if (rule.events) {
+        rule.events.forEach(function (ev) {
+          if (ev.modulePath) {
+            var extKey = ev.modulePath.split('/')[0];
+            value_obj[extKey] = value_obj[extKey] || {};
+            if (!value_obj[extKey][ruleName]) value_obj[extKey][ruleName] = { rule: false, events: [], conditions: false };
+            value_obj[extKey][ruleName].events.push(getEventDisplayName(ev));
+          }
+        });
+      }
+      if (rule.conditions) {
+        rule.conditions.forEach(function (cond) {
+          if (cond.modulePath) {
+            var extKey = cond.modulePath.split('/')[0];
+            value_obj[extKey] = value_obj[extKey] || {};
+            if (!value_obj[extKey][ruleName]) value_obj[extKey][ruleName] = { rule: false, events: [], conditions: false };
+            value_obj[extKey][ruleName].conditions = true;
+          }
+        });
+      }
+    });
+
+    // Data elements: list of { name, path } per extension (for details page); count = array length
+    Object.keys(de_obj).forEach(function (key) {
+      var item = de_obj[key];
+      if (item && item.modulePath) {
+        var extKey = item.modulePath.split('/')[0];
+        value_obj[extKey] = value_obj[extKey] || {};
+        if (!value_obj[extKey].dataelement) value_obj[extKey].dataelement = [];
+        value_obj[extKey].dataelement.push({ name: key, path: item.modulePath });
+      }
+    });
+
+    try {
+      sessionStorage.setItem('_satellite._extension', JSON.stringify(value_obj));
+    } catch (e) {}
+  }
+
+  function getSizeKb(extObj) {
+    if (!extObj) return 0;
+    try {
+      var len = new Blob([JSON.stringify(extObj)]).size;
+      return Number((len / 1000).toFixed(2));
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function buildTable(extObj) {
+    var table = document.getElementById('extension_details');
+    if (!table) return;
+
+    // Remove any existing thead/tbody so count and rows come from this build only
+    table.querySelectorAll('thead').forEach(function (el) { el.remove(); });
+    table.querySelectorAll('tbody').forEach(function (el) { el.remove(); });
+
+    var thead = document.createElement('thead');
+    var headerRow = document.createElement('tr');
+    var headers = [
+      { text: 'ID #', tooltip: 'Extension number', className: 'ext-col-id' },
+      { text: 'Extension Name', tooltip: 'Activated extensions in the Adobe Tags property' },
+      { text: 'Actions', tooltip: 'Extension used as part of an Action' },
+      { text: 'Events', tooltip: 'Extension used to trigger an Event' },
+      { text: 'Conditions', tooltip: 'Extension used in a Condition' },
+      { text: 'Data Elements', tooltip: 'Extension used to create a Data Element' },
+      { text: 'Size (KB)', tooltip: 'Approximate extension size' }
+    ];
+    headers.forEach(function (h, idx) {
+      var th = document.createElement('th');
+      th.className = h.className || '';
+      th.innerHTML = h.text + ' &nbsp;<i class="fa fa-info-circle" style="font-size: 14px" title="' + (h.tooltip || '') + '"></i>';
+      if (idx > 0) th.classList.add('sortable');
+      th.setAttribute('data-col', String(idx));
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    function makeIconCell(count, iconClass, title) {
+      var td = document.createElement('td');
+      td.style.textAlign = 'center';
+      td.setAttribute('data-sort-value', String(count));
+      var span = document.createElement('span');
+      span.className = 'ext-col-icon ' + (count > 0 ? 'ext-col-icon-has' : 'ext-col-icon-empty');
+      span.title = title;
+      span.innerHTML = '<i class="fas ' + iconClass + '"></i> <span class="ext-col-icon-count">' + count + '</span>';
+      td.appendChild(span);
+      return td;
+    }
+
+    function buildExpandableContent(extKey, v) {
+      var wrap = document.createElement('div');
+      wrap.className = 'ext-expanded-content';
+
+      var scrollWrap = document.createElement('div');
+      scrollWrap.className = 'ext-expanded-table-scroll';
+
+      var tbl = document.createElement('table');
+      tbl.className = 'ext-expanded-table';
+      tbl.innerHTML = '<thead><tr><th>Rules</th><th>Events</th><th>Data Elements</th><th>Conditions</th></tr></thead><tbody></tbody>';
+      var tbody = tbl.querySelector('tbody');
+
+      var ruleNames = Object.keys(v).filter(function (k) { return k !== 'dataelement'; });
+      ruleNames.forEach(function (ruleName) {
+        var r = v[ruleName];
+        var eventNames = Array.isArray(r.events) && r.events.length ? r.events.join(', ') : '—';
+        var row = document.createElement('tr');
+        row.innerHTML =
+          '<td>' + (ruleName || '—') + '</td>' +
+          '<td>' + eventNames + '</td>' +
+          '<td>—</td>' +
+          '<td>' + (r.conditions ? 'Yes' : '—') + '</td>';
+        tbody.appendChild(row);
+      });
+
+      var deList = v.dataelement && Array.isArray(v.dataelement) ? v.dataelement : [];
+      deList.forEach(function (item) {
+        var row = document.createElement('tr');
+        row.innerHTML = '<td>—</td><td>—</td><td>' + (item.name || item.path || '—') + '</td><td>—</td>';
+        tbody.appendChild(row);
+      });
+
+      if (tbody.querySelectorAll('tr').length === 0) {
+        var empty = document.createElement('tr');
+        empty.innerHTML = '<td colspan="4">Not used in any rule or data element.</td>';
+        tbody.appendChild(empty);
+      }
+
+      scrollWrap.appendChild(tbl);
+      wrap.appendChild(scrollWrap);
+      return wrap;
+    }
+
+    var tbody = document.createElement('tbody');
+    var keys = Object.keys(extObj).sort();
+    builtExtensionCount = keys.length;
+    keys.forEach(function (key, index) {
+      var ext = extObj[key];
+      var displayName = (ext && ext.displayName) ? ext.displayName : key;
+      var sizeKb = getSizeKb(ext);
+      var v = value_obj[key] || {};
+
+      var actions = 0, events = 0, conditions = 0;
+      Object.keys(v).forEach(function (k) {
+        if (k === 'dataelement') return;
+        var r = v[k];
+        if (r && typeof r === 'object') {
+          if (r.rule) actions++;
+          if (Array.isArray(r.events)) events += r.events.length;
+          else if (r.events) events++;
+          if (r.conditions) conditions++;
+        }
+      });
+      var deCount = (v.dataelement && Array.isArray(v.dataelement)) ? v.dataelement.length : 0;
+
+      var tr = document.createElement('tr');
+      tr.classList.add('data-displayed');
+      tr._rowIndex = index;
+      tr._extKey = key;
+      tr._detailData = v;
+      tr.setAttribute('data-ext-key', key);
+      tr.setAttribute('data-display-name', (displayName || '').toLowerCase());
+
+      var tdId = document.createElement('td');
+      tdId.className = 'ext-col-id';
+      tdId.style.textAlign = 'center';
+      tdId.style.fontWeight = '600';
+      tdId.textContent = String(index + 1);
+      tr.appendChild(tdId);
+
+      var tdName = document.createElement('td');
+      tdName.className = 'ext-name-cell';
+      tdName.style.cursor = 'pointer';
+      var expandIcon = document.createElement('span');
+      expandIcon.className = 'ext-expand-icon';
+      expandIcon.textContent = '\u25B6';
+      expandIcon.style.cursor = 'pointer';
+      expandIcon.style.marginRight = '8px';
+      expandIcon.setAttribute('aria-label', 'Expand details');
+      expandIcon.onclick = function (e) {
+        e.stopPropagation();
+        toggleExpand(expandIcon, index);
       };
-      var size = byte(JSON.stringify(obj[key]));
-      var tr_extension = document.createElement('tr');
-      var th_extension = document.createElement('td');
-      var th_action = document.createElement('td');
-      th_action.id = 'rule_action_' + key;
-      th_action.innerHTML = '0';
-      var th_events = document.createElement('td');
-      th_events.id = 'rule_events_' + key;
-      th_events.innerHTML = '0';
-      var th_conditions = document.createElement('td');
-      th_conditions.id = 'rule_conditions_' + key;
-      th_conditions.innerHTML = '0';
-      var th_de = document.createElement('td');
-      th_de.id = 'de_' + key;
-      th_de.innerHTML = '0';
-      var th_size = document.createElement('td');
-      th_size.innerHTML = Number((size / 1000).toFixed(2));
-      var a = document.createElement('a');
-      a.href = 'extensiondetails.html?extensionname=' + key;
-      a.target = 'iframe2';
-      a.style.textDecoration = 'none';
-      a.innerHTML = obj[key].displayName;
-      th_extension.appendChild(a);
-      tr_extension.appendChild(th_extension);
-      tr_extension.appendChild(th_action);
-      tr_extension.appendChild(th_events);
-      tr_extension.appendChild(th_conditions);
-      tr_extension.appendChild(th_de);
-      tr_extension.appendChild(th_size);
-      extension_details_node.appendChild(tr_extension);
+      tdName.appendChild(expandIcon);
+      tdName.appendChild(document.createTextNode(displayName || key));
+      tdName.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleExpand(expandIcon, index);
+      };
+      tr.appendChild(tdName);
+
+      tr.appendChild(makeIconCell(actions, 'fa-cogs', 'Used in rule actions'));
+      tr.appendChild(makeIconCell(events, 'fa-bolt', 'Used in rule events'));
+      tr.appendChild(makeIconCell(conditions, 'fa-filter', 'Used in rule conditions'));
+      tr.appendChild(makeIconCell(deCount, 'fa-database', 'Used in data elements'));
+
+      var tdSize = document.createElement('td');
+      tdSize.className = 'ext-size-cell';
+      tdSize.textContent = sizeKb.toFixed(2);
+      tdSize.setAttribute('data-sort-value', String(sizeKb));
+      tr.appendChild(tdSize);
+
+      tbody.appendChild(tr);
+
+      var expandTd = document.createElement('td');
+      expandTd.colSpan = 7;
+      expandTd.appendChild(buildExpandableContent(key, v));
+      var expandTr = document.createElement('tr');
+      expandTr.className = 'expandable-row';
+      expandTr.appendChild(expandTd);
+      tbody.appendChild(expandTr);
+    });
+    table.appendChild(tbody);
+  }
+
+  function toggleExpand(icon, rowIndex) {
+    var currentRow = icon.closest('tr');
+    if (!currentRow || currentRow.classList.contains('expandable-row')) return;
+    var expandableRow = currentRow.nextElementSibling;
+    if (!expandableRow || !expandableRow.classList.contains('expandable-row')) return;
+    expandableRow.classList.toggle('active');
+    icon.classList.toggle('expanded', expandableRow.classList.contains('active'));
+  }
+
+  function updatePageInfo() {
+    var tbody = document.getElementById('extension_details') && document.getElementById('extension_details').querySelector('tbody');
+    if (!tbody) return;
+    var allRows = Array.from(tbody.querySelectorAll('tr'));
+    var dataRows = allRows.filter(function (r) { return !r.classList.contains('expandable-row'); });
+    var visibleRows = dataRows.filter(function (r) { return !r.classList.contains('search-hidden'); });
+    var totalPages = Math.ceil(visibleRows.length / ROWS_PER_PAGE) || 1;
+    var start = (currentPage - 1) * ROWS_PER_PAGE;
+    var end = Math.min(start + ROWS_PER_PAGE, visibleRows.length);
+
+    document.getElementById('currentPage').textContent = currentPage;
+    document.getElementById('totalPages').textContent = totalPages;
+    document.getElementById('prevPage').disabled = currentPage <= 1;
+    document.getElementById('nextPage').disabled = totalPages === 0 || currentPage >= totalPages;
+
+    var countEl = document.getElementById('extCountInfo');
+    if (countEl) {
+      if (visibleRows.length === 0) countEl.textContent = 'No extensions match.';
+      else countEl.textContent = 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + builtExtensionCount + ' extension' + (builtExtensionCount !== 1 ? 's' : '');
     }
   }
 
-  // Rules code
-  var rule = sessionStorage.getItem('_satellite._container.rules');
-  const rule_obj = JSON.parse(rule);
-  let value_obj = {},
-    extension_obj = {};
-  for (i = 0; i < rule_obj.length; i++) {
-    extension_obj = {};
-    if (rule_obj[i].actions) {
-      for (j = 0; j < rule_obj[i].actions.length; j++) {
-        if (rule_obj[i].actions[j].modulePath) {
-          var modulePath_action = rule_obj[i].actions[j].modulePath.split('/');
-          extension_obj[modulePath_action[0]] =
-            extension_obj[modulePath_action[0]] || {};
-          if (!extension_obj[modulePath_action[0]].actionvalue) {
-            extension_obj[modulePath_action[0]].actionvalue = 1;
-            value_obj[modulePath_action[0]] =
-              value_obj[modulePath_action[0]] || {};
-            value_obj[modulePath_action[0]].ruleaction =
-              value_obj[modulePath_action[0]].ruleaction + 1 || 1;
-            if (!value_obj[modulePath_action[0]][rule_obj[i].name]) {
-              value_obj[modulePath_action[0]][rule_obj[i].name] =
-                value_obj[modulePath_action[0]][rule_obj[i].name] || {};
-              value_obj[modulePath_action[0]][rule_obj[i].name].rule = 1;
-            } else {
-              value_obj[modulePath_action[0]][rule_obj[i].name].rule = 1;
-            }
-          }
+  function showPage(page) {
+    var tbody = document.getElementById('extension_details') && document.getElementById('extension_details').querySelector('tbody');
+    if (!tbody) return;
+    var allRows = Array.from(tbody.querySelectorAll('tr'));
+    allRows.forEach(function (row) { row.style.display = 'none'; });
+    var dataRows = allRows.filter(function (row) { return !row.classList.contains('expandable-row'); });
+    var visibleRows = dataRows.filter(function (row) { return !row.classList.contains('search-hidden'); });
+    var totalPages = Math.ceil(visibleRows.length / ROWS_PER_PAGE) || 1;
+    currentPage = Math.max(1, Math.min(page, totalPages));
+    var start = (currentPage - 1) * ROWS_PER_PAGE;
+    var end = start + ROWS_PER_PAGE;
+    visibleRows.slice(start, end).forEach(function (row) {
+      row.style.display = '';
+      var next = row.nextElementSibling;
+      if (next && next.classList.contains('expandable-row')) next.style.display = '';
+    });
+    updatePageInfo();
+  }
+
+  function sortTable(columnIndex) {
+    var table = document.getElementById('extension_details');
+    if (!table) return;
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    var allRows = Array.from(tbody.querySelectorAll('tr'));
+    var rows = allRows.filter(function (r) { return !r.classList.contains('expandable-row'); });
+    var isAsc = table.getAttribute('data-sort-ext-' + columnIndex) !== 'asc';
+    table.setAttribute('data-sort-ext-' + columnIndex, isAsc ? 'asc' : 'desc');
+
+    rows.sort(function (a, b) {
+      var cellA = a.cells[columnIndex];
+      var cellB = b.cells[columnIndex];
+      var valA = cellA && cellA.getAttribute('data-sort-value');
+      var valB = cellB && cellB.getAttribute('data-sort-value');
+      if (valA != null && valB != null) {
+        var numA = parseFloat(valA);
+        var numB = parseFloat(valB);
+        if (!isNaN(numA) && !isNaN(numB)) return isAsc ? numA - numB : numB - numA;
+      }
+      var textA = (cellA && cellA.textContent) || '';
+      var textB = (cellB && cellB.textContent) || '';
+      return isAsc ? (textA || '').localeCompare(textB || '') : (textB || '').localeCompare(textA || '');
+    });
+    rows.forEach(function (row) {
+      tbody.appendChild(row);
+      var next = row.nextElementSibling;
+      if (next && next.classList.contains('expandable-row')) tbody.appendChild(next);
+    });
+    currentPage = 1;
+    showPage(1);
+  }
+
+  function exportCSV() {
+    var table = document.getElementById('extension_details');
+    if (!table) return;
+    var headers = [];
+    table.querySelectorAll('thead th').forEach(function (th) {
+      headers.push(th.textContent.replace(/\s*\u00a0.*/, '').trim());
+    });
+    var rows = [headers];
+    table.querySelectorAll('tbody tr').forEach(function (tr) {
+      if (tr.classList.contains('search-hidden') || tr.classList.contains('expandable-row')) return;
+      var cells = [];
+      tr.querySelectorAll('td').forEach(function (td) { cells.push(td.textContent.trim()); });
+      rows.push(cells);
+    });
+    var csv = rows.map(function (row) { return row.map(function (cell) { return '"' + String(cell).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.download = 'extensions.csv';
+    a.href = URL.createObjectURL(blob);
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function init() {
+    var extMain = document.getElementById('ext-main');
+    var noData = document.getElementById('no-data-alert');
+    var loader = document.getElementById('set_display');
+
+    var extObj = getExtensionObject();
+    if (!extObj || Object.keys(extObj).length === 0) {
+      loader.style.display = 'none';
+      if (noData) noData.style.display = 'block';
+      return;
+    }
+
+    buildUsageMap();
+    buildTable(extObj);
+    loader.style.display = 'none';
+    if (extMain) extMain.style.display = 'block';
+
+    var payloadEl = document.getElementById('ext-payload-source');
+    var keysEl = document.getElementById('ext-keys-list');
+    var keyListEl = document.getElementById('ext-storage-key');
+    if (payloadEl) payloadEl.style.display = 'block';
+    if (keyListEl) keyListEl.textContent = "sessionStorage['_satellite._container.extension']";
+    if (keysEl) {
+      var keys = Object.keys(extObj).sort();
+      keysEl.textContent = keys.length ? keys.join(', ') : '(none)';
+    }
+
+    showPage(1);
+
+    var searchInput = document.getElementById('extensionSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        var term = (searchInput.value || '').trim().toLowerCase();
+        var tbody = document.getElementById('extension_details') && document.getElementById('extension_details').querySelector('tbody');
+        if (tbody) {
+          tbody.querySelectorAll('tr').forEach(function (tr) {
+            var name = tr.getAttribute('data-display-name') || '';
+            if (!term || name.indexOf(term) !== -1) tr.classList.remove('search-hidden');
+            else tr.classList.add('search-hidden');
+          });
+          currentPage = 1;
+          showPage(1);
         }
-      }
+      });
     }
-    //end-for-actions
-    if (rule_obj[i].events) {
-      for (j = 0; j < rule_obj[i].events.length; j++) {
-        if (rule_obj[i].events[j].modulePath) {
-          var modulePath_events = rule_obj[i].events[j].modulePath.split('/');
-          extension_obj[modulePath_events[0]] =
-            extension_obj[modulePath_events[0]] || {};
-          if (!extension_obj[modulePath_events[0]].eventvalue) {
-            extension_obj[modulePath_events[0]].eventvalue = 1;
-            value_obj[modulePath_events[0]] =
-              value_obj[modulePath_events[0]] || {};
-            value_obj[modulePath_events[0]].ruleevents =
-              value_obj[modulePath_events[0]].ruleevents + 1 || 1;
-            if (!value_obj[modulePath_events[0]][rule_obj[i].name]) {
-              value_obj[modulePath_events[0]][rule_obj[i].name] =
-                value_obj[modulePath_events[0]][rule_obj[i].name] || {};
-              value_obj[modulePath_events[0]][rule_obj[i].name].events = 1;
-            } else {
-              value_obj[modulePath_events[0]][rule_obj[i].name].events = 1;
-            }
-          }
-        }
-      }
+
+    var prevBtn = document.getElementById('prevPage');
+    var nextBtn = document.getElementById('nextPage');
+    if (prevBtn) prevBtn.addEventListener('click', function () { if (currentPage > 1) showPage(currentPage - 1); });
+    if (nextBtn) nextBtn.addEventListener('click', function () { showPage(currentPage + 1); });
+
+    var downloadArea = document.querySelector('.ext-page-header .download-button');
+    if (downloadArea) {
+      downloadArea.innerHTML = '';
+      var exportBtn = document.createElement('button');
+      exportBtn.className = 'btn btn-success btn-sm';
+      exportBtn.innerHTML = '<i class="fas fa-file-csv"></i> Export CSV';
+      exportBtn.onclick = exportCSV;
+      downloadArea.appendChild(exportBtn);
     }
-    //end-for-events
-    if (rule_obj[i].conditions) {
-      for (j = 0; j < rule_obj[i].conditions.length; j++) {
-        if (rule_obj[i].conditions[j].modulePath) {
-          var modulePath_conditions =
-            rule_obj[i].conditions[j].modulePath.split('/');
-          extension_obj[modulePath_conditions[0]] =
-            extension_obj[modulePath_conditions[0]] || {};
-          if (!extension_obj[modulePath_conditions[0]].conditionsvalue) {
-            extension_obj[modulePath_conditions[0]].conditionsvalue = 1;
-            value_obj[modulePath_conditions[0]] =
-              value_obj[modulePath_conditions[0]] || {};
-            value_obj[modulePath_conditions[0]].conditionsvalue =
-              value_obj[modulePath_conditions[0]].conditionsvalue + 1 || 1;
-            if (!value_obj[modulePath_conditions[0]][rule_obj[i].name]) {
-              value_obj[modulePath_conditions[0]][rule_obj[i].name] =
-                value_obj[modulePath_conditions[0]][rule_obj[i].name] || {};
-              value_obj[modulePath_conditions[0]][
-                rule_obj[i].name
-              ].conditions = 1;
-            } else {
-              value_obj[modulePath_conditions[0]][
-                rule_obj[i].name
-              ].conditions = 1;
-            }
-          }
-        }
-      }
+
+    var table = document.getElementById('extension_details');
+    if (table) {
+      table.querySelectorAll('thead th.sortable').forEach(function (th, i) {
+        var col = parseInt(th.getAttribute('data-col'), 10);
+        if (isNaN(col)) col = i;
+        th.addEventListener('click', function () { sortTable(col); });
+      });
     }
   }
-  //end rule code
-  //start of DE
-  var de_value = sessionStorage.getItem('_satellite._container.dataElements');
-  const de_obj = JSON.parse(de_value);
-  extension_obj = {};
-  for (var key in de_obj) {
-    if (de_obj.hasOwnProperty(key) && de_obj[key].modulePath) {
-      var modulePath_de = de_obj[key].modulePath;
-      modulePath_de = modulePath_de.split('/');
-      value_obj[modulePath_de[0]] = value_obj[modulePath_de[0]] || {};
-      value_obj[modulePath_de[0]].devalue =
-        value_obj[modulePath_de[0]].devalue + 1 || 1;
-      if (!value_obj[modulePath_de[0]]['dataelement']) {
-        value_obj[modulePath_de[0]]['dataelement'] = [];
-        value_obj[modulePath_de[0]]['dataelement'].push({
-          name: key,
-          path: de_obj[key].modulePath,
-        });
-      } else {
-        value_obj[modulePath_de[0]]['dataelement'].push({
-          name: key,
-          path: de_obj[key].modulePath,
-        });
-      }
-    }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
-  //End of DE
-  // values
-  var extension = sessionStorage.setItem(
-    '_satellite._extension',
-    JSON.stringify(value_obj)
-  );
-  for (var key in value_obj) {
-    if (value_obj.hasOwnProperty(key)) {
-      if (value_obj[key].ruleaction) {
-        document.getElementById('rule_action_' + key).innerHTML =
-          value_obj[key].ruleaction;
-      }
-      if (value_obj[key].ruleevents) {
-        document.getElementById('rule_events_' + key).innerHTML =
-          value_obj[key].ruleevents;
-      }
-      if (value_obj[key].conditionsvalue) {
-        document.getElementById('rule_conditions_' + key).innerHTML =
-          value_obj[key].conditionsvalue;
-      }
-      if (value_obj[key].devalue) {
-        document.getElementById('de_' + key).innerHTML = value_obj[key].devalue;
-      }
-    }
-  }
-  //End Values
-}
-
-var download_button = document.getElementsByClassName('download-button');
-if (download_button[0]) {
-  console.log('I am an alert box!');
-  var csv = [];
-  var rows = document.querySelectorAll('table tr');
-  for (var i = 0; i < rows.length; i++) {
-    var row = [],
-      cols = rows[i].querySelectorAll('td, th');
-
-    for (var j = 0; j < cols.length; j++) row.push(cols[j].innerText);
-
-    csv.push(row.join(','));
-  }
-  // Download CSV file
-  console.log('Hey');
-  downloadCSV(csv.join('\n'), 'extension.csv');
-}
-
-function downloadCSV(csv, filename) {
-  console.log('hhh');
-  var csvFile;
-  var downloadLink;
-
-  // CSV file
-  csvFile = new Blob([csv], {
-    type: 'text/csv',
-  });
-
-  // Download link
-  downloadLink = document.createElement('a');
-  downloadLink.download = filename;
-  downloadLink.href = window.URL.createObjectURL(csvFile);
-  downloadLink.style.color = 'black';
-  downloadLink.innerHTML = 'Export CSV File ';
-  downloadLink.style.textAlign = 'right';
-  download_button[0].appendChild(downloadLink);
-}
-var set_display = document.getElementById('set_display');
-set_display.style = 'display: none;';
+})();

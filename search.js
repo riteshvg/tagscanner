@@ -11,17 +11,101 @@ if (search_details_node && value) {
     var rule_value = sessionStorage.getItem("_satellite._container.rules");
     const obj = JSON.parse(rule_value);
     var de_rule_action_count = 0,de_rule_condition_count = 0,de_rule_event_count =0, de_rule_count=0;
-    var rule_custom_code = sessionStorage.getItem('adobe_custom_code');
+    // Use container data instead of registerScript parsing
     var pk = [];
-    rule_custom_code = rule_custom_code || "";
-    rule_custom_code = rule_custom_code.split('rule_ccc_code');
-    for(t=0;t<rule_custom_code.length;t++){
-        if(rule_custom_code[t].indexOf(value) > 0){
-            var k = rule_custom_code[t];
-            k = k.split("_satellite.__registerScript('https://assets.adobedtm.com/");
-            k[0] = k[1].split('min.js');
-            pk.push(k[0][0])
-    }
+    
+    // Get custom code from container data
+    if (window._satellite && window._satellite._container && window._satellite._container.rules) {
+        const containerRules = window._satellite._container.rules;
+        
+        // Search through all rules for custom code that contains the search value
+        for (const rule of containerRules) {
+            // Check conditions
+            if (rule.conditions) {
+                for (const condition of rule.conditions) {
+                    if (condition.settings && condition.settings.source) {
+                        const sourceStr = typeof condition.settings.source === 'function' 
+                            ? condition.settings.source.toString() 
+                            : condition.settings.source;
+                        
+                        if (sourceStr.indexOf(value) > -1) {
+                            // Extract any URLs or identifiers from the custom code
+                            const urlMatch = sourceStr.match(/https:\/\/assets\.adobedtm\.com\/[^"'\s]+/);
+                            if (urlMatch) {
+                                pk.push(urlMatch[0]);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Check actions
+            if (rule.actions) {
+                for (const action of rule.actions) {
+                    // Helper function to check custom code in various locations
+                    function checkCustomCode(source) {
+                        if (!source) return false;
+                        
+                        const sourceStr = typeof source === 'function' 
+                            ? source.toString() 
+                            : source;
+                        
+                        if (sourceStr.indexOf(value) > -1) {
+                            // Extract any URLs or identifiers from the custom code
+                            const urlMatch = sourceStr.match(/https:\/\/assets\.adobedtm\.com\/[^"'\s]+/);
+                            if (urlMatch) {
+                                pk.push(urlMatch[0]);
+                            }
+                            return true;
+                        }
+                        return false;
+                    }
+                    
+                    // Check various possible custom code locations
+                    if (action.settings) {
+                        // 1. Check action.settings.source (primary location)
+                        if (action.settings.source && checkCustomCode(action.settings.source)) {
+                            continue;
+                        }
+                        
+                        // 2. Check action.settings.customCode
+                        if (action.settings.customCode && checkCustomCode(action.settings.customCode)) {
+                            continue;
+                        }
+                        
+                        // 3. Check action.settings.code
+                        if (action.settings.code && checkCustomCode(action.settings.code)) {
+                            continue;
+                        }
+                        
+                        // 4. Check action.settings.script
+                        if (action.settings.script && checkCustomCode(action.settings.script)) {
+                            continue;
+                        }
+                        
+                        // 5. Check action.settings.customSetup.source
+                        if (action.settings.customSetup && action.settings.customSetup.source && checkCustomCode(action.settings.customSetup.source)) {
+                            continue;
+                        }
+                        
+                        // 6. Check action.settings.body
+                        if (action.settings.body && checkCustomCode(action.settings.body)) {
+                            continue;
+                        }
+                        
+                        // 7. Check action.settings.content
+                        if (action.settings.content && checkCustomCode(action.settings.content)) {
+                            continue;
+                        }
+                    }
+                    
+                    // 8. Check action.customCode (root level)
+                    if (action.customCode && checkCustomCode(action.customCode)) {
+                        continue;
+                    }
+                }
+            }
+        }
     }
     for (i = 0; i < obj.length; i++) {
       let de_action_check = 0,de_event_check = 0,de_condition_check = 0; 

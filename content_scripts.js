@@ -119,3 +119,35 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   // Return true to indicate we'll respond asynchronously
   return true;
 });
+
+function extractComponentData() {
+  if (window._satellite && window._satellite._container && window._satellite._container.rules) {
+    const rules = window._satellite._container.rules.map(rule => ({
+      ruleName: rule.name || "",
+      adobeAnalytics: rule.extension === "Adobe Analytics" ? "Yes" : "No",
+      webSdk: rule.extension === "Web SDK" ? "Yes" : "No",
+      sizeKb: rule.size ? (rule.size / 1000).toFixed(2) : "",
+      extension: rule.extension || "",
+      ruleEvents: rule.events ? rule.events.map(e => e.type).join(", ") : "",
+      conditions: rule.conditions ? rule.conditions.map(c => c.type).join(", ") : "",
+      ruleActions: rule.actions ? rule.actions.map(a => a.type).join(", ") : "",
+      customCodeCondYN: rule.customCodeCondition ? "Yes" : "No",
+      customCodeActionYN: rule.customCodeAction ? "Yes" : "No",
+      customCodeCond: rule.customCodeCondition || "",
+      customCodeAction: rule.customCodeAction || ""
+    }));
+    // Save to chrome.storage.local for cross-tab access
+    chrome.storage.local.set({ tagscanner_rules: rules });
+    return rules;
+  }
+  return [];
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === "GET_COMPONENT_DATA") {
+    sendResponse({ data: extractComponentData() });
+  }
+});
+
+// On load, extract and store rules if available
+extractComponentData();

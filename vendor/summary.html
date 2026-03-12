@@ -43,11 +43,6 @@
       .rule-card .summary-card-header {
         background-color: #f68d2e;
       }
-      .download-section {
-        margin-top: 30px;
-        margin-bottom: 40px;
-        text-align: center;
-      }
       .component-list {
         max-height: 200px;
         overflow-y: auto;
@@ -58,6 +53,11 @@
       }
       .component-list li {
         margin-bottom: 5px;
+      }
+      .download-section {
+        margin-top: 30px;
+        margin-bottom: 40px;
+        text-align: center;
       }
       .description-text {
         margin-top: 10px;
@@ -104,7 +104,6 @@
         }
       }
     </style>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
   </head>
   <body>
     <div class="loader-container" id="set_display">
@@ -133,18 +132,16 @@
         </button>
       </div>
       <div class="description-text">
-        This page provides an easier way to summarize the entire implementation
-        There is a provision to see the necessary details of your property, as
-        well as the size of each component type - rules, data elements and
-        extensions. You can then You can download the summary as an attachment
-        and attach it to your audit report, or copy the table component wise and
-        paste it into a email for quick discussions
+        This page summarizes your Adobe Tags property: counts and sizes of
+        rules, data elements, and extensions, and identifies unused components.
+        You can download the summary as a PDF for audit reports, or copy each
+        table and paste it into email for quick discussions.
       </div>
       <div class="row mt-4">
         <div class="col-md-6">
           <div
             class="summary-card data-element-card"
-            data-intro="This section shows unsued data elements"
+            data-intro="This section shows unused data elements"
             data-step="1"
           >
             <div class="summary-card-header">
@@ -194,11 +191,9 @@
         </div>
       </div>
 
-      <!-- The download button will now appear after all cards -->
       <!-- The second row with extension card and property details card is dynamically added by JavaScript -->
     </div>
 
-    <!-- Download section moved to the bottom of the container -->
     <div class="container-fluid">
       <div class="download-section">
         <button id="download-pdf" class="btn btn-primary">

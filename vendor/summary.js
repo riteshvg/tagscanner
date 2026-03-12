@@ -37,9 +37,25 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   try {
-    const dataElements = JSON.parse(de_value);
-    const rules = JSON.parse(rule_value);
-    const extensions = extension_value ? JSON.parse(extension_value) : {};
+    const dataElementsRaw = JSON.parse(de_value);
+    const dataElements =
+      dataElementsRaw &&
+      typeof dataElementsRaw === 'object' &&
+      !Array.isArray(dataElementsRaw)
+        ? dataElementsRaw
+        : {};
+    const rulesRaw = JSON.parse(rule_value);
+    const rules = Array.isArray(rulesRaw)
+      ? rulesRaw
+      : rulesRaw && Array.isArray(rulesRaw.rules)
+        ? rulesRaw.rules
+        : rulesRaw && typeof rulesRaw === 'object'
+          ? Object.values(rulesRaw).filter(
+              (item) => item && typeof item === 'object'
+            )
+          : [];
+    let extensions = extension_value ? JSON.parse(extension_value) : {};
+    if (typeof extensions !== 'object' || extensions === null) extensions = {};
 
     console.log('Data elements parsed:', Object.keys(dataElements).length);
     console.log('Rules parsed:', rules.length);
@@ -104,12 +120,13 @@ document.addEventListener('DOMContentLoaded', function () {
     let totalRuleSize = 0;
     let unusedRuleSize = 0;
 
-    rules.forEach((rule) => {
+    rules.forEach((rule, ruleIndex) => {
       const size = calculateSize(rule);
       totalRuleSize += size;
+      const ruleKey = rule.id || rule.name || 'rule-' + ruleIndex;
 
-      usageData.rules[rule.id] = {
-        name: rule.name,
+      usageData.rules[ruleKey] = {
+        name: rule.name || rule.id || 'Rule ' + (ruleIndex + 1),
         used: false,
         hasEvents: false,
         size: size,
@@ -117,8 +134,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
       // Rules with events are considered "used" as they can be triggered
       if (rule.events && rule.events.length > 0) {
-        usageData.rules[rule.id].used = true;
-        usageData.rules[rule.id].hasEvents = true;
+        usageData.rules[ruleKey].used = true;
+        usageData.rules[ruleKey].hasEvents = true;
 
         // Check if rule events use extensions
         rule.events.forEach((event) => {
@@ -126,7 +143,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const modulePath = event.modulePath.split('/')[0];
             if (usageData.extensions[modulePath]) {
               usageData.extensions[modulePath].used = true;
-              usageData.extensions[modulePath].usedInRules.push(rule.name);
+              usageData.extensions[modulePath].usedInRules.push(
+                rule.name || ruleKey
+              );
             }
           }
         });
@@ -139,7 +158,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const modulePath = condition.modulePath.split('/')[0];
             if (usageData.extensions[modulePath]) {
               usageData.extensions[modulePath].used = true;
-              usageData.extensions[modulePath].usedInRules.push(rule.name);
+              usageData.extensions[modulePath].usedInRules.push(
+                rule.name || ruleKey
+              );
             }
           }
         });
@@ -152,7 +173,9 @@ document.addEventListener('DOMContentLoaded', function () {
             const modulePath = action.modulePath.split('/')[0];
             if (usageData.extensions[modulePath]) {
               usageData.extensions[modulePath].used = true;
-              usageData.extensions[modulePath].usedInRules.push(rule.name);
+              usageData.extensions[modulePath].usedInRules.push(
+                rule.name || ruleKey
+              );
             }
           }
         });
@@ -467,12 +490,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const deSizeInfo = document.createElement('div');
     deSizeInfo.className = 'text-center mt-3';
+    const deTotalCount = Object.keys(dataElements).length;
+    const deUnusedPct =
+      deTotalCount > 0
+        ? Math.round((unusedDataElements.length / deTotalCount) * 100)
+        : 0;
     deSizeInfo.innerHTML = `
       <div class="unused-label">You save</div>
-      <div class="unused-count">${unusedDeSize.toFixed(2)} KB - (${Math.round(
-      (unusedDataElements.length / Object.keys(dataElements).length) * 100
-    )}%) </div>
-      <div class="unused-label">of <strong> ${totalDeSize.toFixed(
+      <div class="unused-count">${unusedDeSize.toFixed(2)} KB - (${deUnusedPct}%)</div>
+      <div class="unused-label">of <strong>${totalDeSize.toFixed(
         2
       )}</strong> KB total if the following data elements are disabled.</div>
     `;
@@ -493,111 +519,36 @@ document.addEventListener('DOMContentLoaded', function () {
     `;
     ruleCardBody.querySelector('.row').after(ruleSizeInfo);
 
-    // Get property information from sessionStorage
-    const propertyName =
-      sessionStorage.getItem('launch_property_name') || 'Unknown Property';
-    const propertyEnvironment =
-      sessionStorage.getItem('launch_property_environment') || 'Production';
-    const tagScannerVersion =
-      sessionStorage.getItem('tagScanner_version') || '1.6.4';
+    // Property details: use sessionStorage when set by popup, otherwise fallbacks
+    const propertyName = sessionStorage.getItem('launch_property_name') || 'Unknown Property';
+    const propertyEnvironment = sessionStorage.getItem('launch_property_environment') || 'Production';
+    const tagScannerVersion = sessionStorage.getItem('tagScanner_version') || '2.0.0';
+    const summaryGenerated = new Date().toLocaleString();
 
-    // Get current date and time for scan timestamp
-    const scanDate = new Date();
-    const scanDateStr = scanDate.toLocaleDateString();
-    const scanTimeStr = scanDate.toLocaleTimeString();
-    const scanTimestamp = `${scanDateStr} ${scanTimeStr}`;
+    const deCount = Object.keys(dataElements).length;
+    const ruleCount = rules.length;
+    const extCount = Object.keys(extensions).length;
+    const totalComponents = deCount + ruleCount + extCount;
+    const totalSizeKb = (totalDeSize + totalRuleSize + totalExtSize).toFixed(2);
 
-    // Create property details card
+    // Create property details card (values from already-computed counts)
     const propertyDetailsCard = document.createElement('div');
-    propertyDetailsCard.className =
-      'card shadow mb-4 summary-card property-details-card';
-    propertyDetailsCard.innerHTML = `
-      <div class="summary-card-header" style="background-color: #36b9cc;">
-        <i class="fas fa-info-circle mr-2"></i> Property Details
-      </div>
-      <div class="summary-card-body">
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>Property Name:</strong>
-          </div>
-          <div class="col-md-8">
-            ${propertyName}
-          </div>
-        </div>
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>Environment:</strong>
-          </div>
-          <div class="col-md-8">
-            ${propertyEnvironment}
-          </div>
-        </div>
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>Scan Date:</strong>
-          </div>
-          <div class="col-md-8">
-            ${scanTimestamp}
-          </div>
-        </div>
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>Data Elements:</strong>
-          </div>
-          <div class="col-md-8">
-            ${Object.keys(dataElements).length} (${
-      unusedDataElements.length
-    } unused)
-          </div>
-        </div>
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>Rules:</strong>
-          </div>
-          <div class="col-md-8">
-            ${rules.length} (${unusedRules.length} unused)
-          </div>
-        </div>
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>Extensions:</strong>
-          </div>
-          <div class="col-md-8">
-            ${Object.keys(extensions).length} (${
-      unusedExtensions.length
-    } unused)
-          </div>
-        </div>
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>Total Components:</strong>
-          </div>
-          <div class="col-md-8">
-            ${
-              Object.keys(dataElements).length +
-              rules.length +
-              Object.keys(extensions).length
-            }
-          </div>
-        </div>
-        <div class="row mb-3">
-          <div class="col-md-4">
-            <strong>Total Size:</strong>
-          </div>
-          <div class="col-md-8">
-            ${(totalDeSize + totalRuleSize + totalExtSize).toFixed(2)} KB
-          </div>
-        </div>
-        <div class="row">
-          <div class="col-md-4">
-            <strong>TagScanner Version:</strong>
-          </div>
-          <div class="col-md-8">
-            1.6.4
-          </div>
-        </div>
-      </div>
-    `;
+    propertyDetailsCard.className = 'card shadow mb-4 summary-card property-details-card';
+    propertyDetailsCard.innerHTML =
+      '<div class="summary-card-header" style="background-color: #36b9cc;">' +
+        '<i class="fas fa-info-circle mr-2"></i> Property Details' +
+      '</div>' +
+      '<div class="summary-card-body">' +
+        '<div class="row mb-3"><div class="col-md-4"><strong>Property Name:</strong></div><div class="col-md-8">' + propertyName + '</div></div>' +
+        '<div class="row mb-3"><div class="col-md-4"><strong>Environment:</strong></div><div class="col-md-8">' + propertyEnvironment + '</div></div>' +
+        '<div class="row mb-3"><div class="col-md-4"><strong>Summary Generated:</strong></div><div class="col-md-8">' + summaryGenerated + '</div></div>' +
+        '<div class="row mb-3"><div class="col-md-4"><strong>Data Elements:</strong></div><div class="col-md-8">' + deCount + ' total (' + unusedDataElements.length + ' unused)</div></div>' +
+        '<div class="row mb-3"><div class="col-md-4"><strong>Rules:</strong></div><div class="col-md-8">' + ruleCount + ' total (' + unusedRules.length + ' unused)</div></div>' +
+        '<div class="row mb-3"><div class="col-md-4"><strong>Extensions:</strong></div><div class="col-md-8">' + extCount + ' total (' + unusedExtensions.length + ' unused)</div></div>' +
+        '<div class="row mb-3"><div class="col-md-4"><strong>Total Components:</strong></div><div class="col-md-8">' + totalComponents + '</div></div>' +
+        '<div class="row mb-3"><div class="col-md-4"><strong>Total Size:</strong></div><div class="col-md-8">' + totalSizeKb + ' KB</div></div>' +
+        '<div class="row"><div class="col-md-4"><strong>TagScanner Version:</strong></div><div class="col-md-8">' + tagScannerVersion + '</div></div>' +
+      '</div>';
 
     // Create copy button for property details card
     const propDetailsCopyButton = document.createElement('div');
@@ -701,11 +652,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const extCardBody = extensionCard.querySelector('.summary-card-body');
     const extSizeInfo = document.createElement('div');
     extSizeInfo.className = 'text-center mt-3';
+    const extTotalCount = Object.keys(extensions).length;
+    const extUnusedPct =
+      extTotalCount > 0
+        ? Math.round((unusedExtensions.length / extTotalCount) * 100)
+        : 0;
     extSizeInfo.innerHTML = `
       <div class="unused-label">You save</div>
-      <div class="unused-count">${unusedExtSize.toFixed(2)} KB - (${Math.round(
-      (unusedExtensions.length / Object.keys(extensions).length) * 100
-    )}%)</div>
+      <div class="unused-count">${unusedExtSize.toFixed(2)} KB - (${extUnusedPct}%)</div>
       <div class="unused-label">of ${totalExtSize.toFixed(
         2
       )} KB total if the extensions are disabled.</div>
@@ -983,7 +937,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Add TagScanner version
     const printVersion = document.createElement('p');
     printVersion.id = 'print-version';
-    printVersion.textContent = `TagScanner Version: 1.6.4`;
+    printVersion.textContent = `TagScanner Version: 2.0.0`;
     printStats.after(printVersion);
 
     document.getElementById(
@@ -993,13 +947,7 @@ document.addEventListener('DOMContentLoaded', function () {
     } (${totalDeSize.toFixed(2)} KB)
        Unused Data Elements: ${
          unusedDataElements.length
-       } (${unusedDeSize.toFixed(2)} KB - ${
-      Object.keys(dataElements).length > 0
-        ? Math.round(
-            (unusedDataElements.length / Object.keys(dataElements).length) * 100
-          )
-        : 0
-    }%)`;
+       } (${unusedDeSize.toFixed(2)} KB - ${deUnusedPct}%)`;
 
     document.getElementById('print-rule-summary').textContent = `Total Rules: ${
       rules.length
@@ -1026,9 +974,7 @@ document.addEventListener('DOMContentLoaded', function () {
     } (${totalExtSize.toFixed(2)} KB)
        | Unused Extensions: ${unusedExtensions.length} (${unusedExtSize.toFixed(
       2
-    )} KB - ${Math.round(
-      (unusedExtensions.length / Object.keys(extensions).length) * 100
-    )}%)`;
+    )} KB - ${extTotalCount > 0 ? Math.round((unusedExtensions.length / extTotalCount) * 100) : 0}%)`;
 
     // Create extensions table
     const extPrintTable = document.createElement('table');
@@ -1160,14 +1106,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // Hide loading spinner
     document.getElementById('set_display').style.display = 'none';
 
-    // Check if this is the first visit and start tour if it is
-    if (!localStorage.getItem('tagScannerTourShown')) {
-      // Set a small delay to ensure UI is fully rendered
-      setTimeout(function () {
-        startTour();
-        localStorage.setItem('tagScannerTourShown', 'true');
-      }, 1000);
-    }
+    // Note: Tour is now handled by tour-initializer.js and only starts when user clicks "Take a Tour" button
+    // This prevents conflicts between auto-starting tour and manual tour
   } catch (error) {
     console.error('Error analyzing component usage:', error);
     document.getElementById('set_display').style.display = 'none';
@@ -1192,50 +1132,12 @@ document.addEventListener('DOMContentLoaded', function () {
   }, 1000);
 });
 
-// Function to define and start the tour
+// Function to define and start the tour - DEPRECATED
+// This function is no longer used as tours are now handled by tour-initializer.js
+// Keeping for reference but not called anywhere
 function startTour() {
-  introJs()
-    .setOptions({
-      steps: [
-        {
-          intro:
-            'The summary page is an easier way to summarize the entire implementation and share with your team. This page is also print friendly. You can see the total size of your property, as well as the size of each component type.',
-        },
-        {
-          element: document.querySelector('.property-details-card'),
-          intro:
-            'This section shows details about your Adobe Tags property, including name, environment, and total size.',
-        },
-        {
-          element: document.querySelector('.extension-card'),
-          intro:
-            'This section shows all unused Extensions that are adding weight to your property.',
-        },
-        {
-          element: document.querySelector('.rule-card'),
-          intro:
-            'This section shows all unused Rules that are adding weight to your property.',
-        },
-        {
-          element: document.querySelector('.data-element-card'),
-          intro:
-            'This section shows all unused Data Elements that are adding weight to your property.',
-        },
-        {
-          element: document.querySelector('.tablesorter'),
-          intro: 'Click on any column header to sort the table by that column.',
-        },
-        {
-          element: document.querySelector('#download-pdf'),
-          intro:
-            'Generate a PDF report that you can share with your team or stakeholders.',
-        },
-      ],
-      exitOnOverlayClick: false,
-      showBullets: true,
-      showProgress: true,
-    })
-    .start();
+  console.log('startTour function called - this should not happen');
+  // Tour functionality moved to tour-initializer.js
 }
 
 // Add function to copy table to clipboard

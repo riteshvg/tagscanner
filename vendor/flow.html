@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Component Flow</title>
+    <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+    <link href="../css/styles.css" rel="stylesheet" />
+    <style>
+      body { background: #f0f2f5; }
+      .flow-page-header {
+        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      }
+      .flow-page-header h5 {
+        color: white;
+        padding: 12px 16px;
+        margin-bottom: 0;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .flow-page-header h5 i {
+        margin-right: 10px;
+        opacity: 0.95;
+      }
+      .flow-config-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px 16px;
+        background: #fff;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        font-size: 14px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        border: 1px solid #e8eaed;
+      }
+      .flow-config-bar label {
+        margin: 0;
+        color: #5f6368;
+        font-weight: 500;
+      }
+      .flow-config-bar input {
+        padding: 8px 12px;
+        border: 1px solid #dadce0;
+        border-radius: 6px;
+        width: 320px;
+        max-width: 100%;
+        font-size: 14px;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+      .flow-config-bar #flowSearchClear {
+        margin-left: 4px;
+      }
+      .flow-config-bar input:focus {
+        outline: none;
+        border-color: #4e73df;
+        box-shadow: 0 0 0 2px rgba(78,115,223,0.2);
+      }
+      .flow-chart-wrapper {
+        width: 100%;
+        margin-left: -15px;
+        margin-right: -15px;
+        max-width: calc(100% + 30px);
+      }
+      .flow-chart-container {
+        width: 100%;
+        max-height: 560px;
+        min-height: 320px;
+        background: linear-gradient(180deg, #fafbfc 0%, #f0f2f5 100%);
+        border-radius: 12px;
+        overflow: auto;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+        border: 1px solid #e1e4e8;
+      }
+      .flow-chart-container svg {
+        display: block;
+        width: 100%;
+        min-width: 100%;
+      }
+      .flow-column-bg {
+        fill: #e8eaed;
+      }
+      .flow-node {
+        cursor: pointer;
+      }
+      .flow-node:hover .flow-node-pill {
+        filter: brightness(1.08);
+      }
+      .flow-node-modal .modal-dialog { max-width: 560px; min-width: 420px; }
+      .flow-node-modal .modal-body {
+        max-height: 70vh;
+        overflow-y: auto;
+      }
+      .flow-node-modal .list-group-item { font-size: 14px; }
+      .flow-node-modal { z-index: 1050; }
+      .flow-node-modal.show { display: block !important; }
+      .flow-modal-backdrop {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); z-index: 1040;
+      }
+      .flow-node .flow-node-pill {
+        rx: 14px;
+        transition: filter 0.2s ease;
+      }
+      .flow-node.de-node .flow-node-pill { fill: #0d9488; }
+      .flow-node.rule-node .flow-node-pill { fill: #2563eb; }
+      .flow-node.ext-node .flow-node-pill { fill: #64748b; }
+      .flow-node text {
+        font-size: 12px;
+        fill: #1e293b;
+        pointer-events: none;
+        font-weight: 500;
+      }
+      .flow-node text.flow-node-label {
+        fill: #334155;
+      }
+      .flow-link {
+        fill: none;
+        stroke: #94a3b8;
+        stroke-opacity: 0.45;
+        transition: stroke-opacity 0.2s ease;
+      }
+      .flow-link:hover {
+        stroke-opacity: 0.75;
+      }
+      .flow-node.dimmed,
+      .flow-link.dimmed {
+        opacity: 0.22;
+        transition: opacity 0.2s ease;
+      }
+      .flow-node.selected .flow-node-pill {
+        stroke: #0f172a;
+        stroke-width: 2.5px;
+        filter: brightness(1.1);
+      }
+      .flow-column-label {
+        font-size: 11px;
+        font-weight: 600;
+        fill: #64748b;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .flow-column-divider {
+        stroke: #e2e8f0;
+        stroke-width: 1;
+        stroke-dasharray: 4 4;
+      }
+      .spinner {
+        width: 64px;
+        height: 64px;
+        border: 8px solid;
+        border-color: #4e73df transparent #4e73df transparent;
+        border-radius: 50%;
+        animation: spin-anim 1.2s linear infinite;
+      }
+      @keyframes spin-anim {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .loader-container {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: fixed;
+        background: rgba(255, 255, 255, 0.9);
+        z-index: 1;
+      }
+      .loading-message { margin-top: 15px; color: #5a5c69; }
+      .flow-empty {
+        padding: 48px 24px;
+        text-align: center;
+        color: #64748b;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      .flow-info-panel {
+        background: #fff;
+        border-radius: 8px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
+        border: 1px solid #e8eaed;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      }
+      .flow-info-panel h6 {
+        color: #4e73df;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .flow-info-panel p {
+        color: #5a5c69;
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="loader-container" id="flowLoader">
+      <div class="spinner"></div>
+      <div class="loading-message">Loading flow...</div>
+    </div>
+
+    <div class="container-fluid">
+      <div class="flow-page-header">
+        <h5><i class="fas fa-project-diagram mr-2"></i> Flow</h5>
+      </div>
+
+      <div class="flow-info-panel">
+        <h6><i class="fas fa-info-circle mr-2"></i>About Flow</h6>
+        <p>This view shows how <strong>Data Elements</strong>, <strong>Rules</strong>, and <strong>Extensions</strong> connect in your property. The diagram flows left to right: data elements feed into rules, and rules use extensions. Use the search box to focus on a specific component and see only its connections. Click any node in the diagram to open a list of its connections; click again or press Escape to clear the selection. For full lists and CSV exports, use the <strong>Rules</strong>, <strong>Data Elements</strong>, and <strong>Extensions</strong> tabs in the sidebar.</p>
+      </div>
+
+      <div class="flow-config-bar">
+        <label for="flowSearch">Show flow for</label>
+        <input type="text" id="flowSearch" list="flowSearchList" placeholder="Type a data element, rule or extension name..."
+          autocomplete="off" aria-label="Search for a component to show its flow" />
+        <datalist id="flowSearchList"></datalist>
+        <button type="button" id="flowSearchClear" class="btn btn-sm btn-outline-secondary" style="display: none;">Clear</button>
+        <span class="text-muted" style="color: #94a3b8; font-size: 13px;">Data Elements → Rules → Extensions</span>
+      </div>
+
+      <div class="flow-chart-wrapper">
+        <div class="flow-chart-container" id="flowChart"></div>
+      </div>
+    </div>
+
+    <!-- Modal: connections for clicked node -->
+    <div class="modal flow-node-modal" id="flowNodeModal" tabindex="-1" role="dialog" aria-labelledby="flowNodeModalTitle" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="flowNodeModalTitle">Connections</h5>
+            <button type="button" class="close" id="flowNodeModalClose" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body" id="flowNodeModalBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="d3.js"></script>
+    <script src="flow.js"></script>
+  </body>
+</html>

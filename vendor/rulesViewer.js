@@ -250,37 +250,50 @@ function populateRulesTable(rules) {
       nameCell.textContent = rule.name || 'Unnamed Rule';
       row.appendChild(nameCell);
 
-      // Details Button
-      const detailsCell = document.createElement('td');
-      const detailsBtn = document.createElement('button');
-      detailsBtn.textContent = 'View Details';
-      detailsBtn.style.padding = '5px 10px';
-      detailsBtn.style.fontSize = '12px';
+      // Rule Event(s)
+      const eventCell = document.createElement('td');
+      let events = rule.events || rule.event || [];
+      if (!Array.isArray(events)) events = [events];
+      eventCell.textContent = events.map(e => e.type || e.name || e || '').join(', ');
+      row.appendChild(eventCell);
 
-      detailsBtn.addEventListener('click', function () {
-        // Toggle details section
-        const detailsId = `rule-details-${rule.id || index}`;
-        let detailsSection = document.getElementById(detailsId);
+      // Rule Condition(s)
+      const conditionCell = document.createElement('td');
+      let conditions = rule.conditions || rule.condition || rule.criteria || [];
+      if (!Array.isArray(conditions)) conditions = [conditions];
+      conditionCell.textContent = conditions.map(c => c.type || c.name || c || '').join(', ');
+      row.appendChild(conditionCell);
 
-        if (detailsSection) {
-          detailsSection.remove();
-        } else {
-          detailsSection = document.createElement('div');
-          detailsSection.id = detailsId;
-          detailsSection.className = 'rule-details';
+      // Rule Action(s)
+      const actionCell = document.createElement('td');
+      let actions = rule.actions || rule.action || [];
+      if (!Array.isArray(actions)) actions = [actions];
+      actionCell.textContent = actions.map(a => a.type || a.name || a || '').join(', ');
+      row.appendChild(actionCell);
 
-          // Create a formatted display of the rule details
-          const detailsPre = document.createElement('pre');
-          detailsPre.textContent = JSON.stringify(rule, null, 2);
-          detailsSection.appendChild(detailsPre);
+      // Action Extension
+      const extensionCell = document.createElement('td');
+      // Try to extract extension from actions or rule, fallback to N/A
+      let extension = '';
+      if (actions.length > 0 && actions[0].extension) {
+        extension = actions.map(a => a.extension).filter(Boolean).join(', ');
+      } else if (rule.extension) {
+        extension = rule.extension;
+      } else {
+        extension = 'N/A';
+      }
+      extensionCell.textContent = extension;
+      row.appendChild(extensionCell);
 
-          // Insert after the current row
-          row.parentNode.insertBefore(detailsSection, row.nextSibling);
-        }
-      });
+      // Custom Code in Condition
+      const customCodeCondCell = document.createElement('td');
+      customCodeCondCell.textContent = rule.customCodeCondition || (rule.conditionCustomCode ? 'Yes' : 'No');
+      row.appendChild(customCodeCondCell);
 
-      detailsCell.appendChild(detailsBtn);
-      row.appendChild(detailsCell);
+      // Custom Code in Action
+      const customCodeActionCell = document.createElement('td');
+      customCodeActionCell.textContent = rule.customCodeAction || (rule.actionCustomCode ? 'Yes' : 'No');
+      row.appendChild(customCodeActionCell);
 
       tableBody.appendChild(row);
     });
@@ -342,10 +355,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
 
-  // Add event listener to the refresh button
-  document.getElementById('refreshBtn').addEventListener('click', function () {
-    displayRules(false);
-  });
+
 
   // Add event listener to the mock data button
   document.getElementById('mockDataBtn').addEventListener('click', function () {

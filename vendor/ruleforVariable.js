@@ -233,8 +233,28 @@ function getExtensionFromPath(modulePath) {
 function getActionNameFromPath(modulePath) {
   if (!modulePath) return 'Unknown';
 
+  // Check for specific Adobe Analytics actions first
+  if (modulePath.includes('adobe-analytics/src/lib/actions/setVariables.js')) {
+    return 'Set Variable';
+  } else if (modulePath.includes('adobe-analytics/src/lib/actions/updateVariables.js')) {
+    return 'Update Variable';
+  } else if (modulePath.includes('adobe-analytics/src/lib/actions/sendBeacon.js')) {
+    return 'Send Beacon';
+  } else if (modulePath.includes('adobe-analytics/src/lib/actions/clearVariables.js')) {
+    return 'Clear Variables';
+  }
+
   // Extract the file name without extension
   const fileName = modulePath.split('/').pop().replace('.js', '');
+
+  // Handle special cases for index.js files
+  if (fileName === 'index') {
+    if (modulePath.includes('setVariables')) {
+      return 'Set Variable';
+    } else if (modulePath.includes('updateVariables')) {
+      return 'Update Variable';
+    }
+  }
 
   // Convert camelCase or kebab-case to readable format
   return fileName
@@ -496,71 +516,103 @@ function processWebSDKComponent(action, containerNode) {
   try {
     // Create a dedicated section for Web SDK
     var webSDKHeader = document.createElement('h3');
-    webSDKHeader.innerHTML = 'Web SDK Configuration';
+    webSDKHeader.innerHTML = 'Web SDK - Update Variable (Data)';
     containerNode.appendChild(webSDKHeader);
 
     // Create container for the table
     var tableContainer = document.createElement('div');
     tableContainer.style.cssText = 'margin-bottom: 20px; padding: 0;';
 
-    // First, let's handle data element references in XDM
-    let xdmData = action.settings.xdm;
+    // Check for data configuration - prioritize 'data' property for this function
     let extractedData = null;
 
-    // Check if we have a data element reference instead of direct XDM object
-    if (typeof xdmData === 'string' && xdmData.includes('%')) {
-      const dataElementName = xdmData.replace(/%/g, '');
-      try {
-        // Try to get the data element value
-        const de_value = sessionStorage.getItem(
-          '_satellite._container.dataElements'
-        );
-        if (de_value) {
-          const dataElements = JSON.parse(de_value);
-          if (
-            dataElements[dataElementName] &&
-            dataElements[dataElementName].settings
-          ) {
-            // Extract the data from the data element
-            extractedData = dataElements[dataElementName].settings.data;
-
-            // Add info about the data element source
-            const infoElement = document.createElement('div');
-            infoElement.style.cssText =
-              'margin-bottom: 15px; padding: 10px; background-color: #f0f7ff; border-left: 4px solid #0066cc; border-radius: 4px;';
-            infoElement.innerHTML = `<strong>Data Source:</strong> Data Element "${dataElementName}"`;
-            containerNode.appendChild(infoElement);
+    // First check for 'data' property (this is typically for the first WebSDK action)
+    if (action.settings.data) {
+      let dataData = action.settings.data;
+      
+      if (typeof dataData === 'string' && dataData.includes('%')) {
+        // Handle data element reference
+        const dataElementName = dataData.replace(/%/g, '');
+        try {
+          const de_value = sessionStorage.getItem(
+            '_satellite._container.dataElements'
+          );
+          if (de_value) {
+            const dataElements = JSON.parse(de_value);
+            if (
+              dataElements[dataElementName] &&
+              dataElements[dataElementName].settings
+            ) {
+              extractedData = dataElements[dataElementName].settings.data;
+              
+              // Add info about the data element source
+              const infoElement = document.createElement('div');
+              infoElement.style.cssText =
+                'margin-bottom: 15px; padding: 10px; background-color: #f0f7ff; border-left: 4px solid #0066cc; border-radius: 4px;';
+              infoElement.innerHTML = `<strong>Data Source:</strong> Data Element "${dataElementName}"`;
+              containerNode.appendChild(infoElement);
+            }
           }
+        } catch (e) {
+          console.error('Error extracting data element:', e);
         }
-      } catch (e) {
-        console.error('Error extracting data element:', e);
+      } else {
+        extractedData = dataData;
+        
+        // Add info about using data property
+        const infoElement = document.createElement('div');
+        infoElement.style.cssText =
+          'margin-bottom: 15px; padding: 10px; background-color: #f0f7ff; border-left: 4px solid #0066cc; border-radius: 4px;';
+        infoElement.innerHTML = `<strong>Data Source:</strong> Using "data" property`;
+        containerNode.appendChild(infoElement);
       }
-    } else {
-      // Direct XDM object
-      extractedData = xdmData;
+    }
+    
+    // If no data found, check for XDM property as fallback
+    if (!extractedData && action.settings.xdm) {
+      let xdmData = action.settings.xdm;
+      
+      if (typeof xdmData === 'string' && xdmData.includes('%')) {
+        // Handle data element reference
+        const dataElementName = xdmData.replace(/%/g, '');
+        try {
+          const de_value = sessionStorage.getItem(
+            '_satellite._container.dataElements'
+          );
+          if (de_value) {
+            const dataElements = JSON.parse(de_value);
+            if (
+              dataElements[dataElementName] &&
+              dataElements[dataElementName].settings
+            ) {
+              extractedData = dataElements[dataElementName].settings.data;
+              
+              // Add info about the data element source
+              const infoElement = document.createElement('div');
+              infoElement.style.cssText =
+                'margin-bottom: 15px; padding: 10px; background-color: #f0f7ff; border-left: 4px solid #0066cc; border-radius: 4px;';
+              infoElement.innerHTML = `<strong>Data Source:</strong> Data Element "${dataElementName}" (XDM)`;
+              containerNode.appendChild(infoElement);
+            }
+          }
+        } catch (e) {
+          console.error('Error extracting data element:', e);
+        }
+      } else {
+        extractedData = xdmData;
+        
+        // Add info about using XDM property
+        const infoElement = document.createElement('div');
+        infoElement.style.cssText =
+          'margin-bottom: 15px; padding: 10px; background-color: #f0f7ff; border-left: 4px solid #0066cc; border-radius: 4px;';
+        infoElement.innerHTML = `<strong>Data Source:</strong> Using "xdm" property`;
+        containerNode.appendChild(infoElement);
+      }
     }
 
-    // If we have no data at all, check if there's "data" property instead
-    if (!extractedData && action.settings.data) {
-      extractedData = { data: action.settings.data };
-
-      // Add info about using data property
-      const infoElement = document.createElement('div');
-      infoElement.style.cssText =
-        'margin-bottom: 15px; padding: 10px; background-color: #f0f7ff; border-left: 4px solid #0066cc; border-radius: 4px;';
-      infoElement.innerHTML = `<strong>Data Source:</strong> Using "data" property (no XDM found)`;
-      containerNode.appendChild(infoElement);
-    }
-
-    // If we still have no data, show a message
+    // If we still have no data, just continue without showing an error message
     if (!extractedData) {
-      const noDataMsg = document.createElement('div');
-      noDataMsg.style.cssText =
-        'padding: 10px; background-color: #fff8e1; border-left: 4px solid #ffc107; border-radius: 4px;';
-      noDataMsg.innerHTML =
-        '<strong>Note:</strong> No XDM or data configuration found for this Web SDK action.';
-      containerNode.appendChild(noDataMsg);
-      return;
+      // Don't show error message, just continue processing
     }
 
     // Create table for XDM paths

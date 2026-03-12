@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Property Report</title>
+    <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+    <link href="../css/styles.css" rel="stylesheet" />
+    <style>
+      .report-header {
+        background-color: #4e73df;
+        color: white;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+      }
+      .report-header h5 { margin: 0; color: white; }
+      .config-card {
+        border: 1px solid #e3e6f0;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        overflow: hidden;
+      }
+      .config-card-header {
+        background-color: #f8f9fc;
+        padding: 12px 16px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .config-card-header:hover { background-color: #eaecf4; }
+      .config-card-body { padding: 16px; }
+      .report-output {
+        border: 1px solid #e3e6f0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+        min-height: 200px;
+        background-color: #fafbfc;
+      }
+      .report-section {
+        margin-bottom: 20px;
+      }
+      .report-section h6 {
+        color: #4e73df;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+      .report-section pre, .report-section p {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin: 0 0 8px 0;
+        font-size: 0.9rem;
+      }
+      .btn-generate { margin-right: 10px; }
+      .loader-ai {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #f3f3f3;
+        border-top-color: #4e73df;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      #no-data-alert { margin-top: 20px; }
+      #validation-msg.alert-success { background-color: #d4edda; color: #155724; }
+      #validation-msg.alert-danger { background-color: #f8d7da; color: #721c24; }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div class="report-header">
+        <h5><i class="fas fa-file-medical-alt mr-2"></i> AI Property Report</h5>
+      </div>
+      <p class="description-text">
+        Generate a summary, grade, and health assessment of your connected Adobe Tags property using Azure OpenAI.
+        The report outlines issues (e.g. incorrect custom code, misconfigurations) and recommended next steps.
+        You can download the result as a PDF.
+      </p>
+
+      <div id="no-data-alert" class="alert alert-warning" style="display: none;">
+        No property data found. Please scan a site with the TagScanner extension and load Rules or Summary first, then return here.
+      </div>
+
+      <div id="report-main" style="display: none;">
+        <div class="config-card">
+          <div class="config-card-header" id="config-toggle">
+            <span><i class="fas fa-cog mr-2"></i> Azure OpenAI settings</span>
+            <i class="fas fa-chevron-down" id="config-chevron"></i>
+          </div>
+          <div id="config-body" class="config-card-body">
+            <div class="form-group">
+              <label for="azure-endpoint">Endpoint URL</label>
+              <input type="url" class="form-control" id="azure-endpoint" placeholder="https://your-resource.openai.azure.com/" />
+            </div>
+            <div class="form-group">
+              <label for="azure-key">API Key</label>
+              <input type="password" class="form-control" id="azure-key" placeholder="Your Azure OpenAI API key" />
+            </div>
+            <div class="form-group">
+              <label for="azure-deployment">Deployment / Model name</label>
+              <input type="text" class="form-control" id="azure-deployment" placeholder="e.g. gpt-4 or your deployment name" />
+            </div>
+            <div class="mb-2">
+              <button type="button" class="btn btn-secondary btn-sm" id="save-config">Save settings</button>
+              <button type="button" class="btn btn-info btn-sm ml-2" id="validate-config">Validate connection</button>
+              <span id="config-saved-msg" class="text-success ml-2" style="display: none;">Saved.</span>
+            </div>
+            <div id="validation-msg" class="alert mb-0" style="display: none;" role="status"></div>
+          </div>
+        </div>
+
+        <div>
+          <button type="button" class="btn btn-primary btn-generate" id="generate-report">
+            <i class="fas fa-magic mr-2"></i> Generate report
+          </button>
+          <button type="button" class="btn btn-success" id="download-pdf" disabled>
+            <i class="fas fa-file-pdf mr-2"></i> Download PDF
+          </button>
+        </div>
+
+        <div class="report-output mt-4" id="report-output">
+          <p class="text-muted">Click "Generate report" to analyze your property. Results will appear here.</p>
+        </div>
+      </div>
+    </div>
+
+    <script src="jspdf.umd.min.js"></script>
+    <script src="ai-report.js"></script>
+  </body>
+</html>

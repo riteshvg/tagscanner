@@ -1,15 +1,14 @@
 {
   "name": "TagScanner",
-  "description": "Scan your Adobe Tag property and export your library output with custom code plus visualize how different components are inter-related.",
-  "version": "1.6.4",
+  "description": "Scan your Adobe Tag property and export your library output with custom code.",
+  "version": "2.0.0",
   "manifest_version": 3,
-
-  "permissions": ["scripting", "activeTab"],
+  "permissions": ["activeTab", "storage"],
   "icons": {
-    "16": "./images/tagscanner_16x16.png",
-    "32": "./images/tagscanner_32x32.png",
-    "48": "./images/tagscanner_48x48.png",
-    "128": "./images/tagscanner_128x128.png"
+    "16": "images/tagscanner_16x16.png",
+    "32": "images/tagscanner_32x32.png",
+    "48": "images/tagscanner_48x48.png",
+    "128": "images/tagscanner_128x128.png"
   },
   "background": {
     "service_worker": "service_worker.js"
@@ -23,10 +22,10 @@
   "action": {
     "default_title": "TagScanner",
     "default_icon": {
-      "16": "./images/tagscanner_16x16.png",
-      "32": "./images/tagscanner_32x32.png",
-      "48": "./images/tagscanner_48x48.png",
-      "128": "./images/tagscanner_128x128.png"
+      "16": "images/tagscanner_16x16.png",
+      "32": "images/tagscanner_32x32.png",
+      "48": "images/tagscanner_48x48.png",
+      "128": "images/tagscanner_128x128.png"
     }
   },
   "content_scripts": [

@@ -193,34 +193,106 @@ var satellite = {};
 
       //Assigning Values in popup
       sessionStorage.setItem('launch_property_name', propertyName);
+      sessionStorage.setItem('launch_property_environment', 'Production');
       document.getElementById('property_name').innerHTML =
         'PROPERTY NAME: ' + propertyName;
 
       //Hard Setting Environment to Production - TODO: fix if ever needed. Currently will always be on prod if not owner of property.
-      document.getElementById('environment_name').innerHTML =
-        'Environment: Production';
+      var envLabel = 'Environment: Production';
+      document.getElementById('environment_name').innerHTML = envLabel;
+      if (document.getElementById('topbar-env')) {
+        document.getElementById('topbar-env').innerHTML = '<i class="fas fa-cloud mr-1"></i>Env: Production';
+      }
 
       //Extension details
       var extensionStr = JSON.stringify(extensions);
       sessionStorage.setItem('_satellite._container.extension', extensionStr);
       extensionStr = extensionStr.split('hostedLibFilesBaseUrl');
-      document.getElementById('extensions').innerHTML = extensionStr.length - 1;
+      var extCount = extensionStr.length - 1;
+      document.getElementById('extensions').innerHTML = extCount;
       sessionStorage.setItem('extensions-length', extensionStr.length - 1);
+      if (document.getElementById('topbar-ext')) {
+        document.getElementById('topbar-ext').innerHTML = '<i class="fas fa-puzzle-piece mr-1"></i>Extensions: ' + extCount;
+      }
 
       //Rule details
       document.getElementById('rule_details').innerHTML = rules.length;
+      if (document.getElementById('topbar-rules')) {
+        document.getElementById('topbar-rules').innerHTML = '<i class="fas fa-wrench mr-1"></i>Rules: ' + rules.length;
+      }
       sessionStorage.setItem('rule-length', rules.length);
       sessionStorage.setItem(
         '_satellite._container.rules',
         JSON.stringify(rules)
       );
 
+      // Save Components Overview format for display.html iframe (content script cannot read _satellite)
+      var rulesRaw = rules || (satellite._container && satellite._container.rules);
+      var rulesArray = Array.isArray(rulesRaw) ? rulesRaw : (rulesRaw && typeof rulesRaw === 'object' ? Object.values(rulesRaw) : []);
+      var tagscannerRules = rulesArray.map(function (rule) {
+        return {
+          ruleName: rule.name || '',
+          adobeAnalytics: rule.extension === 'Adobe Analytics' ? 'Yes' : 'No',
+          webSdk: rule.extension === 'Web SDK' ? 'Yes' : 'No',
+          sizeKb: rule.size ? (rule.size / 1000).toFixed(2) : '',
+          extension: rule.extension || '',
+          ruleEvents: rule.events ? rule.events.map(function (e) { return e.type; }).join(', ') : '',
+          conditions: rule.conditions ? rule.conditions.map(function (c) { return c.type; }).join(', ') : '',
+          ruleActions: rule.actions ? rule.actions.map(function (a) { return a.type; }).join(', ') : '',
+          customCodeCondYN: rule.customCodeCondition ? 'Yes' : 'No',
+          customCodeActionYN: rule.customCodeAction ? 'Yes' : 'No',
+          customCodeCond: rule.customCodeCondition || '',
+          customCodeAction: rule.customCodeAction || ''
+        };
+      });
+      if (tagscannerRules.length > 0) {
+        if (chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ tagscanner_rules: tagscannerRules });
+        }
+      }
+      // Library snapshot for Components Overview (slightly more than the header bar)
+      var customCodeRules = tagscannerRules.filter(function (r) {
+        return r.customCodeCondYN === 'Yes' || r.customCodeActionYN === 'Yes';
+      }).length;
+      var snapshot = {
+        propertyName: propertyName || 'Unknown',
+        environment: 'Production',
+        rulesCount: rulesArray.length,
+        dataElementsCount: typeof dataElements === 'object' ? Object.keys(dataElements).length : 0,
+        extensionsCount: typeof extensions === 'object' ? Object.keys(extensions).length : 0,
+        customCodeRulesCount: customCodeRules
+      };
+      if (chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ tagscanner_snapshot: snapshot });
+      }
+      var iframe = document.getElementById('component-iframe');
+      if (iframe && iframe.contentWindow) {
+        try {
+          iframe.contentWindow.postMessage({ type: 'TAGSCANNER_SNAPSHOT', data: snapshot }, '*');
+          if (tagscannerRules.length > 0) {
+            iframe.contentWindow.postMessage({ type: 'TAGSCANNER_RULES', data: tagscannerRules }, '*');
+          }
+        } catch (e) {
+          console.warn('TagScanner: could not postMessage to component iframe', e);
+        }
+      }
+
       //Data Element details
       var deStr = JSON.stringify(dataElements);
       sessionStorage.setItem('_satellite._container.dataElements', deStr);
       deStr = deStr.split('modulePath');
-      document.getElementById('dataelement').innerHTML = deStr.length - 1;
+      var deCount = deStr.length - 1;
+      document.getElementById('dataelement').innerHTML = deCount;
       sessionStorage.setItem('dataelement-length', deStr.length - 1);
+      if (document.getElementById('topbar-de')) {
+        document.getElementById('topbar-de').innerHTML = '<i class="fas fa-database mr-1"></i>Data Elements: ' + deCount;
+      }
+
+      // Load flow view in Components Overview once data is ready (so flow has data to display)
+      var componentIframe = document.getElementById('component-iframe');
+      if (componentIframe && !componentIframe.src) {
+        componentIframe.src = 'display.html';
+      }
 
       //Setting Display Properly if everything is proper
       var set_display = document.getElementById('set_display');
@@ -291,6 +363,7 @@ function parseExtensions(extensions) {
 //Parsing rules
 function parseRules(rules) {
   let parsedRules = [];
+  
   for (let rule in rules) {
     let component = rules[rule];
     let componentName = component.name;
@@ -321,6 +394,7 @@ function parseRules(rules) {
       let eventOrder = undefined;
       let de_module = undefined,
         de_settings = undefined;
+      
       parsedRules.push([
         componentType,
         componentName,
@@ -352,6 +426,7 @@ function parseRules(rules) {
       let eventOrder = undefined;
       let de_module = undefined,
         de_settings = undefined;
+      
       parsedRules.push([
         componentType,
         componentName,
@@ -381,6 +456,8 @@ function parseRules(rules) {
       }
       let de_module = undefined,
         de_settings = undefined;
+      // For events, customCode is undefined, so always 'No' for third-party tracking
+      let hasThirdPartyTracking = 'No';
       parsedRules.push([
         componentType,
         componentName,
@@ -392,6 +469,7 @@ function parseRules(rules) {
         ruleModule,
         ruleSettings,
         eventOrder,
+        hasThirdPartyTracking,
       ]);
     }
   }
@@ -417,7 +495,7 @@ function toTable(headers, data) {
 if (window.location.href.indexOf('page_url=') > -1) {
   sessionStorage.setItem('launch_page_url', window.location.href);
 }
-sessionStorage.setItem('tagScanner_version', '1.1.0');
+sessionStorage.setItem('tagScanner_version', '2.0.0');
 // document.getElementById('feed_back_form').addEventListener('click', newwindow);
 // function newwindow() {
 //   window.open(

@@ -3,90 +3,170 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Extension Page</title>
+    <title>Extensions</title>
     <script src="intro.js"></script>
-    <link
-      href="../vendor/fontawesome-free/css/all.min.css"
-      rel="stylesheet"
-      type="text/css"
-    />
+    <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
     <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
     <link href="../css/styles.css" rel="stylesheet" />
     <link href="intro.css" rel="stylesheet" />
     <style>
-      .icon-hide {
-        display: none;
-      }
-
-      .i-info :hover .icon-hide {
-        display: block;
-        color: red;
-      }
-
       table {
         font-family: arial, sans-serif;
         border-collapse: collapse;
         width: 100%;
+        min-width: 1200px;
+        font-size: 0.85rem;
+        margin: 0;
       }
-      td,
-      th {
+      th, td {
         border: 1px solid #dddddd;
         text-align: left;
-        padding: 8px;
+        padding: 6px 4px;
+        max-width: 180px;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: break-word;
       }
-
-      tr:nth-child(even) {
-        background-color: #dddddd;
+      th {
+        position: sticky;
+        top: 0;
+        background: #f1f1f1;
+        z-index: 2;
+        font-size: 0.85rem;
+        font-weight: 600;
       }
-
-      /* Modern styling matching summary.html */
-      .summary-card {
-        border-radius: 8px;
+      #extension_details th {
+        white-space: normal;
+        word-wrap: break-word;
+        text-overflow: unset;
+        overflow: visible;
+      }
+      .table-container {
+        overflow-x: auto;
+        max-width: 100vw;
         margin-bottom: 20px;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       }
-      .summary-card-header {
-        padding: 15px;
-        border-radius: 8px 8px 0 0;
-        font-weight: bold;
-        color: white;
+      .download-section { margin-top: 30px; margin-bottom: 40px; text-align: center; }
+      .description-text { margin-top: 10px; margin-bottom: 15px; }
+      .ext-page-header {
+        background-color: #4e73df;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
       }
-      .summary-card-body {
-        padding: 20px;
+      .ext-page-header h5 { color: white; padding: 10px; margin-bottom: 0; }
+      .ext-page-header h5 i { margin-right: 8px; }
+      .ext-header-actions { display: flex; align-items: center; gap: 8px; }
+      .ext-name-cell {
+        color: #46a8f7;
+        font-weight: 500;
       }
-      .extension-card .summary-card-header {
-        background-color: #46a8f7;
-      }
-      .download-section {
-        margin-top: 30px;
-        margin-bottom: 40px;
+      /* Column widths – ID, Extension Name, icon columns, Size */
+      #extension_details th.ext-col-id, #extension_details td.ext-col-id {
+        width: 1%;
+        max-width: 52px;
+        min-width: 40px;
+        white-space: nowrap;
         text-align: center;
+        font-weight: 600;
       }
-      .description-text {
-        margin-top: 10px;
-        margin-bottom: 15px;
+      #extension_details th:nth-child(1), #extension_details td:nth-child(1) {
+        text-align: center;
+        font-weight: 600;
       }
-
-      /* Spinner and loader */
+      /* Extension Name */
+      #extension_details th:nth-child(2), #extension_details td:nth-child(2) {
+        width: 18%;
+        min-width: 140px;
+        max-width: 240px;
+        white-space: normal;
+        word-wrap: break-word;
+      }
+      /* Icon columns: Actions, Events, Conditions, Data Elements */
+      #extension_details th:nth-child(3), #extension_details td:nth-child(3),
+      #extension_details th:nth-child(4), #extension_details td:nth-child(4),
+      #extension_details th:nth-child(5), #extension_details td:nth-child(5),
+      #extension_details th:nth-child(6), #extension_details td:nth-child(6) {
+        width: 12%;
+        min-width: 100px;
+        max-width: 140px;
+        white-space: normal;
+        word-wrap: break-word;
+        text-align: center;
+        text-overflow: unset;
+        overflow: visible;
+      }
+      /* Icon + count style */
+      .ext-col-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 18px;
+        transition: opacity 0.2s ease, background-color 0.2s ease;
+      }
+      .ext-col-icon:hover {
+        background-color: rgba(70, 168, 247, 0.12);
+        opacity: 0.9;
+      }
+      .ext-col-icon-has { color: #46a8f7; }
+      .ext-col-icon-empty { color: #ccc; }
+      .ext-col-icon-empty:hover { background-color: rgba(0, 0, 0, 0.05); }
+      .ext-col-icon-count {
+        font-size: 13px;
+        font-weight: 600;
+        color: #5a5c69;
+      }
+      /* Size column */
+      #extension_details th:nth-child(7), #extension_details td:nth-child(7) {
+        width: 10%;
+        min-width: 80px;
+        max-width: 100px;
+        white-space: nowrap;
+      }
+      #extension_details td.ext-size-cell {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      #extension_details th.sortable { cursor: pointer; }
+      /* Chevron expansion – same as Rules / Data Elements */
+      .ext-expand-icon {
+        cursor: pointer;
+        margin-right: 8px;
+        display: inline-block;
+        transition: transform 0.3s ease;
+        font-size: 0.7em;
+        vertical-align: middle;
+      }
+      .ext-expand-icon.expanded { transform: rotate(90deg); }
+      .expandable-row { display: none; }
+      .expandable-row.active { display: table-row; }
+      .ext-expanded-content {
+        background: #f8f9fa;
+        padding: 20px;
+        border-left: 4px solid #46a8f7;
+      }
+      .ext-expanded-table-scroll {
+        max-height: 280px;
+        overflow: auto;
+        border: 1px solid #e3e6f0;
+        border-radius: 4px;
+      }
+      .ext-expanded-table { width: 100%; font-size: 0.85rem; border-collapse: collapse; table-layout: fixed; }
+      .ext-expanded-table th, .ext-expanded-table td { padding: 6px 8px; border: 1px solid #e3e6f0; text-align: left; width: 25%; box-sizing: border-box; }
+      .ext-expanded-table th { background: #eaecf4; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+      .ext-expanded-table td { white-space: normal; word-break: break-word; overflow-wrap: break-word; }
       .spinner {
         width: 64px;
         height: 64px;
         border: 8px solid;
-        border-color: #3d5af1 transparent #3d5af1 transparent;
+        border-color: #4e73df transparent #4e73df transparent;
         border-radius: 50%;
         animation: spin-anim 1.2s linear infinite;
       }
-
-      @keyframes spin-anim {
-        0% {
-          transform: rotate(0deg);
-        }
-
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-
+      @keyframes spin-anim { to { transform: rotate(360deg); } }
       .loader-container {
         width: 100%;
         height: 100vh;
@@ -98,104 +178,57 @@
         background: rgba(255, 255, 255, 0.9);
         z-index: 1;
       }
-
-      .loading-message {
-        margin-top: 15px;
-        font-size: 16px;
-        color: #666;
-      }
+      .loading-message { margin-top: 15px; font-size: 16px; color: #5a5c69; }
     </style>
   </head>
   <body>
     <div class="loader-container" id="set_display">
       <div class="spinner"></div>
-      <div class="loading-message">
-        <p>Loading extensions data...</p>
-      </div>
+      <div class="loading-message"><p>Loading extensions...</p></div>
     </div>
 
-    <div class="container-fluid">
-      <div
-        style="
-          background-color: #4e73df;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <h5 style="color: white; padding: 10px; margin-bottom: 0">
-          Extensions
-        </h5>
-        <button
-          id="start-tour"
-          class="btn btn-light btn-sm"
-          style="margin-right: 10px"
-        >
-          <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
-        </button>
+    <div class="container-fluid" id="ext-main" style="display: none;">
+      <div class="ext-page-header">
+        <h5><i class="fas fa-plug mr-2"></i> Extensions</h5>
+        <div class="ext-header-actions">
+          <button id="start-tour" class="btn btn-light btn-sm" style="margin-right: 10px">
+            <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
+          </button>
+          <div class="download-button"></div>
+        </div>
       </div>
-
       <div class="description-text">
-        This page shows all extensions configured in your Adobe Tags property.
-        The table displays how each extension is used in rules and data
-        elements. You can sort the table by clicking on any column header.
+        This page shows all extensions configured in your Adobe Tags property and how each is used in rules and data elements. You can sort by clicking column headers and search by extension name.
       </div>
 
-      <div class="summary-card extension-card">
-        <div class="summary-card-header">
-          <i class="fas fa-puzzle-piece mr-2"></i> Extension Details
-          <h6
-            class="download-button"
-            style="text-align: right; margin-top: -20px"
-          ></h6>
+      <div class="search-container" style="margin-bottom: 20px">
+        <div class="input-group">
+          <input type="text" id="extensionSearchInput" class="form-control" placeholder="Search by extension name..." />
+          <div class="input-group-append">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+          </div>
         </div>
-        <div class="summary-card-body">
-          <table id="extension_details" style="width: 100%">
-            <tr>
-              <th
-                title="Extension Name - Activated extensions in the Adobe Tags' property"
-              >
-                Extension Name &nbsp;<i class="fas fa-info-circle"></i>
-              </th>
-              <th
-                title="Used in Rule: Actions - Extension as a part of an Action "
-              >
-                Used In Rule: Actions &nbsp;<i class="fas fa-info-circle"></i>
-              </th>
-              <th
-                title="Used in Rule: Events - Extension used to trigger an Event"
-              >
-                Used In Rule: Events &nbsp;<i class="fas fa-info-circle"></i>
-              </th>
-              <th
-                title="Used in Rule: Conditions - Extension utilized to create a Condition"
-              >
-                Used In Rule: Conditions &nbsp;<i
-                  class="fas fa-info-circle"
-                ></i>
-              </th>
-              <th
-                title="Used in Data Element - Extension used to create a Data Element"
-              >
-                Used In Data Element &nbsp;<i class="fas fa-info-circle"></i>
-              </th>
-              <th
-                title="Size in KB - Weight of the Extension that is getting added to your library Size"
-              >
-                Size in KB &nbsp;<i class="fas fa-info-circle"></i>
-              </th>
-            </tr>
-          </table>
-        </div>
+      </div>
+      <div class="table-container">
+        <table id="extension_details" style="width: 100%"></table>
+      </div>
+      <div class="pagination-container" style="margin-top: 20px; text-align: center">
+        <div id="extCountInfo" style="margin-bottom: 10px; font-size: 14px; color: #5a5c69;"></div>
+        <button id="prevPage" class="btn btn-primary btn-sm" disabled><i class="fas fa-chevron-left"></i> Previous</button>
+        <span id="pageInfo" style="margin: 0 15px">Page <span id="currentPage">1</span> of <span id="totalPages">1</span></span>
+        <button id="nextPage" class="btn btn-primary btn-sm">Next <i class="fas fa-chevron-right"></i></button>
       </div>
     </div>
 
-    <!-- Remove the download section with tour button -->
-    <div class="container-fluid">
-      <div class="download-section"></div>
+    <div id="no-data-alert" class="container-fluid" style="display: none;">
+      <div class="ext-page-header">
+        <h5><i class="fas fa-plug mr-2"></i> Extensions</h5>
+      </div>
+      <div class="alert alert-warning mt-4">
+        No extension data found. Please scan a site with the TagScanner extension and load Rules or Data Elements first, then return here.
+      </div>
     </div>
 
-    <!-- Scripts -->
     <script src="jquery.js"></script>
     <script src="tablesorter.js"></script>
     <script src="initTableSorter.js"></script>

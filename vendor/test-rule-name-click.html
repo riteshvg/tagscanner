@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rule name click – unit test</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .pass { color: green; }
+    .fail { color: red; }
+    #rule_details { border-collapse: collapse; }
+    #rule_details td, #rule_details th { border: 1px solid #ddd; padding: 8px; }
+    .rule-name-cell { cursor: pointer; color: #4e73df; }
+  </style>
+</head>
+<body>
+  <h1>Rule name click behavior – unit test</h1>
+  <div id="results"></div>
+  <hr>
+  <p>Table below is built with the same structure as rule.js (no anchors in rule name cell). Click the rule name – it should only expand the row, not navigate.</p>
+  <table id="rule_details">
+    <thead><tr><th>ID</th><th>Rule Name</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    (function () {
+      var results = document.getElementById('results');
+      var tbody = document.querySelector('#rule_details tbody');
+      var passed = 0;
+      var failed = 0;
+
+      function assert(condition, message) {
+        if (condition) {
+          passed++;
+          results.innerHTML += '<p class="pass">PASS: ' + message + '</p>';
+        } else {
+          failed++;
+          results.innerHTML += '<p class="fail">FAIL: ' + message + '</p>';
+        }
+      }
+
+      // Build one row using the same structure as rule.js (no <a> in rule name cell)
+      var tr = document.createElement('tr');
+      tr._rowIndex = 0;
+      var tdId = document.createElement('td');
+      tdId.textContent = '1';
+      tr.appendChild(tdId);
+      var tdName = document.createElement('td');
+      tdName.classList.add('rule-name-cell');
+      tdName.style.cursor = 'pointer';
+      var ruleNameExpandIcon = document.createElement('span');
+      ruleNameExpandIcon.className = 'expand-icon';
+      ruleNameExpandIcon.textContent = '▶';
+      var ruleNameSpan = document.createElement('span');
+      ruleNameSpan.classList.add('rule-name-text');
+      ruleNameSpan.textContent = 'Test Rule';
+      tdName.appendChild(ruleNameExpandIcon);
+      tdName.appendChild(ruleNameSpan);
+      tdName.onclick = function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.__ruleNameClicked = true;
+        return false;
+      };
+      tr.appendChild(tdName);
+      tbody.appendChild(tr);
+
+      // Test 1: Rule name cell must not contain any <a> element
+      var anchorsInRuleNameCell = tdName.querySelectorAll('a');
+      assert(anchorsInRuleNameCell.length === 0, 'Rule name cell contains no anchor tags (anchors found: ' + anchorsInRuleNameCell.length + ')');
+
+      // Test 2: Rule name cell must have class rule-name-cell
+      assert(tdName.classList.contains('rule-name-cell'), 'Rule name cell has class rule-name-cell');
+
+      // Test 3: Rule name cell must not have href attribute
+      assert(!tdName.getAttribute('href'), 'Rule name cell has no href attribute');
+
+      // Test 4: Simulate click and ensure our handler runs and default is prevented
+      window.__ruleNameClicked = false;
+      var clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true, view: window });
+      tdName.dispatchEvent(clickEvent);
+      assert(window.__ruleNameClicked === true, 'Click handler ran (__ruleNameClicked is true)');
+      assert(clickEvent.defaultPrevented === true, 'Click default was prevented');
+
+      // Test 5: No link in the entire rule name column
+      var allCells = tbody.querySelectorAll('tr td:nth-child(2)');
+      var anyLink = false;
+      for (var i = 0; i < allCells.length; i++) {
+        if (allCells[i].querySelector('a') || allCells[i].tagName === 'A') anyLink = true;
+      }
+      assert(!anyLink, 'No link in rule name column');
+
+      results.innerHTML += '<p><strong>Total: ' + passed + ' passed, ' + failed + ' failed.</strong></p>';
+      if (failed > 0) {
+        results.innerHTML += '<p class="fail">Some tests failed. Rule name should not be a link and click should not navigate.</p>';
+      } else {
+        results.innerHTML += '<p class="pass">All tests passed. Rule name cell has no link and click is handled without navigation.</p>';
+      }
+    })();
+  </script>
+</body>
+</html>

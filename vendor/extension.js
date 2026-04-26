@@ -6,6 +6,16 @@
   var builtExtensionCount = 0; // set in buildTable so footer count is correct regardless of DOM
   var value_obj = {}; // extension key -> { [ruleName]: { rule, events, conditions }, dataelement?: [{ name, path }] }
 
+  function isComponentDisabled(obj) {
+    if (!obj || typeof obj !== 'object') return false;
+    if (obj.enabled === false) return true;
+    if (obj.disabled === true) return true;
+    if (obj.isEnabled === false) return true;
+    if (typeof obj.status === 'string' && obj.status.toLowerCase() === 'disabled') return true;
+    if (typeof obj.state === 'string' && obj.state.toLowerCase() === 'disabled') return true;
+    return false;
+  }
+
   function getExtensionObject() {
     var raw = sessionStorage.getItem('_satellite._container.extension');
     if (!raw || raw.trim() === '') return null;
@@ -41,6 +51,42 @@
   function buildUsageMap() {
     var rules = getRulesArray();
     var de_obj = getDataElementsObject();
+    var extObjForKeys = getExtensionObject() || {};
+    var extKeys = Object.keys(extObjForKeys);
+
+    function getCustomCodeStringsFromComponent(comp) {
+      var out = [];
+      if (!comp || typeof comp !== 'object') return out;
+      try {
+        if (comp.settings) {
+          if (typeof comp.settings.source === 'string') out.push(comp.settings.source);
+          if (typeof comp.settings.script === 'string') out.push(comp.settings.script);
+          if (typeof comp.settings.customCode === 'string') out.push(comp.settings.customCode);
+          if (typeof comp.settings.code === 'string') out.push(comp.settings.code);
+        }
+        if (typeof comp.source === 'string') out.push(comp.source);
+      } catch (e) {}
+      return out.filter(Boolean);
+    }
+
+    function findExtensionRefsInCustomCode(codeStr) {
+      if (!codeStr || typeof codeStr !== 'string') return [];
+      var lower = codeStr.toLowerCase();
+      if (lower.indexOf('turbine') === -1) return [];
+      var hits = [];
+      for (var i = 0; i < extKeys.length; i++) {
+        var extKey = extKeys[i];
+        var k = String(extKey || '').toLowerCase();
+        if (!k) continue;
+        var hasKey =
+          lower.indexOf("turbine.getextensionsettings('" + k + "')") > -1 ||
+          lower.indexOf('turbine.getextensionsettings(\"' + k + '\")') > -1 ||
+          lower.indexOf("turbine.getsharedmodule('" + k + "'") > -1 ||
+          lower.indexOf('turbine.getsharedmodule(\"' + k + '\"') > -1;
+        if (hasKey) hits.push(extKey);
+      }
+      return hits;
+    }
 
     function getEventDisplayName(ev) {
       if (!ev) return 'Event';
@@ -62,6 +108,14 @@
             if (!value_obj[extKey][ruleName]) value_obj[extKey][ruleName] = { rule: false, events: [], conditions: false };
             value_obj[extKey][ruleName].rule = true;
           }
+          // Custom code can invoke other extensions via turbine.* APIs
+          getCustomCodeStringsFromComponent(action).forEach(function (s) {
+            findExtensionRefsInCustomCode(s).forEach(function (k) {
+              value_obj[k] = value_obj[k] || {};
+              if (!value_obj[k][ruleName]) value_obj[k][ruleName] = { rule: false, events: [], conditions: false };
+              value_obj[k][ruleName].rule = true;
+            });
+          });
         });
       }
       if (rule.events) {
@@ -72,6 +126,13 @@
             if (!value_obj[extKey][ruleName]) value_obj[extKey][ruleName] = { rule: false, events: [], conditions: false };
             value_obj[extKey][ruleName].events.push(getEventDisplayName(ev));
           }
+          getCustomCodeStringsFromComponent(ev).forEach(function (s) {
+            findExtensionRefsInCustomCode(s).forEach(function (k) {
+              value_obj[k] = value_obj[k] || {};
+              if (!value_obj[k][ruleName]) value_obj[k][ruleName] = { rule: false, events: [], conditions: false };
+              value_obj[k][ruleName].events.push(getEventDisplayName(ev));
+            });
+          });
         });
       }
       if (rule.conditions) {
@@ -82,6 +143,13 @@
             if (!value_obj[extKey][ruleName]) value_obj[extKey][ruleName] = { rule: false, events: [], conditions: false };
             value_obj[extKey][ruleName].conditions = true;
           }
+          getCustomCodeStringsFromComponent(cond).forEach(function (s) {
+            findExtensionRefsInCustomCode(s).forEach(function (k) {
+              value_obj[k] = value_obj[k] || {};
+              if (!value_obj[k][ruleName]) value_obj[k][ruleName] = { rule: false, events: [], conditions: false };
+              value_obj[k][ruleName].conditions = true;
+            });
+          });
         });
       }
     });
@@ -249,6 +317,13 @@
       };
       tdName.appendChild(expandIcon);
       tdName.appendChild(document.createTextNode(displayName || key));
+      if (isComponentDisabled(ext)) {
+        var disabledBadge = document.createElement('span');
+        disabledBadge.className = 'component-disabled-badge';
+        disabledBadge.textContent = 'Disabled';
+        tdName.appendChild(disabledBadge);
+        tr.classList.add('component-disabled');
+      }
       tdName.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
@@ -364,23 +439,41 @@
   }
 
   function exportCSV() {
-    var table = document.getElementById('extension_details');
-    if (!table) return;
-    var headers = [];
-    table.querySelectorAll('thead th').forEach(function (th) {
-      headers.push(th.textContent.replace(/\s*\u00a0.*/, '').trim());
+    var extObj = getExtensionObject();
+    if (!extObj || Object.keys(extObj).length === 0) {
+      alert('No extensions to export. Load a property first.');
+      return;
+    }
+    buildUsageMap();
+    function toCsvCell(val) {
+      return '"' + String(val).replace(/"/g, '""') + '"';
+    }
+    var headers = ['ID #', 'Extension Name', 'Actions', 'Events', 'Conditions', 'Data Elements', 'Size (KB)'];
+    var keys = Object.keys(extObj).sort();
+    var csvLines = [headers.map(toCsvCell).join(',')];
+    keys.forEach(function (key, index) {
+      var ext = extObj[key];
+      var displayName = (ext && ext.displayName) ? ext.displayName : key;
+      var sizeKb = getSizeKb(ext);
+      var v = value_obj[key] || {};
+      var actions = 0, events = 0, conditions = 0;
+      Object.keys(v).forEach(function (k) {
+        if (k === 'dataelement') return;
+        var r = v[k];
+        if (r && typeof r === 'object') {
+          if (r.rule) actions++;
+          if (Array.isArray(r.events)) events += r.events.length;
+          else if (r.events) events++;
+          if (r.conditions) conditions++;
+        }
+      });
+      var deCount = (v.dataelement && Array.isArray(v.dataelement)) ? v.dataelement.length : 0;
+      csvLines.push([index + 1, displayName, actions, events, conditions, deCount, sizeKb.toFixed(2)].map(toCsvCell).join(','));
     });
-    var rows = [headers];
-    table.querySelectorAll('tbody tr').forEach(function (tr) {
-      if (tr.classList.contains('search-hidden') || tr.classList.contains('expandable-row')) return;
-      var cells = [];
-      tr.querySelectorAll('td').forEach(function (td) { cells.push(td.textContent.trim()); });
-      rows.push(cells);
-    });
-    var csv = rows.map(function (row) { return row.map(function (cell) { return '"' + String(cell).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
-    var blob = new Blob([csv], { type: 'text/csv' });
+    var csvContent = '\uFEFF' + csvLines.join('\r\n');
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     var a = document.createElement('a');
-    a.download = 'extensions.csv';
+    a.download = 'extensions_export.csv';
     a.href = URL.createObjectURL(blob);
     a.click();
     URL.revokeObjectURL(a.href);

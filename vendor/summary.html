@@ -64,6 +64,411 @@
         margin-bottom: 15px;
       }
 
+      /* ── AI Health Analysis section ────────────────────────── */
+      .ai-section {
+        margin-top: 28px;
+        margin-bottom: 8px;
+      }
+      .ai-section-header {
+        background: linear-gradient(135deg, #1a1d23 0%, #2d3748 100%);
+        border-radius: 10px 10px 0 0;
+        padding: 16px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .ai-section-header h5 {
+        color: #fff;
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+      }
+      .ai-section-header h5 i { margin-right: 8px; color: #61dafb; }
+      .ai-section-body {
+        background: #fff;
+        border: 1px solid #e3e6f0;
+        border-top: none;
+        border-radius: 0 0 10px 10px;
+        padding: 24px;
+      }
+      /* Scan prompt (no report yet) */
+      .ai-scan-prompt {
+        text-align: center;
+        padding: 32px 0 24px;
+      }
+      .ai-scan-prompt p {
+        color: #5a5c69;
+        font-size: 13.5px;
+        margin-bottom: 20px;
+        max-width: 480px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .btn-ai-scan {
+        background: linear-gradient(135deg, #27c5c1, #1a56a0);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 10px 28px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        letter-spacing: 0.3px;
+      }
+      .btn-ai-scan:hover { opacity: 0.92; }
+      .btn-ai-scan i { margin-right: 8px; }
+      .ai-scan-cost-note {
+        margin-top: 10px;
+        font-size: 11.5px;
+        color: #aaa;
+      }
+      /* Settings link */
+      .ai-settings-link {
+        font-size: 12px;
+        color: #6b7280;
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 0;
+        text-decoration: underline;
+      }
+      .ai-settings-link:hover { color: #374151; }
+      /* Scanning spinner */
+      .ai-scanning {
+        text-align: center;
+        padding: 32px 0;
+      }
+      .ai-scanning p { color: #5a5c69; margin-top: 14px; font-size: 13px; }
+      /* Report */
+      .ai-report-meta {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      /* Score row */
+      .ai-score-row {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+      .ai-score-circle {
+        width: 96px;
+        height: 96px;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border: 4px solid;
+      }
+      .ai-score-number {
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .ai-score-grade {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        margin-top: 2px;
+      }
+      .ai-score-A { border-color: #10b981; color: #10b981; background: #ecfdf5; }
+      .ai-score-B { border-color: #3b82f6; color: #3b82f6; background: #eff6ff; }
+      .ai-score-C { border-color: #f59e0b; color: #f59e0b; background: #fffbeb; }
+      .ai-score-D { border-color: #f97316; color: #f97316; background: #fff7ed; }
+      .ai-score-F { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
+      .ai-executive-summary {
+        flex: 1;
+        font-size: 14px;
+        color: #374151;
+        line-height: 1.65;
+      }
+      /* Category scores */
+      .ai-category-scores {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      .ai-cat-score {
+        background: #f8f9fc;
+        border: 1px solid #e3e6f0;
+        border-radius: 8px;
+        padding: 12px 14px;
+        text-align: center;
+      }
+      .ai-cat-label {
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6b7280;
+        margin-bottom: 6px;
+      }
+      .ai-cat-bar-wrap {
+        background: #e5e7eb;
+        border-radius: 4px;
+        height: 6px;
+        overflow: hidden;
+        margin-bottom: 6px;
+      }
+      .ai-cat-bar { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+      .ai-cat-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1f2937;
+      }
+      /* Issue cards */
+      .ai-issues-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+      .ai-issue-card {
+        border-radius: 0 6px 6px 0;
+        padding: 10px 14px;
+        border-left: 3px solid;
+      }
+      .ai-issue-critical { background: #fef2f2; border-color: #ef4444; }
+      .ai-issue-warning  { background: #fffbeb; border-color: #f59e0b; }
+      .ai-issue-win      { background: #f0fdf4; border-color: #10b981; }
+      .ai-issue-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 3px;
+      }
+      .ai-issue-critical .ai-issue-title { color: #b91c1c; }
+      .ai-issue-warning  .ai-issue-title { color: #92400e; }
+      .ai-issue-win      .ai-issue-title { color: #065f46; }
+      .ai-issue-body { font-size: 12.5px; color: #4b5563; line-height: 1.5; }
+      .ai-issue-fix {
+        font-size: 12px;
+        margin-top: 5px;
+        padding: 5px 10px;
+        background: rgba(0,0,0,0.04);
+        border-radius: 4px;
+        color: #374151;
+      }
+      .ai-issue-fix i { margin-right: 5px; color: #6b7280; }
+      .ai-issue-savings {
+        display: inline-block;
+        margin-top: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #065f46;
+        background: #d1fae5;
+        padding: 2px 7px;
+        border-radius: 10px;
+      }
+      /* Reasoning box */
+      .ai-reasoning-box {
+        background: #f8f9fc;
+        border: 1px solid #e3e6f0;
+        border-left: 3px solid #4e73df;
+        border-radius: 0 8px 8px 0;
+        padding: 11px 16px;
+        font-size: 12.5px;
+        color: #6b7280;
+        line-height: 1.6;
+        margin-bottom: 20px;
+      }
+      .ai-reasoning-box strong { color: #374151; }
+      .ai-reasoning-factors {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .ai-reasoning-factor {
+        background: #fff;
+        border: 1px solid #e3e6f0;
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: 11.5px;
+        color: #374151;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .ai-reasoning-factor i { font-size: 11px; }
+      /* Recommendation cards */
+      .ai-rec-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        background: #f8f9fc;
+        border: 1px solid #e3e6f0;
+        border-radius: 8px;
+        padding: 11px 14px;
+        margin-bottom: 8px;
+      }
+      .ai-rec-num {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #4e73df;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+      .ai-rec-body {
+        flex: 1;
+        font-size: 13px;
+        color: #374151;
+        line-height: 1.55;
+      }
+      .ai-rec-tag {
+        display: inline-block;
+        margin-top: 5px;
+        font-size: 10.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: #e5e7eb;
+        color: #6b7280;
+      }
+      /* Section subheadings */
+      .ai-sub-heading {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6b7280;
+        margin: 18px 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .ai-sub-heading i { font-size: 12px; }
+
+      /* ── Modals (shared) ──────────────────────────────────── */
+      .ts-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.55);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+      }
+      .ts-modal-overlay.show { display: flex; }
+      .ts-modal {
+        background: #fff;
+        border-radius: 10px;
+        width: 90%;
+        max-width: 460px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+        overflow: hidden;
+      }
+      .ts-modal-header {
+        background: linear-gradient(135deg, #1a1d23, #2d3748);
+        color: #fff;
+        padding: 16px 22px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .ts-modal-header h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .ts-modal-header h3 i { margin-right: 8px; color: #61dafb; }
+      .ts-modal-close {
+        background: none;
+        border: none;
+        color: #9ca3af;
+        font-size: 22px;
+        cursor: pointer;
+        line-height: 1;
+        padding: 0 2px;
+      }
+      .ts-modal-close:hover { color: #fff; }
+      .ts-modal-body { padding: 22px; }
+      .ts-form-group { margin-bottom: 16px; }
+      .ts-form-group label {
+        display: block;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 5px;
+      }
+      .ts-form-group label .ts-optional {
+        font-weight: 400;
+        color: #9ca3af;
+        font-size: 11px;
+        margin-left: 4px;
+      }
+      .ts-form-group input,
+      .ts-form-group select {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 13px;
+        color: #111827;
+        box-sizing: border-box;
+      }
+      .ts-form-group input:focus,
+      .ts-form-group select:focus {
+        outline: none;
+        border-color: #27c5c1;
+        box-shadow: 0 0 0 2px rgba(39,197,193,0.15);
+      }
+      .ts-form-group .ts-hint {
+        font-size: 11px;
+        color: #9ca3af;
+        margin-top: 4px;
+      }
+      .ts-modal-footer {
+        padding: 14px 22px 18px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        border-top: 1px solid #f3f4f6;
+      }
+      .ts-btn-primary {
+        background: linear-gradient(135deg, #27c5c1, #1a56a0);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 22px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .ts-btn-primary:hover { opacity: 0.9; }
+      .ts-btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .ts-btn-secondary:hover { background: #e5e7eb; }
+      .ts-credentials-warning {
+        background: #fffbeb;
+        border: 1px solid #fcd34d;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font-size: 11.5px;
+        color: #78350f;
+        margin-bottom: 16px;
+      }
+      .ts-credentials-warning i { margin-right: 5px; }
+
       /* Print-friendly styles */
       #print-section {
         display: none;
@@ -131,13 +536,22 @@
           <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
         </button>
       </div>
-      <div class="description-text">
+      <div class="description-text" style="display:none">
         This page summarizes your Adobe Tags property: counts and sizes of
         rules, data elements, and extensions, and identifies unused components.
         You can download the summary as a PDF for audit reports, or copy each
         table and paste it into email for quick discussions.
       </div>
-      <div class="row mt-4">
+      <div class="alert alert-info small mb-3 de-usage-disclaimer" role="note" style="display:none">
+        <i class="fas fa-info-circle mr-2"></i>
+        Unused data elements are inferred from the compiled library JSON in this
+        scan only. Custom code that exists only in remote hosted files (for example
+        Adobe CDN bundles) is not downloaded or analyzed, so the unused list may
+        omit references that exist only in those files.
+        On the Data Elements tab you can run an optional deep scan to fetch and
+        scan those HTTPS bundles, then merge results into the table.
+      </div>
+      <div class="row mt-4" style="display:none">
         <div class="col-md-6">
           <div
             class="summary-card data-element-card"
@@ -194,11 +608,46 @@
       <!-- The second row with extension card and property details card is dynamically added by JavaScript -->
     </div>
 
-    <div class="container-fluid">
+    <div class="container-fluid" style="display:none">
       <div class="download-section">
         <button id="download-pdf" class="btn btn-primary">
           <i class="fas fa-file-pdf mr-2"></i> Download PDF Summary
         </button>
+      </div>
+    </div>
+
+    <!-- AI Health Analysis Section -->
+    <div class="container-fluid" style="margin-bottom:20px">
+      <div class="ai-section">
+        <div class="ai-section-header">
+          <h5><i class="fas fa-brain"></i> AI Property Health Analysis
+            <span style="margin-left:10px;font-size:10px;font-weight:600;background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;letter-spacing:0.3px;vertical-align:middle">LIMITED PREVIEW</span>
+          </h5>
+          <button class="ai-settings-link" id="btnBedrockSettings">
+            <i class="fas fa-cog" style="margin-right:4px"></i>Settings
+          </button>
+        </div>
+        <div class="ai-section-body" id="aiSectionBody">
+          <!-- State 1: Scan prompt -->
+          <div id="aiScanPrompt" class="ai-scan-prompt">
+            <p id="aiScanPromptMsg">Get an AI-powered health assessment of your Adobe Tags property — unused component analysis, custom code risks, performance recommendations, and a prioritized cleanup plan.</p>
+            <button class="btn-ai-scan" id="btnRunAIScan">
+              <i class="fas fa-magic"></i> Analyze Property Health
+            </button>
+            <div class="ai-scan-cost-note">Powered by AWS Bedrock &middot; Claude 3.5 Haiku</div>
+            <div style="margin-top:10px;font-size:11px;color:#f59e0b;font-weight:600">
+              <i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>
+              Limited preview &mdash; powered by TagScanner&rsquo;s shared API. Access may be revoked at any time.
+            </div>
+          </div>
+          <!-- State 2: Scanning spinner -->
+          <div id="aiScanning" class="ai-scanning" style="display:none">
+            <div style="font-size:36px;color:#27c5c1"><i class="fas fa-circle-notch fa-spin"></i></div>
+            <p>Analyzing your property with AI&hellip; this usually takes 5&ndash;15 seconds.</p>
+          </div>
+          <!-- State 3: Report -->
+          <div id="aiReportContainer" style="display:none"></div>
+        </div>
       </div>
     </div>
 
@@ -239,8 +688,104 @@
       <ol id="print-recommendations"></ol>
     </div>
 
+    <!-- Email Gate Modal -->
+    <div class="ts-modal-overlay" id="emailGateModal">
+      <div class="ts-modal">
+        <div class="ts-modal-header">
+          <h3><i class="fas fa-envelope"></i> One quick step before your scan</h3>
+          <button class="ts-modal-close" id="emailGateClose">&times;</button>
+        </div>
+        <div class="ts-modal-body">
+          <p style="font-size:13px;color:#6b7280;margin-bottom:16px;">We collect your email to reach out about TagScanner quality and improvements. No spam, ever.</p>
+          <div class="ts-form-group">
+            <label for="inputEmail">Work email <span style="color:#ef4444">*</span></label>
+            <input type="email" id="inputEmail" placeholder="you@company.com" autocomplete="email" />
+          </div>
+          <div class="ts-form-group">
+            <label for="inputRole">Your role <span class="ts-optional">(optional)</span></label>
+            <select id="inputRole">
+              <option value="">Select your role&hellip;</option>
+              <option value="developer">Developer / Engineer</option>
+              <option value="analyst">Analytics / Data</option>
+              <option value="marketer">Marketer / Campaign</option>
+              <option value="consultant">Consultant / Agency</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="ts-form-group">
+            <label for="inputConcern">Main concern for this property <span class="ts-optional">(optional)</span></label>
+            <select id="inputConcern">
+              <option value="">Any / General health check</option>
+              <option value="performance">Page load performance</option>
+              <option value="bloat">Unused component cleanup</option>
+              <option value="custom_code">Custom code quality</option>
+              <option value="data_quality">Data quality / accuracy</option>
+              <option value="maintenance">Maintainability</option>
+            </select>
+          </div>
+        </div>
+        <div class="ts-modal-footer">
+          <button class="ts-btn-secondary" id="emailGateCancel">Cancel</button>
+          <button class="ts-btn-primary" id="emailGateSubmit"><i class="fas fa-magic" style="margin-right:6px"></i>Run Scan</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bedrock Settings Modal -->
+    <div class="ts-modal-overlay" id="bedrockSettingsModal">
+      <div class="ts-modal">
+        <div class="ts-modal-header">
+          <h3><i class="fas fa-key"></i> AWS Bedrock Configuration</h3>
+          <button class="ts-modal-close" id="bedrockSettingsClose">&times;</button>
+        </div>
+        <div class="ts-modal-body">
+          <div class="ts-credentials-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            This is a limited-time preview powered by TagScanner&rsquo;s shared API. Access may be revoked at any time.
+          </div>
+          <div class="ts-form-group">
+            <label for="inputAccessKeyId">AWS Access Key ID <span class="ts-optional">(own credentials — optional)</span></label>
+            <input type="text" id="inputAccessKeyId" placeholder="Leave blank to use TagScanner shared API" autocomplete="off" />
+          </div>
+          <div class="ts-form-group">
+            <label for="inputSecretKey">AWS Secret Access Key <span class="ts-optional">(own credentials — optional)</span></label>
+            <input type="password" id="inputSecretKey" placeholder="Leave blank to use TagScanner shared API" autocomplete="off" />
+          </div>
+          <div class="ts-form-group">
+            <label for="inputRegion">AWS Region</label>
+            <select id="inputRegion">
+              <option value="us-east-1">us-east-1 (N. Virginia)</option>
+              <option value="us-west-2">us-west-2 (Oregon)</option>
+              <option value="eu-west-1">eu-west-1 (Ireland)</option>
+              <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+              <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+            </select>
+          </div>
+          <div class="ts-form-group">
+            <label for="inputModelId">AI Model</label>
+            <select id="inputModelId">
+              <option value="us.anthropic.claude-3-5-haiku-20241022-v1:0">Claude 3.5 Haiku — cross-region (fast · ~$0.001/scan)</option>
+              <option value="anthropic.claude-3-5-haiku-20241022-v1:0">Claude 3.5 Haiku — direct (fast · ~$0.001/scan)</option>
+              <option value="us.anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2 — cross-region (~$0.004/scan)</option>
+              <option value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2 — direct (~$0.004/scan)</option>
+              <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku — direct (cheapest · ~$0.0003/scan)</option>
+              <option value="amazon.nova-pro-v1:0">Amazon Nova Pro (~$0.002/scan)</option>
+              <option value="amazon.nova-lite-v1:0">Amazon Nova Lite (cheapest · ~$0.0001/scan)</option>
+            </select>
+          </div>
+        </div>
+        <div class="ts-modal-footer">
+          <button class="ts-btn-secondary" id="bedrockSettingsCancel">Cancel</button>
+          <button class="ts-btn-primary" id="bedrockSettingsSave"><i class="fas fa-save" style="margin-right:6px"></i>Save &amp; Continue</button>
+        </div>
+      </div>
+    </div>
+
     <script src="jquery-3.2.1.min.js"></script>
     <script src="jquery.tablesorter.min.js"></script>
+    <script src="data-element-rule-refs.js"></script>
+    <script src="bedrockClient.js"></script>
+    <script src="healthPayload.js"></script>
     <script src="summary.js"></script>
     <script src="tour-initializer.js"></script>
     <script src="summary-tour.js"></script>

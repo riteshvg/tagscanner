@@ -15,13 +15,14 @@ if (rule_details_node) {
   var thead = document.createElement('thead');
   var tbody = document.createElement('tbody');
 
-  // Define all headers (6 columns; Size at end)
+  // Define all headers (7 columns; Custom Code then Size at end)
   var headers = [
     { text: 'ID #', tooltip: 'Rule number in sequential order' },
     { text: 'Rule Name', tooltip: 'Name of the rule in your Adobe Tags property' },
     { text: 'Events', tooltip: 'Event types that trigger this rule' },
-    { text: 'Conditions', tooltip: 'Conditions for this rule (includes custom code)' },
-    { text: 'Actions', tooltip: 'Actions performed by this rule (includes custom code)' },
+    { text: 'Conditions', tooltip: 'Conditions for this rule' },
+    { text: 'Actions', tooltip: 'Actions performed by this rule' },
+    { text: 'Custom Code', tooltip: 'Custom code attached to conditions or actions in this rule' },
     { text: 'Size (KB)', tooltip: 'Approximate rule size in kilobytes (from rule data)' }
   ];
   var headerRow = document.createElement('tr');
@@ -54,6 +55,16 @@ if (rule_details_node) {
 
   console.log('Processed rules array:', rulesArray);
 
+  function isComponentDisabled(obj) {
+    if (!obj || typeof obj !== 'object') return false;
+    if (obj.enabled === false) return true;
+    if (obj.disabled === true) return true;
+    if (obj.isEnabled === false) return true;
+    if (typeof obj.status === 'string' && obj.status.toLowerCase() === 'disabled') return true;
+    if (typeof obj.state === 'string' && obj.state.toLowerCase() === 'disabled') return true;
+    return false;
+  }
+
   // Helper function to escape code for use in onclick handlers
   function escapeCode(code) {
     if (!code || typeof code !== 'string') return '';
@@ -75,11 +86,10 @@ if (rule_details_node) {
   function createCodeButton(title, code, index) {
     const button = document.createElement('button');
     button.className = 'code-button';
-    button.innerHTML = '<span class="code-icon">📝</span> View Code';
+    button.innerHTML = '<i class="fas fa-code"></i>';
     button.title = title;
     button.onclick = function(e) {
       e.stopPropagation();
-      const escapedCode = escapeCode(code);
       showCodeModal(title, code);
     };
     return button;
@@ -107,7 +117,7 @@ if (rule_details_node) {
     var icon = document.createElement('i');
     icon.className = 'fas ' + iconClass;
     span.appendChild(icon);
-    if (hasData && count > 1) {
+    if (hasData && count >= 1) {
       var countSpan = document.createElement('span');
       countSpan.className = 'rule-col-icon-count';
       countSpan.textContent = count;
@@ -161,19 +171,6 @@ if (rule_details_node) {
       countBadge.className = 'count-badge';
       countBadge.textContent = '×' + conditionTypes.length;
       wrapper.appendChild(countBadge);
-    }
-
-    // Add custom code button if exists
-    if (customCodeConditions && customCodeConditions.length > 0) {
-      customCodeConditions.forEach((codeObj, index) => {
-        const code = typeof codeObj === 'string' ? codeObj : codeObj.code;
-        if (code && code.trim()) {
-          const buttonTitle = customCodeConditions.length > 1 
-            ? `Custom Code - Condition ${index + 1}`
-            : 'Custom Code - Condition';
-          wrapper.appendChild(createCodeButton(buttonTitle, code, index));
-        }
-      });
     }
 
     return wrapper;
@@ -234,19 +231,6 @@ if (rule_details_node) {
       wrapper.appendChild(countBadge);
     }
 
-    // Add custom code button if exists
-    if (customCodeActions && customCodeActions.length > 0) {
-      customCodeActions.forEach((codeObj, index) => {
-        const code = typeof codeObj === 'string' ? codeObj : (codeObj.code || '');
-        if (code && code.trim()) {
-          const buttonTitle = customCodeActions.length > 1
-            ? `Custom Code - Action ${index + 1} (${codeObj.actionName || 'Action'})`
-            : `Custom Code - Action (${codeObj.actionName || 'Action'})`;
-          wrapper.appendChild(createCodeButton(buttonTitle, code, index));
-        }
-      });
-    }
-
     return wrapper;
   }
 
@@ -282,6 +266,13 @@ if (rule_details_node) {
     ruleNameSpan.classList.add('rule-name-text');
     tdName.appendChild(ruleNameExpandIcon);
     tdName.appendChild(ruleNameSpan);
+    if (isComponentDisabled(rule)) {
+      var disabledBadge = document.createElement('span');
+      disabledBadge.className = 'component-disabled-badge';
+      disabledBadge.textContent = 'Disabled';
+      tdName.appendChild(disabledBadge);
+      tr.classList.add('component-disabled');
+    }
     tdName.onclick = function (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -1998,13 +1989,12 @@ if (rule_details_node) {
     // Actions (moved here to match new column order)
     tr.appendChild(tdActions);
 
-    // Size (KB) – at end of row
+    // Size (KB) – appended after Custom Code column below
     var sizeKb = getRuleSizeKb(rule);
     var tdSize = document.createElement('td');
     tdSize.textContent = sizeKb.toFixed(2) + ' KB';
     tdSize.setAttribute('data-sort-value', String(sizeKb));
     tdSize.className = 'rule-size-cell';
-    tr.appendChild(tdSize);
 
     // Custom Code (Action)
     var tdCustomCodeAction = document.createElement('td');
@@ -2252,6 +2242,59 @@ if (rule_details_node) {
     tr._customCodeConditions = typeof customCodeConditionsArray !== 'undefined' ? customCodeConditionsArray : [];
     tr._customCodeActions = allActionCustomCode || [];
 
+    // Custom Code column – single centered button matching Data Elements style
+    var tdCode = document.createElement('td');
+    tdCode.style.minWidth = '72px';
+    tdCode.style.textAlign = 'center';
+    var allCustomCode = [];
+    (tr._customCodeConditions || []).forEach(function (c) {
+      var code = typeof c === 'string' ? c : (c.code || '');
+      if (code && code.trim()) allCustomCode.push({ label: 'Condition', code: code });
+    });
+    (tr._customCodeActions || []).forEach(function (c) {
+      var code = typeof c === 'string' ? c : (c.code || '');
+      if (code && code.trim()) allCustomCode.push({ label: (typeof c === 'object' && c.actionName) ? c.actionName : 'Action', code: code });
+    });
+    var hasCode = allCustomCode.length > 0;
+    tdCode.setAttribute('data-sort-value', hasCode ? '1' : '0');
+    var codeSortToken = document.createElement('span');
+    codeSortToken.textContent = hasCode ? 'Yes' : 'No';
+    codeSortToken.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden';
+    tdCode.appendChild(codeSortToken);
+    var codeIconBtn = document.createElement('button');
+    codeIconBtn.type = 'button';
+    codeIconBtn.className = 'btn';
+    codeIconBtn.style.cssText = 'border:none;background:transparent;padding:0;line-height:1;font-size:18px;';
+    codeIconBtn.innerHTML = '<i class="fas fa-code"></i>';
+    if (!hasCode) {
+      codeIconBtn.disabled = true;
+      codeIconBtn.title = 'No custom code in this rule';
+      codeIconBtn.style.color = '#c4c7cf';
+      codeIconBtn.style.cursor = 'not-allowed';
+    } else {
+      var snippetCount = allCustomCode.length;
+      codeIconBtn.title = snippetCount === 1 ? 'View custom code' : 'View ' + snippetCount + ' custom code snippets';
+      codeIconBtn.style.color = '#27c5c1';
+      codeIconBtn.style.cursor = 'pointer';
+      codeIconBtn.onclick = (function (codeItems, rName) {
+        return function () {
+          if (codeItems.length === 1) {
+            showCodeModal(codeItems[0].label + ': ' + rName, codeItems[0].code);
+          } else {
+            var combined = codeItems.map(function (item, idx) {
+              return '/* ---- ' + item.label + ' (' + (idx + 1) + ' of ' + codeItems.length + ') ---- */\n' + item.code;
+            }).join('\n\n');
+            showCodeModal('Custom Code: ' + rName + ' (' + codeItems.length + ' snippets)', combined);
+          }
+        };
+      })(allCustomCode, rule.name || ('Rule ' + (i + 1)));
+    }
+    tdCode.appendChild(codeIconBtn);
+    tr.appendChild(tdCode);
+
+    // Size (KB) – appended last
+    tr.appendChild(tdSize);
+
     tbody.appendChild(tr);
   }
 
@@ -2386,31 +2429,6 @@ if (rule_details_node) {
   if (set_display) set_display.style.display = 'none';
 }
 
-// Add proper null checks for the download button
-var download_button = document.getElementsByClassName('download-button');
-if (download_button && download_button.length > 0) {
-  var table = document.getElementById('rule_details');
-  if (table) {
-    var csv = [];
-    var rows = table.querySelectorAll('tr');
-    if (rows && rows.length > 0) {
-      for (var i = 0; i < rows.length; i++) {
-        var row = [],
-          cols = rows[i].querySelectorAll('td, th');
-
-        for (var j = 0; j < cols.length; j++) row.push(cols[j].innerText);
-
-        csv.push(row.join(','));
-      }
-      // Download CSV file
-      downloadCSV(csv.join('\n'), 'rules.csv');
-    }
-  }
-}
-
-function downloadCSV(csv, filename) {
-  // Function is now empty to remove CSV export link from the rule page
-}
 var set_display = document.getElementById('set_display');
 if (set_display) {
   set_display.style = 'display: none;';
@@ -2560,825 +2578,87 @@ if (download_button && download_button.length > 0) {
 }
 
 function exportMainRulesTableToCSV() {
-  var table = document.getElementById('rule_details');
-  if (!table) {
-    alert('No table found to export.');
-    return;
-  }
-  // Get visible rows only (skip header row)
-  var rows = Array.from(table.querySelectorAll('tr')).filter((row, idx) => row.offsetParent !== null && idx !== 0);
-  // Get headers from the table and clean them up
-  var headers = Array.from(table.querySelectorAll('th')).map(th => th.innerText.trim().replace(/\s+\u00a0.*/, ''));
-
-  // Remove any existing WebSDK or AA columns to prevent duplication
-  headers = headers.filter(header =>
-    !header.toLowerCase().includes('websdk') &&
-    !header.toLowerCase().includes('aa ') &&
-    !header.toLowerCase().includes('adobe analytics')
-  );
-
-  // Add new columns for AA and WebSDK after 'Custom Code (Action)'
-  var insertAfterIdx = headers.findIndex(h => h.toLowerCase().includes('custom code (action)'));
-  var aaColumns = [
-    'AA eVars',
-    'AA Props',
-    'AA Events',
-    'AA Additional',
-    'AA Custom Code'
-  ];
-  var websdkColumns = [
-    'WebSDK Data',
-    'WebSDK XDM'
-  ];
-  var newHeaders = headers.slice(0, insertAfterIdx + 1)
-    .concat(aaColumns)
-    .concat(websdkColumns)
-    .concat(headers.slice(insertAfterIdx + 1));
-
-  // Get rules data from sessionStorage
   var rulesRaw = sessionStorage.getItem('_satellite._container.rules');
-  var rules = [];
-  if (rulesRaw) {
+  var rulesArray = [];
+  if (rulesRaw && rulesRaw.trim() !== '') {
     try {
       var obj = JSON.parse(rulesRaw);
-      if (Array.isArray(obj)) rules = obj;
-      else if (typeof obj === 'object' && obj !== null) {
-        if (obj.rules && Array.isArray(obj.rules)) rules = obj.rules;
-        else rules = Object.values(obj).filter(item => typeof item === 'object' && item !== null);
-      }
-    } catch (e) { rules = []; }
+      if (Array.isArray(obj)) rulesArray = obj;
+      else if (obj && typeof obj === 'object')
+        rulesArray = (obj.rules && Array.isArray(obj.rules)) ? obj.rules : Object.values(obj).filter(function (item) { return item && typeof item === 'object'; });
+    } catch (e) {}
+  }
+  if (rulesArray.length === 0) {
+    alert('No rules data to export. Load a property first.');
+    return;
   }
 
-  // Helper to extract custom code or source from a rule (for condition, action, or other fields)
-  function extractAnySource(items) {
-    if (!Array.isArray(items)) return '';
-    let codeArr = [];
-
-    items.forEach(item => {
-      if (item && item.modulePath && item.modulePath.includes('customCode')) {
-        let customCode = null;
-
-        // Use the same logic as the rule table to extract custom code
-        if (item.settings && item.settings.source) {
-          customCode = extractCustomCodeFromSource(item.settings.source);
-        } else if (item.settings && item.settings.code) {
-          customCode = extractCustomCodeFromSource(item.settings.code);
-        } else if (item.settings && item.settings.script) {
-          customCode = extractCustomCodeFromSource(item.settings.script);
-        } else if (item.settings && item.settings.customCode) {
-          customCode = extractCustomCodeFromSource(item.settings.customCode);
-        } else if (item.settings && item.settings.body) {
-          customCode = extractCustomCodeFromSource(item.settings.body);
-        } else if (item.settings && item.settings.content) {
-          customCode = extractCustomCodeFromSource(item.settings.content);
-        }
-
-        // If no custom code found in specific properties, check all settings properties
-        if (!customCode && item.settings) {
-          for (const key in item.settings) {
-            const value = item.settings[key];
-            if (typeof value === 'string' && value.length > 10 &&
-              !value.startsWith('http') && !value.includes('assets.adobedtm.com') &&
-              (value.includes('function') || value.includes('var ') || value.includes('let ') ||
-                value.includes('const ') || value.includes('if ') || value.includes('for ') ||
-                value.includes('while ') || value.includes('return ') || value.includes('document.') ||
-                value.includes('console.') || value.includes('=>'))) {
-              customCode = value;
-              break;
-            }
-          }
-        }
-
-        if (customCode && customCode.trim()) {
-          codeArr.push(customCode);
-        }
-      }
-    });
-
-    return codeArr.join('\n---\n');
-  }
-
-  // Helper function to extract custom code from source (same logic as rule table)
-  function extractCustomCodeFromSource(source) {
-    if (!source) return null;
-
-    // If source is a function, extract the function body
-    if (typeof source === 'function') {
-      const functionString = source.toString();
-      const bodyMatch = functionString.match(/function\s*\([^)]*\)\s*\{([\s\S]*)\}$/);
-      if (bodyMatch && bodyMatch[1]) {
-        return bodyMatch[1].trim();
-      } else {
-        const fallbackMatch = functionString.match(/\{([\s\S]*)\}/);
-        if (fallbackMatch && fallbackMatch[1]) {
-          return fallbackMatch[1].trim();
-        }
-      }
-      return functionString;
-    }
-
-    // If source is a string, check if it's actual code (not a URL)
-    if (typeof source === 'string') {
-      // If it looks like actual code (not a URL), use it directly
-      if (!source.startsWith('http') && !source.startsWith('@http') && !source.includes('assets.adobedtm.com')) {
-        return source;
-      } else {
-        // It's a URL, try to find the actual code in session storage
-        return findCustomCodeInSessionStorage(source);
-      }
-    }
-
-    return source;
-  }
-
-  // Helper function to extract actual custom code content from various sources
-  function extractCustomCodeContent(source) {
-    if (!source) return null;
-
-    // If source is a function, extract the function body
-    if (typeof source === 'function') {
-      const functionString = source.toString();
-      const bodyMatch = functionString.match(/function\s*\([^)]*\)\s*\{([\s\S]*)\}$/);
-      if (bodyMatch && bodyMatch[1]) {
-        return bodyMatch[1].trim();
-      } else {
-        const fallbackMatch = functionString.match(/\{([\s\S]*)\}/);
-        if (fallbackMatch && fallbackMatch[1]) {
-          return fallbackMatch[1].trim();
-        }
-      }
-      return functionString;
-    }
-
-    // If source is a string, check if it's a URL or actual code
-    if (typeof source === 'string') {
-      // If it looks like actual code (not a URL), use it directly
-      if (!source.startsWith('http') && !source.startsWith('@http') && !source.includes('assets.adobedtm.com')) {
-        return source;
-      } else {
-        // It's a URL, try to find the actual code in session storage
-        return findCustomCodeInSessionStorage(source);
-      }
-    }
-
-    return source;
-  }
-
-  // Helper function to find custom code in session storage data
-  function findCustomCodeInSessionStorage(url) {
+  function ruleSizeKb(rule) {
+    if (rule == null) return 0;
+    if (typeof rule.size === 'number' && rule.size >= 0) return (rule.size / 1024).toFixed(2);
     try {
-      // Get rules data from session storage
-      const rulesRaw = sessionStorage.getItem('_satellite._container.rules');
-      if (!rulesRaw) return url; // Fallback to URL if no data
-
-      const rules = JSON.parse(rulesRaw);
-
-      // Look through all rules for custom code that matches the URL
-      for (const rule of rules) {
-        if (rule.conditions) {
-          for (const condition of rule.conditions) {
-            if (condition.settings && condition.settings.source) {
-              if (typeof condition.settings.source === 'string' &&
-                condition.settings.source.includes(url.replace('.min.js', ''))) {
-                return extractCustomCodeContent(condition.settings.source);
-              }
-            }
-          }
-        }
-
-        if (rule.actions) {
-          for (const action of rule.actions) {
-            if (action.settings && action.settings.source) {
-              if (typeof action.settings.source === 'string' &&
-                action.settings.source.includes(url.replace('.min.js', ''))) {
-                return extractCustomCodeContent(action.settings.source);
-              }
-            }
-          }
-        }
-      }
-
-      // If not found, return the URL as fallback
-      return url;
-    } catch (e) {
-      console.error('Error finding custom code in session storage:', e);
-      return url; // Fallback to URL
+      var json = JSON.stringify(rule);
+      var len = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(json).length : (typeof Blob !== 'undefined' ? new Blob([json]).size : json.length * 2);
+      return (len / 1024).toFixed(2);
+    } catch (e) { return '0'; }
+  }
+  function eventSummary(ev) {
+    if (!ev) return '';
+    if (ev.type) return ev.type;
+    if (ev.name) return ev.name;
+    if (ev.modulePath) {
+      var evH = hostBundleLabelFromModulePath(ev.modulePath);
+      if (evH) return evH;
+      return ev.modulePath.split('/').pop().replace(/\.js$/, '') || 'Event';
     }
+    return 'Event';
+  }
+  function conditionSummary(c) {
+    if (!c) return '';
+    if (c.name) return c.name;
+    if (c.modulePath) {
+      var cH = hostBundleLabelFromModulePath(c.modulePath);
+      if (cH) return cH;
+      return c.modulePath.split('/').pop().replace(/\.js$/, '') || 'Condition';
+    }
+    return c.type || 'Condition';
+  }
+  function actionSummary(a) {
+    if (!a) return '';
+    if (a.name) return a.name;
+    if (a.modulePath) {
+      var aH = hostBundleLabelFromModulePath(a.modulePath);
+      if (aH) return aH;
+      var fn = a.modulePath.split('/').pop().replace(/\.js$/, '');
+      if (fn === 'index' && a.modulePath.indexOf('sendEvent') !== -1) return 'WebSDK Send Event';
+      if (fn === 'index' && a.modulePath.indexOf('setVariables') !== -1) return 'Adobe Analytics SetVariable';
+      return fn || 'Action';
+    }
+    return a.type || 'Action';
   }
 
-  // Function to extract custom code using the exact same logic as the rule table
-  function extractCustomCodeFromRuleTable(actions) {
-    if (!Array.isArray(actions)) return '';
-
-    let customCodeActions = [];
-
-    actions.forEach(action => {
-      if (action && action.modulePath && action.modulePath.includes('customCode')) {
-        let customCode = null;
-
-        // Check for custom code in various locations (same logic as rule table)
-        if (action.settings && action.settings.source) {
-          customCode = extractCustomCodeFromSource(action.settings.source);
-        } else if (action.settings && action.settings.code) {
-          customCode = extractCustomCodeFromSource(action.settings.code);
-        } else if (action.settings && action.settings.script) {
-          customCode = extractCustomCodeFromSource(action.settings.script);
-        } else if (action.settings && action.settings.customCode) {
-          customCode = extractCustomCodeFromSource(action.settings.customCode);
-        } else if (action.settings && action.settings.body) {
-          customCode = extractCustomCodeFromSource(action.settings.body);
-        } else if (action.settings && action.settings.content) {
-          customCode = extractCustomCodeFromSource(action.settings.content);
-        }
-
-        // If no custom code found in specific properties, check all settings properties (same logic as rule table)
-        if (!customCode && action.settings) {
-          for (const key in action.settings) {
-            const value = action.settings[key];
-            if (typeof value === 'string' && value.length > 10 &&
-              !value.startsWith('http') && !value.includes('assets.adobedtm.com') &&
-              (value.includes('function') || value.includes('var ') || value.includes('let ') ||
-                value.includes('const ') || value.includes('if ') || value.includes('for ') ||
-                value.includes('while ') || value.includes('return ') || value.includes('document.') ||
-                value.includes('console.') || value.includes('=>'))) {
-              customCode = value;
-              break;
-            }
-          }
-        }
-
-        if (customCode && customCode.trim()) {
-          customCodeActions.push({
-            code: customCode,
-            actionName: action.name || action.id || 'Unknown Action'
-          });
-        }
-      }
-    });
-
-    // Return the actual code content, not URLs
-    return customCodeActions.map(action => action.code).join('\n---\n');
-  }
-
-  // Helper to extract AA details from actions
-  function extractAADetails(actions) {
-    let aa = {
-      eVars: '',
-      props: '',
-      events: '',
-      additional: '',
-      customCode: ''
-    };
-    if (!Array.isArray(actions)) return aa;
-    for (let action of actions) {
-      if (
-        action.modulePath &&
-        action.modulePath.includes('adobe-analytics/') &&
-        !action.modulePath.includes('sendBeacon.js') &&
-        !action.modulePath.includes('clearVariables.js') &&
-        action.settings &&
-        action.settings.trackerProperties
-      ) {
-        const tp = action.settings.trackerProperties;
-        // eVars
-        if (tp.eVars) {
-          aa.eVars = (tp.eVars.map(e => (e.name || e) + (e.value ? ': ' + e.value : '')).join('\n'));
-        }
-        // props
-        if (tp.props) {
-          aa.props = (tp.props.map(p => (p.name || p) + (p.value ? ': ' + p.value : '')).join('\n'));
-        }
-        // events
-        if (tp.events) {
-          aa.events = (tp.events.map(ev => (ev.name ? ev.name.replaceAll('%', '') : ev)).join('\n'));
-        }
-        // Additional settings
-        let additional = [];
-        if (tp.pageName) additional.push('Page Name: ' + tp.pageName);
-        if (tp.pageURL) additional.push('Page URL: ' + tp.pageURL);
-        if (tp.campaign) {
-          let campaignValue = tp.campaign;
-          if (typeof tp.campaign === 'object') {
-            // Extract the actual value from campaign object structure
-            if (tp.campaign.value !== undefined) {
-              campaignValue = tp.campaign.value;
-            } else if (tp.campaign.type === 'value' && tp.campaign.value !== undefined) {
-              campaignValue = tp.campaign.value;
-            } else {
-              // Fallback to stringify if we can't extract the value
-              campaignValue = JSON.stringify(tp.campaign);
-            }
-          }
-          additional.push('Campaign: ' + campaignValue);
-        }
-        // Any other campaign keys
-        Object.keys(tp).forEach(key => {
-          if (key.toLowerCase().includes('campaign') && tp[key] && tp[key] !== 'Value' && tp[key] !== 'value') {
-            if (typeof tp[key] !== 'object') additional.push(`Campaign ${key}: ${tp[key]}`);
-          }
-        });
-        aa.additional = additional.join('\n');
-        // Custom code
-        let customCode = '';
-        if (action.settings.customSetup && action.settings.customSetup.source) {
-          customCode = action.settings.customSetup.source;
-        } else if (action.settings.customCode) {
-          customCode = action.settings.customCode;
-        } else if (action.settings.source) {
-          customCode = action.settings.source;
-        } else if (action.settings.code) {
-          customCode = action.settings.code;
-        } else if (action.settings.script) {
-          customCode = action.settings.script;
-        } else if (action.customCode) {
-          customCode = action.customCode;
-        }
-        aa.customCode = customCode;
-        break; // Only one AA action per rule for CSV
-      }
-    }
-    return aa;
-  }
-
-  // Helper to extract WebSDK details from actions (separate for Data and XDM)
-  function extractWebSDKDetails(actions) {
-    let wsData = {
-      eventType: '',
-      dataElements: '',
-      customCode: '',
-      eVars: '',
-      props: '',
-      events: '',
-      contextData: '',
-      additionalSettings: ''
-    };
-
-    let wsXdm = {
-      eventType: '',
-      dataElements: '',
-      customCode: '',
-      eVars: '',
-      props: '',
-      events: '',
-      contextData: '',
-      additionalSettings: ''
-    };
-
-    if (!Array.isArray(actions)) return { data: wsData, xdm: wsXdm };
-
-    let dataActionFound = false;
-    let xdmActionFound = false;
-
-    let webSDKActionCount = 0;
-
-    for (let action of actions) {
-      if (action.modulePath && action.modulePath.includes('adobe-alloy/')) {
-        webSDKActionCount++;
-
-        // Determine if this is a Data or XDM action based on action number (like rule details page)
-        const isXdmAction = webSDKActionCount === 2; // Second WebSDK action is XDM
-        const isDataAction = webSDKActionCount === 1; // First WebSDK action is Data
-
-        // Debug logging for action detection
-        console.log('WebSDK Action Detection:', {
-          actionName: action.name,
-          actionNumber: webSDKActionCount,
-          isDataAction: isDataAction,
-          isXdmAction: isXdmAction,
-          hasXdm: !!(action.settings && action.settings.xdm),
-          hasData: !!(action.settings && action.settings.data)
-        });
-
-        // Process based on action number
-        if (isDataAction && !dataActionFound) {
-          // Process Data action (first WebSDK action)
-          wsData = extractWebSDKActionData(action, 'data');
-          dataActionFound = true;
-          console.log('Found Data action (action #1):', action.name);
-        } else if (isXdmAction && !xdmActionFound) {
-          // Process XDM action (second WebSDK action)
-          wsXdm = extractWebSDKActionData(action, 'xdm');
-          xdmActionFound = true;
-          console.log('Found XDM action (action #2):', action.name);
-        }
-
-        // Stop if we found both types
-        if (dataActionFound && xdmActionFound) break;
-      }
-    }
-
-    // Only use fallback if we haven't found either type
-    if (!dataActionFound && !xdmActionFound) {
-      for (let action of actions) {
-        if (action.modulePath && action.modulePath.includes('adobe-alloy/')) {
-          // Try to determine which type this action should be based on its structure
-          const hasXdm = action.settings && action.settings.xdm;
-          const hasData = action.settings && action.settings.data;
-
-          console.log('Fallback Action Analysis:', {
-            actionName: action.name,
-            hasXdm: hasXdm,
-            hasData: hasData,
-            dataActionFound: dataActionFound,
-            xdmActionFound: xdmActionFound
-          });
-
-          if (hasXdm && !hasData && !xdmActionFound) {
-            // If it has XDM but no data, use it for XDM columns
-            wsXdm = extractWebSDKActionData(action, 'xdm');
-            xdmActionFound = true;
-            console.log('Assigned action to XDM in fallback:', action.name);
-          } else if (hasData && !hasXdm && !dataActionFound) {
-            // If it has data but no XDM, use it for Data columns
-            wsData = extractWebSDKActionData(action, 'data');
-            dataActionFound = true;
-            console.log('Assigned action to Data in fallback:', action.name);
-          } else if (hasXdm && hasData && !xdmActionFound) {
-            // If it has both, prioritize XDM for XDM columns
-            wsXdm = extractWebSDKActionData(action, 'xdm');
-            xdmActionFound = true;
-            console.log('Assigned action with both XDM and Data to XDM in fallback:', action.name);
-          } else if (hasData && !dataActionFound) {
-            // If we still haven't found a data action, use this one
-            wsData = extractWebSDKActionData(action, 'data');
-            dataActionFound = true;
-            console.log('Assigned remaining action to Data in fallback:', action.name);
-          }
-
-          // Don't break here - continue to process all actions
-        }
-      }
-    }
-
-    console.log('Final WebSDK Details Return:', {
-      dataActionFound: dataActionFound,
-      xdmActionFound: xdmActionFound,
-      dataKeys: Object.keys(wsData),
-      xdmKeys: Object.keys(wsXdm),
-      dataSample: JSON.stringify(wsData).substring(0, 100),
-      xdmSample: JSON.stringify(wsXdm).substring(0, 100)
-    });
-
-    return { data: wsData, xdm: wsXdm };
-  }
-
-  // Helper function to extract data from a single WebSDK action
-  function extractWebSDKActionData(action, type) {
-    let ws = {
-      eventType: '',
-      dataElements: '',
-      customCode: '',
-      eVars: '',
-      props: '',
-      events: '',
-      contextData: '',
-      additionalSettings: ''
-    };
-
-    // Event Type
-    ws.eventType = action.settings && action.settings.type ? action.settings.type : '';
-
-    // Use the same comprehensive data extraction as rule details page
-    let extractedData = null;
-
-    if (type === 'xdm') {
-      // For XDM actions, ONLY use xdm data - no fallback to data property
-      let xdmData = action.settings.xdm;
-
-      console.log('XDM Action Debug:', {
-        hasXdm: !!xdmData,
-        xdmType: typeof xdmData,
-        xdmData: xdmData
-      });
-
-      // Check if we have a data element reference instead of direct XDM object
-      if (typeof xdmData === 'string' && xdmData.includes('%')) {
-        const dataElementName = xdmData.replace(/%/g, '');
-        console.log('XDM Data Element Name:', dataElementName);
-        try {
-          const de_value = sessionStorage.getItem('_satellite._container.dataElements');
-          if (de_value) {
-            const dataElements = JSON.parse(de_value);
-            if (dataElements[dataElementName] && dataElements[dataElementName].settings) {
-              extractedData = dataElements[dataElementName].settings.data;
-              console.log('Extracted XDM from data element:', extractedData);
-            } else {
-              console.log('Data element not found or no settings:', dataElementName);
-            }
-          } else {
-            console.log('No data elements found in session storage');
-          }
-        } catch (e) {
-          console.error('Error extracting data element:', e);
-        }
-      } else if (typeof xdmData === 'object' && xdmData !== null) {
-        extractedData = xdmData;
-        console.log('Using direct XDM object:', extractedData);
-      } else {
-        console.log('XDM data is not a string with % or an object:', xdmData);
-      }
-    } else if (type === 'data') {
-      // For Data actions, ONLY use data property - no fallback to xdm
-      extractedData = action.settings.data;
-    }
-
-    // Only use fallback sources if we don't have data from the primary source
-    if (!extractedData && action.settings) {
-      // For XDM actions, don't fall back to data property
-      // For Data actions, don't fall back to xdm property
-      if (type === 'xdm') {
-        // Only check for trackerProperties or other non-data sources for XDM
-        if (action.settings.trackerProperties) {
-          extractedData = action.settings.trackerProperties;
-        }
-      } else if (type === 'data') {
-        // Only check for trackerProperties or other non-xdm sources for Data
-        if (action.settings.trackerProperties) {
-          extractedData = action.settings.trackerProperties;
-        }
-      }
-    }
-
-    // Debug logging
-    console.log('WebSDK Action Debug:', {
-      type: type,
-      hasSettings: !!action.settings,
-      hasXdm: !!(action.settings && action.settings.xdm),
-      hasData: !!(action.settings && action.settings.data),
-      xdmType: action.settings && action.settings.xdm ? typeof action.settings.xdm : 'undefined',
-      extractedDataType: extractedData ? typeof extractedData : 'undefined',
-      extractedDataKeys: extractedData ? Object.keys(extractedData) : [],
-      actionSettingsKeys: action.settings ? Object.keys(action.settings) : []
-    });
-
-    // For both XDM and Data actions, return the actual data structure immediately
-    if (type === 'xdm' || type === 'data') {
-      // Return the extracted data directly instead of the processed structure
-      console.log(`Returning ${type} data:`, extractedData);
-      return extractedData || {};
-    }
-
-    // For other action types, continue with processing
-    // Now extract eVars and props using the same logic as rule details page
-    if (extractedData) {
-      // Function to get all complete paths from an object (same as rule details)
-      function getCompletePaths(obj, parentPath = '') {
-        let paths = [];
-        for (const key in obj) {
-          const currentPath = parentPath ? `${parentPath}.${key}` : key;
-          const value = obj[key];
-          if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-            paths = paths.concat(getCompletePaths(value, currentPath));
-          } else {
-            paths.push({ path: currentPath, value: value });
-          }
-        }
-        return paths;
-      }
-
-      const completePaths = getCompletePaths(extractedData);
-
-      // Extract eVars using the same filtering logic as rule details
-      const evarPaths = completePaths.filter(({ path }) =>
-        (path.includes('eVar') || path.includes('evar')) &&
-        !path.includes('pageName') &&
-        !path.includes('page_name') &&
-        !path.includes('page') &&
-        !(path.includes('_adobe.analytics.') && !path.includes('eVar'))
-      );
-
-      let evars = [];
-      evarPaths.forEach(({ path, value }) => {
-        const evarMatch = path.match(/eVar(\d+)/i);
-        const evarName = evarMatch ? `eVar${evarMatch[1]}` : path;
-        const val = Array.isArray(value) ? JSON.stringify(value) : value;
-        evars.push(`${evarName}: ${val}`);
-      });
-      ws.eVars = evars.join('\n');
-
-      // Extract props using the same filtering logic as rule details
-      const propPaths = completePaths.filter(({ path }) =>
-        path.includes('prop') || path.includes('_adobe.analytics.prop')
-      );
-
-      let props = [];
-      propPaths.forEach(({ path, value }) => {
-        const propMatch = path.match(/prop(\d+)/i);
-        const propName = propMatch ? `prop${propMatch[1]}` : path;
-        const val = Array.isArray(value) ? JSON.stringify(value) : value;
-        props.push(`${propName}: ${val}`);
-      });
-      ws.props = props.join('\n');
-
-      // Extract events
-      let eventsData = [];
-      // First check for traditional trackerProperties events
-      if (action.settings && action.settings.trackerProperties && action.settings.trackerProperties.events) {
-        const eventList = action.settings.trackerProperties.events;
-        eventList.forEach(event => {
-          const eventName = event.name ? event.name.replaceAll('%', '') : event;
-          const eventValue = event.value ? event.value : '1';
-          eventsData.push(`${eventName}: ${eventValue}`);
-        });
-      }
-
-      // Check for events in data._adobe.analytics.events (string format)
-      const analyticsEventsPath = completePaths.find(({ path }) =>
-        path.includes('_adobe.analytics.events') || path.includes('analytics.events')
-      );
-
-      if (analyticsEventsPath && analyticsEventsPath.value) {
-        const eventsString = analyticsEventsPath.value;
-        const eventPairs = eventsString.split(',');
-
-        eventPairs.forEach(eventPair => {
-          if (eventPair.includes('=')) {
-            const [eventName, eventValue] = eventPair.split('=');
-            const cleanEventName = eventName.replaceAll('%', '');
-            const cleanEventValue = eventValue ? eventValue.replaceAll('%', '') : '1';
-            eventsData.push(`${cleanEventName}: ${cleanEventValue}`);
-          } else {
-            const cleanEventName = eventPair.replaceAll('%', '');
-            eventsData.push(`${cleanEventName}: 1`);
-          }
-        });
-      }
-
-      // Capture all XDM events (event1to100, event101to200, etc.)
-      const eventPaths = completePaths.filter(({ path }) =>
-        path.includes('event') && path.includes('value')
-      );
-
-      eventPaths.forEach(({ path, value }) => {
-        const pathParts = path.split('.');
-        let eventName = '';
-
-        for (let i = 0; i < pathParts.length; i++) {
-          if (pathParts[i].startsWith('event') && pathParts[i] !== 'event1to100' &&
-            pathParts[i] !== 'event101to200' && pathParts[i] !== 'event201to300' &&
-            pathParts[i] !== 'event301to400' && pathParts[i] !== 'event401to500' &&
-            pathParts[i] !== 'event501to600' && pathParts[i] !== 'event601to700' &&
-            pathParts[i] !== 'event701to800' && pathParts[i] !== 'event801to900' &&
-            pathParts[i] !== 'event901to1000') {
-            eventName = pathParts[i];
-            break;
-          }
-        }
-
-        if (eventName && path.endsWith('.value')) {
-          const eventValue = value !== null && value !== undefined ? value : '1';
-          eventsData.push(`${eventName}: ${eventValue}`);
-        }
-      });
-
-      ws.events = eventsData.join('\n');
-
-      // Extract Context Data
-      let contextDataRows = [];
-      const contextDataPaths = completePaths.filter(({ path }) => {
-        if (path.toLowerCase().includes('contextdata') || path.toLowerCase().includes('context_data')) {
-          return true;
-        }
-        if (path.includes('commerce') || path.includes('Commerce')) {
-          return true;
-        }
-        if (path.includes('list') || path.includes('List')) {
-          return true;
-        }
-        if (path.includes('_experience') && !path.includes('event') && !path.includes('eVar') && !path.includes('prop')) {
-          return true;
-        }
-        if (path.includes('internal') || path.includes('session') || path.includes('_id')) {
-          return true;
-        }
-        return false;
-      });
-
-      contextDataPaths.forEach(({ path, value }) => {
-        const pathParts = path.split('.');
-        let propertyName = '';
-
-        if (path.includes('commerce')) {
-          for (let i = pathParts.length - 1; i >= 0; i--) {
-            if (pathParts[i] === 'commerce' && i + 1 < pathParts.length) {
-              propertyName = pathParts[i + 1];
-              break;
-            }
-          }
-          if (propertyName && pathParts[pathParts.length - 1] === 'value') {
-            propertyName = `commerce.${propertyName}`;
-          }
-        } else {
-          propertyName = pathParts[pathParts.length - 2] || pathParts[pathParts.length - 1];
-          if (propertyName === 'value') {
-            propertyName = pathParts[pathParts.length - 2] || 'Unknown';
-          }
-        }
-
-        const val = Array.isArray(value) ? JSON.stringify(value) : value;
-        contextDataRows.push(`${propertyName}: ${val}`);
-      });
-
-      ws.contextData = contextDataRows.join('\n');
-
-      // Extract Additional Settings
-      let addPropsData = [];
-      const additionalProperties = completePaths.filter(({ path }) =>
-        (path.includes('pageName') ||
-          path.includes('page_name') ||
-          path.includes('page') ||
-          path.includes('_adobe.analytics.')) &&
-        !path.includes('prop') && !path.includes('eVar') && !path.toLowerCase().includes('event') &&
-        !path.includes('commerce') && !path.includes('list') && !path.includes('List') &&
-        !path.toLowerCase().includes('contextdata') && !path.toLowerCase().includes('context_data')
-      );
-
-      additionalProperties.forEach(({ path, value }) => {
-        let propertyName = '';
-        if (path.includes('pageName')) {
-          propertyName = 'pageName';
-        } else if (path.includes('page_name')) {
-          propertyName = 'page_name';
-        } else if (path.includes('_adobe.analytics.')) {
-          const propertyMatch = path.match(/_adobe\.analytics\.(.+)/);
-          if (propertyMatch) {
-            propertyName = propertyMatch[1];
-          } else {
-            propertyName = path;
-          }
-        } else {
-          propertyName = path;
-        }
-        const val = Array.isArray(value) ? JSON.stringify(value) : value;
-        addPropsData.push(`${propertyName}: ${val}`);
-      });
-
-      ws.additionalSettings = addPropsData.join('\n');
-    }
-
-
-    // Data Elements (flatten keys if present)
-    if (action.settings && action.settings.data) {
-      ws.dataElements = Object.keys(action.settings.data).join('\n');
-    }
-    // Custom Code
-    if (action.settings && action.settings.customCode) {
-      ws.customCode = action.settings.customCode;
-    }
-
-    return ws;
-  }
-
-  // Map visible rows to rule data for accurate code extraction
-  var data = [newHeaders];
-  rows.forEach((row, idx) => {
-    var cells = Array.from(row.children);
-    // Try to match rule by name (first cell, strip commas)
-    var ruleName = cells[0]?.innerText?.replace(/,/g, '').trim();
-    var rule = rules.find(r => (r.name || r.id || '').replace(/,/g, '').trim() === ruleName);
-    var rowData = cells.map((cell, colIdx) => cell.innerText.trim());
-    // Insert AA and WebSDK details after Custom Code (Action)
-    if (rule) {
-      var aa = extractAADetails(rule.actions);
-      var ws = extractWebSDKDetails(rule.actions);
-      var insertIdx = insertAfterIdx + 1;
-      // Overwrite the Custom Code (Action) column with actual code
-      var customCodeActionIdx = headers.findIndex(h => h.toLowerCase().includes('custom code (action)'));
-      if (customCodeActionIdx !== -1) {
-        // Extract actual custom code using the same logic as the rule table
-        var customCode = extractCustomCodeFromRuleTable(rule.actions);
-        rowData[customCodeActionIdx] = customCode;
-      }
-
-      // Insert AA and WebSDK columns
-      rowData.splice(insertIdx, 0,
-        aa.eVars, aa.props, aa.events, aa.additional, aa.customCode,
-        JSON.stringify(ws.data), JSON.stringify(ws.xdm)
-      );
-    } else {
-      // If rule not found, insert blanks
-      var insertIdx = insertAfterIdx + 1;
-      rowData.splice(insertIdx, 0,
-        '', '', '', '', '', // AA columns
-        '', ''  // WebSDK columns
-      );
-    }
-    data.push(rowData);
+  var headers = ['ID #', 'Rule Name', 'Events', 'Conditions', 'Actions', 'Size (KB)'];
+  var rows = rulesArray.map(function (rule, i) {
+    var events = (rule.events && Array.isArray(rule.events)) ? rule.events.map(eventSummary).filter(Boolean).join('; ') : '';
+    var conditions = (rule.conditions && Array.isArray(rule.conditions)) ? rule.conditions.map(conditionSummary).filter(Boolean).join('; ') : '';
+    var actions = (rule.actions && Array.isArray(rule.actions)) ? rule.actions.map(actionSummary).filter(Boolean).join('; ') : '';
+    var name = (rule.name || rule.id || 'Rule ' + (i + 1)).replace(/,/g, '');
+    return [String(i + 1), name, events, conditions, actions, ruleSizeKb(rule)];
   });
 
-  // Convert to CSV string (with UTF-8 BOM for Excel compatibility)
-  function toCsvRow(arr) {
-    return arr.map(val => '"' + String(val).replace(/"/g, '""') + '"').join(',');
+  function toCsvCell(val) {
+    return '"' + String(val).replace(/"/g, '""') + '"';
   }
-  var csvContent = '\uFEFF' + data.map(toCsvRow).join('\r\n');
-  // Download CSV file
+  var csvLines = [headers.map(toCsvCell).join(',')].concat(rows.map(function (r) { return r.map(toCsvCell).join(','); }));
+  var csvContent = '\uFEFF' + csvLines.join('\r\n');
   var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   var link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = 'rules_table_export.csv';
+  link.download = 'rules_export.csv';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
 }
 
 // True if string looks like a Launch data element ID (e.g. DE + hex)
@@ -3480,6 +2760,305 @@ function cleanActionSettingsForDisplay(settings) {
   return out;
 }
 
+// Structured static analysis for custom code — returns HTML
+function analyzeCodeWithoutAI(code) {
+  var src = String(code || '');
+  if (!src.trim()) return '<p style="color:#888;font-style:italic;margin:0">No code available to analyze.</p>';
+
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function has(re) { return re.test(src); }
+  function count(re) { return (src.match(re)||[]).length; }
+
+  var lines = src.split(/\r?\n/);
+  var nonEmpty = lines.filter(function(l){ return l.trim(); });
+  var avgLineLen = nonEmpty.length ? Math.round(src.length / nonEmpty.length) : src.length;
+  var maybeMinified = (nonEmpty.length <= 2 && src.length > 500) || avgLineLen > 220;
+
+  var returnMatches = [];
+  var returnRe = /\breturn\s+([^\n;{}]{1,120})/g, rm;
+  while ((rm = returnRe.exec(src)) !== null) {
+    var rv = rm[1].trim();
+    if (rv && rv !== 'null' && rv !== 'undefined' && rv !== "''" && rv !== '""')
+      returnMatches.push(rv.length > 90 ? rv.slice(0,90) + '\u2026' : rv);
+    if (returnMatches.length >= 3) break;
+  }
+
+  var returnType = 'unknown';
+  if (has(/\breturn\s+(true|false|!![^;{]{0,40})/)) returnType = 'boolean';
+  else if (has(/\breturn\s+['"`]/) || has(/\.toString\s*\(\)/) || has(/\breturn\s+String\s*\(/)) returnType = 'string';
+  else if (has(/\breturn\s+(parseInt|parseFloat|Number)\s*\(/)) returnType = 'number';
+  else if (has(/\breturn\s+\[/)) returnType = 'array';
+  else if (has(/\breturn\s+\{/) || has(/\breturn\s+new\s+Object/)) returnType = 'object';
+  else if (has(/\breturn\s+new\s+Promise/) || has(/async\s+function|\bawait\s+/)) returnType = 'Promise';
+  else if (returnMatches.length > 2) returnType = 'conditional';
+  else if (returnMatches.length > 0) returnType = 'value';
+
+  var ddPaths = [], ddSeen = {};
+  var ddRe = /\b(digitalData(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*){1,6})/g, ddm;
+  while ((ddm = ddRe.exec(src)) !== null) {
+    if (!ddSeen[ddm[1]] && ddPaths.length < 8) { ddSeen[ddm[1]] = true; ddPaths.push(ddm[1]); }
+  }
+
+  var adlPaths = [], adlSeen = {};
+  var adlRe = /\b(adobeDataLayer(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*){1,5})/g, adlm;
+  while ((adlm = adlRe.exec(src)) !== null) {
+    if (!adlSeen[adlm[1]] && adlPaths.length < 6) { adlSeen[adlm[1]] = true; adlPaths.push(adlm[1]); }
+  }
+
+  var dlPaths = [], dlSeen = {};
+  var dlRe = /\b(dataLayer(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*){1,5})/g, dlm;
+  while ((dlm = dlRe.exec(src)) !== null) {
+    if (!dlSeen[dlm[1]] && dlPaths.length < 6) { dlSeen[dlm[1]] = true; dlPaths.push(dlm[1]); }
+  }
+
+  var winPaths = [], winSeen = {};
+  var winRe = /\b(window\.[a-zA-Z_$][a-zA-Z0-9_$]*(?:\.[a-zA-Z_$][a-zA-Z0-9_$]*){0,4})/g, wm;
+  while ((wm = winRe.exec(src)) !== null) {
+    if (!winSeen[wm[1]] && winPaths.length < 6) { winSeen[wm[1]] = true; winPaths.push(wm[1]); }
+  }
+
+  var docLocReads = [], docLocSeen = {};
+  var docLocRe = /\b(document\.(?:title|referrer|URL)|location\.(?:href|pathname|search|hash|origin|hostname))\b/g, dlcm;
+  while ((dlcm = docLocRe.exec(src)) !== null) {
+    if (!docLocSeen[dlcm[1]] && docLocReads.length < 6) { docLocSeen[dlcm[1]] = true; docLocReads.push(dlcm[1]); }
+  }
+
+  var deRefs = [];
+  var satRe = /_satellite\.getVar\s*\(\s*['"]([^'"]+)['"]\s*\)/g, sm;
+  while ((sm = satRe.exec(src)) !== null) { if (deRefs.indexOf(sm[1]) === -1) deRefs.push(sm[1]); }
+  var pctRe = /%([^%\s]{1,60})%/g, pm2;
+  while ((pm2 = pctRe.exec(src)) !== null) { if (deRefs.indexOf(pm2[1]) === -1) deRefs.push(pm2[1]); }
+
+  var urlParamKeys = [];
+  var upRe = /(?:searchParams\.get|URLSearchParams[^)]*)\s*\(\s*['"]([^'"]{1,40})['"]\s*\)|\.get\s*\(\s*['"]([^'"]{1,40})['"]\s*\)/g, up;
+  while ((up = upRe.exec(src)) !== null) {
+    var upKey = up[1] || up[2];
+    if (upKey && urlParamKeys.indexOf(upKey) === -1) urlParamKeys.push(upKey);
+  }
+  var hasUrlSearch = has(/location\.search/) && urlParamKeys.length === 0;
+
+  var storageKeys = [];
+  var stRe = /(?:localStorage|sessionStorage)\.(?:getItem|setItem|removeItem)\s*\(\s*['"]([^'"]{1,60})['"]/g, st;
+  while ((st = stRe.exec(src)) !== null) {
+    var stEntry = (src.substring(st.index, st.index + 13).indexOf('session') >= 0 ? 'session' : 'local') + ':' + st[1];
+    if (storageKeys.indexOf(stEntry) === -1) storageKeys.push(stEntry);
+  }
+
+  var cookieKeys = [];
+  var ckRe = /getCookie\s*\(\s*['"]([^'"]{1,60})['"]\s*\)|cookie\.(?:get|read)\s*\(\s*['"]([^'"]{1,60})['"]/g, ck;
+  while ((ck = ckRe.exec(src)) !== null) {
+    var ckName = ck[1] || ck[2];
+    if (ckName && cookieKeys.indexOf(ckName) === -1) cookieKeys.push(ckName);
+  }
+  var hasCookieRead = has(/document\.cookie/);
+
+  var networkCalls = count(/\bfetch\s*\(|\bXMLHttpRequest\b|\.sendBeacon\s*\(/g);
+  var returnCount = count(/\breturn\b/g);
+  var firesEvent = has(/_satellite\.track\s*\(|_satellite\.notify\s*\(/);
+  var satelliteTrackNames = [];
+  var satTrackRe = /_satellite\.track\s*\(\s*['"]([^'"]+)['"]/g, stm;
+  while ((stm = satTrackRe.exec(src)) !== null) satelliteTrackNames.push(stm[1]);
+
+  // ---- PROSE SUMMARY ----
+  var proseParts = [];
+  if (ddPaths.length) proseParts.push('reads from the <strong>Adobe data layer</strong> (<code>digitalData</code>)');
+  if (adlPaths.length) proseParts.push('reads from the <strong>ECMA data layer</strong> (<code>adobeDataLayer</code>)');
+  if (dlPaths.length) proseParts.push('reads from <strong>dataLayer</strong>');
+  if (winPaths.length) proseParts.push('reads from <strong>window</strong> globals');
+  if (deRefs.length) {
+    var depLabel = deRefs.length === 1 ? 'data element <code>' + esc(deRefs[0]) + '</code>' : deRefs.length + ' Tags data elements';
+    proseParts.push('depends on ' + depLabel);
+  }
+  if (urlParamKeys.length) proseParts.push('extracts <code>' + urlParamKeys.slice(0,2).map(esc).join('</code>, <code>') + '</code> from the URL query string');
+  else if (hasUrlSearch) proseParts.push('parses the URL query string');
+  if (storageKeys.length) proseParts.push('reads from browser storage');
+  if (hasCookieRead || cookieKeys.length) proseParts.push('reads browser cookies');
+  if (docLocReads.length) proseParts.push('reads ' + docLocReads.slice(0,2).map(function(d){ return '<code>' + esc(d) + '</code>'; }).join(', '));
+  if (networkCalls > 0) proseParts.push('makes ' + networkCalls + ' async network call' + (networkCalls > 1 ? 's' : ''));
+
+  var outcomeParts = [];
+  if (firesEvent) {
+    outcomeParts.push(satelliteTrackNames.length ? 'fires satellite event <code>' + esc(satelliteTrackNames[0]) + '</code>' : 'fires a satellite event');
+  }
+  if (returnMatches.length) {
+    var typeStr = (returnType !== 'unknown' && returnType !== 'value') ? ' (' + returnType + ')' : '';
+    outcomeParts.push('returns a value' + typeStr);
+  }
+
+  var proseHtml;
+  if (proseParts.length || outcomeParts.length) {
+    var sentence = proseParts.length ? 'This code ' + proseParts.join(', ') : '';
+    if (outcomeParts.length) sentence += (proseParts.length ? ', and ' : 'This code ') + outcomeParts.join(' and ');
+    proseHtml = sentence + '.';
+  } else {
+    proseHtml = 'Custom code — no named data source patterns detected. Review the code above for logic details.';
+  }
+
+  // ---- DATA FLOW ----
+  var flowSources = [];
+  ddPaths.slice(0,4).forEach(function(p){ flowSources.push({ label: p, color: '#27c5c1', tag: 'digitalData' }); });
+  adlPaths.slice(0,3).forEach(function(p){ flowSources.push({ label: p, color: '#3498db', tag: 'adobeDataLayer' }); });
+  dlPaths.slice(0,3).forEach(function(p){ flowSources.push({ label: p, color: '#2ecc71', tag: 'dataLayer' }); });
+  winPaths.slice(0,3).forEach(function(p){ flowSources.push({ label: p, color: '#8e44ad', tag: 'window' }); });
+  deRefs.slice(0,4).forEach(function(r){ flowSources.push({ label: r, color: '#4e73df', tag: 'Tags DE' }); });
+  urlParamKeys.slice(0,3).forEach(function(k){ flowSources.push({ label: '?' + k + '=', color: '#1abc9c', tag: 'URL param' }); });
+  if (hasUrlSearch) flowSources.push({ label: 'location.search', color: '#1abc9c', tag: 'URL' });
+  storageKeys.slice(0,3).forEach(function(k){ var p = k.split(':'); flowSources.push({ label: p[1], color: '#9b59b6', tag: p[0]+'Storage' }); });
+  cookieKeys.slice(0,3).forEach(function(k){ flowSources.push({ label: k, color: '#e67e22', tag: 'cookie' }); });
+  if (hasCookieRead && !cookieKeys.length) flowSources.push({ label: 'document.cookie', color: '#e67e22', tag: 'cookie' });
+  docLocReads.slice(0,3).forEach(function(d){ flowSources.push({ label: d, color: '#95a5a6', tag: 'browser' }); });
+
+  var retTypeColors = { string:'#27ae60', number:'#e67e22', boolean:'#e74c3c', object:'#3498db', array:'#1abc9c', Promise:'#f39c12', conditional:'#8e44ad', value:'#5a5c69', unknown:'#aaa' };
+
+  // ---- DEBUG COMMANDS ----
+  var debugCmds = [];
+  ddPaths.slice(0,4).forEach(function(p){ debugCmds.push({ label: p, cmd: p }); });
+  adlPaths.slice(0,3).forEach(function(p){ debugCmds.push({ label: p, cmd: p }); });
+  dlPaths.slice(0,2).forEach(function(p){ debugCmds.push({ label: p, cmd: p }); });
+  winPaths.slice(0,2).forEach(function(p){ debugCmds.push({ label: p, cmd: p }); });
+  deRefs.slice(0,4).forEach(function(r){ debugCmds.push({ label: 'DE: '+r, cmd: '_satellite.getVar("'+r.replace(/"/g,'\\"')+'")' }); });
+  urlParamKeys.slice(0,3).forEach(function(k){ debugCmds.push({ label: '?'+k+'=', cmd: 'new URLSearchParams(location.search).get("'+k.replace(/"/g,'\\"')+'")' }); });
+  storageKeys.slice(0,3).forEach(function(k){ var p=k.split(':'); var store=p[0]==='session'?'sessionStorage':'localStorage'; debugCmds.push({ label: store+': '+p[1], cmd: store+'.getItem("'+p[1].replace(/"/g,'\\"')+'")' }); });
+  cookieKeys.slice(0,3).forEach(function(k){ debugCmds.push({ label: 'cookie: '+k, cmd: 'document.cookie.split("; ").find(r=>r.startsWith("'+k.replace(/"/g,'\\"')+'="))?.split("=")[1]' }); });
+  if (hasCookieRead && !cookieKeys.length) debugCmds.push({ label: 'All cookies', cmd: 'document.cookie' });
+  docLocReads.slice(0,3).forEach(function(d){ debugCmds.push({ label: d, cmd: d }); });
+  if (satelliteTrackNames.length) {
+    satelliteTrackNames.slice(0,2).forEach(function(n){ debugCmds.push({ label: 'Listen for event: '+n, cmd: '// In DevTools: _satellite.monitor = { ruleTriggered: function(r){console.log(r.rule.name);} }' }); });
+  }
+  if (networkCalls > 0) debugCmds.push({ label: 'Network calls', cmd: '// Open DevTools \u2192 Network tab \u2192 reload to inspect outbound requests' });
+
+  // ---- RISK FLAGS ----
+  var risks = [];
+  if (/\b\w+\.\w+\.\w+\.\w+/.test(src) && !has(/&&|\?\.|\?\?/)) {
+    risks.push({ sev: 'error', icon: 'fa-exclamation-triangle', text: 'Deep property chain without null guards \u2014 throws <code>TypeError</code> if any level is <code>undefined</code>.', fix: 'Use optional chaining: <code>digitalData?.page?.pageInfo?.pageName</code>' });
+  }
+  if (!has(/\btry\s*\{/) && src.length > 80) {
+    risks.push({ sev: 'warn', icon: 'fa-shield-alt', text: 'No <code>try/catch</code> \u2014 uncaught errors silently break this rule.', fix: 'Wrap in <code>try { \u2026 } catch(e) { /* handle */ }</code>' });
+  }
+  if (returnCount > 2) {
+    risks.push({ sev: 'info', icon: 'fa-code-branch', text: returnCount + ' return paths \u2014 verify every branch returns the same type.', fix: 'Add a final <code>return undefined;</code> so no path falls through.' });
+  }
+  if (has(/\beval\s*\(/)) {
+    risks.push({ sev: 'error', icon: 'fa-skull-crossbones', text: '<code>eval()</code> detected \u2014 blocked by CSP on most production pages.', fix: 'Replace with <code>JSON.parse()</code> or a safe dynamic function.' });
+  }
+  if (has(/document\.write\s*\(/)) {
+    risks.push({ sev: 'error', icon: 'fa-ban', text: '<code>document.write()</code> breaks async pages and is deprecated.', fix: 'Use <code>document.createElement()</code> + <code>appendChild()</code>.' });
+  }
+  if (maybeMinified) {
+    risks.push({ sev: 'info', icon: 'fa-compress-alt', text: 'Code appears minified \u2014 analysis may be incomplete.', fix: 'Use the Format button above to restore readability.' });
+  }
+  if (networkCalls > 0) {
+    risks.push({ sev: 'warn', icon: 'fa-wifi', text: networkCalls + ' network call(s) \u2014 adds async latency to every rule firing.', fix: 'Cache the result in <code>sessionStorage</code>, or move I/O to a dedicated rule action.' });
+  }
+  if (has(/\bsetTimeout\s*\(|\bsetInterval\s*\(/)) {
+    risks.push({ sev: 'warn', icon: 'fa-clock', text: 'Timer inside rule code \u2014 async delay may cause race conditions.', fix: 'Use a custom event rule to defer execution until the value is ready.' });
+  }
+  if (has(/console\.log\s*\(|console\.debug\s*\(/)) {
+    risks.push({ sev: 'info', icon: 'fa-terminal', text: '<code>console.log</code>/<code>debug</code> found \u2014 remove before production.', fix: 'Guard with <code>if (window._debug) console.log(\u2026)</code> or remove.' });
+  }
+
+  // ---- BUILD HTML ----
+  var sevBg = { error:'#fdecea', warn:'#fff8e1', info:'#f0f4ff' };
+  var sevBorder = { error:'#f5c2be', warn:'#ffe082', info:'#c5d5f8' };
+  var sevColor = { error:'#c0392b', warn:'#b7770d', info:'#3a5bc7' };
+  var sevIconColor = { error:'#c0392b', warn:'#e67e22', info:'#4e73df' };
+
+  var html = '';
+
+  // Section 1: Prose
+  html += '<div class="de-analysis-section">';
+  html += '<div class="de-analysis-heading"><i class="fas fa-align-left"></i> What This Code Does</div>';
+  html += '<p class="de-analysis-prose">' + proseHtml + '</p>';
+  html += '</div>';
+
+  // Section 2: Data Flow
+  if (flowSources.length || returnMatches.length) {
+    html += '<div class="de-analysis-section">';
+    html += '<div class="de-analysis-heading"><i class="fas fa-exchange-alt"></i> Data Flow</div>';
+    html += '<div class="de-analysis-flow">';
+
+    html += '<div class="de-flow-col">';
+    html += '<div class="de-flow-label">Reads from</div>';
+    if (flowSources.length) {
+      flowSources.forEach(function(fi){
+        html += '<div class="de-flow-item" style="border-left:3px solid '+fi.color+'">';
+        html += '<span class="de-flow-type" style="background:'+fi.color+'22;color:'+fi.color+'">'+esc(fi.tag)+'</span>';
+        html += '<code>'+esc(fi.label)+'</code></div>';
+      });
+    } else {
+      html += '<div class="de-flow-item de-flow-none">no named sources detected</div>';
+    }
+    html += '</div>';
+
+    html += '<div class="de-flow-arrow"><i class="fas fa-arrow-right"></i></div>';
+
+    html += '<div class="de-flow-col">';
+    html += '<div class="de-flow-label">Returns / Fires</div>';
+    if (firesEvent && satelliteTrackNames.length) {
+      html += '<div class="de-flow-item" style="border-left:3px solid #e74c3c">';
+      html += '<span class="de-flow-type" style="background:#e74c3c22;color:#e74c3c">event</span>';
+      html += '<code>'+esc(satelliteTrackNames[0])+'</code></div>';
+    }
+    if (returnMatches.length) {
+      var rtColor = retTypeColors[returnType] || '#5a5c69';
+      if (returnType !== 'unknown' && returnType !== 'value') {
+        html += '<div class="de-flow-item" style="border-left:3px solid '+rtColor+'">';
+        html += '<span class="de-flow-type" style="background:'+rtColor+'22;color:'+rtColor+'">'+esc(returnType)+'</span></div>';
+      }
+      returnMatches.slice(0,2).forEach(function(r){
+        html += '<div class="de-flow-item" style="border-left:3px solid #e3e6f0">';
+        html += '<code class="de-flow-ret" title="'+esc(r)+'">'+esc(r)+'</code></div>';
+      });
+    } else if (!firesEvent) {
+      html += '<div class="de-flow-item de-flow-none">void / side effects only</div>';
+    }
+    html += '</div>';
+
+    html += '</div></div>';
+  }
+
+  // Section 3: Debug in Browser Console
+  if (debugCmds.length) {
+    html += '<div class="de-analysis-section">';
+    html += '<div class="de-analysis-heading"><i class="fas fa-terminal"></i> Debug in Browser Console</div>';
+    html += '<div class="de-debug-hint">Paste into DevTools Console on the target page to inspect each source live:</div>';
+    html += '<div class="de-debug-list">';
+    debugCmds.forEach(function(cmd){
+      var isComment = cmd.cmd.charAt(0) === '/';
+      html += '<div class="de-debug-cmd'+(isComment?' de-debug-cmd-comment':'')+'">';
+      html += '<span class="de-debug-label" title="'+esc(cmd.label)+'">'+esc(cmd.label)+'</span>';
+      html += '<div class="de-debug-code-wrap">';
+      html += '<code class="de-debug-code">'+esc(cmd.cmd)+'</code>';
+      if (!isComment) {
+        html += '<button class="de-debug-copy" title="Copy to clipboard" type="button" onclick="(function(btn){var c=btn.closest(\'.de-debug-cmd\').querySelector(\'.de-debug-code\');var t=document.createElement(\'textarea\');t.value=c.textContent;document.body.appendChild(t);t.select();document.execCommand(\'copy\');document.body.removeChild(t);btn.innerHTML=\'<i class=\\"fas fa-check\\" style=\\"color:#27c5c1\\"></i>\';setTimeout(function(){btn.innerHTML=\'<i class=\\"fas fa-copy\\"></i>\';},1500);})(this)"><i class="fas fa-copy"></i></button>';
+      }
+      html += '</div></div>';
+    });
+    html += '</div></div>';
+  }
+
+  // Section 4: Risk Flags
+  if (risks.length) {
+    html += '<div class="de-analysis-section">';
+    html += '<div class="de-analysis-heading" style="color:#c0392b"><i class="fas fa-exclamation-triangle"></i> Risk Flags</div>';
+    risks.forEach(function(r){
+      var bg = sevBg[r.sev]||'#f8f9fa', border = sevBorder[r.sev]||'#e3e6f0';
+      var col = sevColor[r.sev]||'#5a5c69', ic = sevIconColor[r.sev]||'#5a5c69';
+      html += '<div class="de-risk-item" style="background:'+bg+';border:1px solid '+border+';border-left:3px solid '+col+'">';
+      html += '<div class="de-risk-text"><i class="fas '+r.icon+'" style="color:'+ic+';margin-right:6px"></i><span style="color:'+col+'">'+r.text+'</span></div>';
+      if (r.fix) html += '<div class="de-risk-fix"><i class="fas fa-wrench" style="margin-right:5px;color:#888"></i>'+r.fix+'</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  if (!proseParts.length && !outcomeParts.length && !flowSources.length && !debugCmds.length && !risks.length) {
+    html += '<p style="color:#888;font-style:italic;margin:0">No patterns detected. Code may be too minimal or use uncommon structures.</p>';
+  }
+
+  return html;
+}
+
 // Modal functions for displaying custom code
 function showCodeModal(title, code) {
   const modal = document.getElementById('codeModal');
@@ -3489,10 +3068,107 @@ function showCodeModal(title, code) {
 
   if (modal && modalTitle && codeContent) {
     modalTitle.textContent = title;
-    codeContent.textContent = code;
+    var rawCode = code != null ? String(code) : '';
+    codeContent.textContent = rawCode;
     modal.style.display = 'block';
+
+    // Format with Prettier if available; update display and copy target on success
+    if (rawCode && typeof prettier !== 'undefined' && typeof prettierPlugins !== 'undefined') {
+      prettier.format(rawCode, {
+        parser: 'babel',
+        plugins: [prettierPlugins.babel, prettierPlugins.estree],
+        printWidth: 80,
+        tabWidth: 2,
+        singleQuote: true,
+        semi: true,
+      }).then(function (formatted) {
+        codeContent.textContent = formatted;
+        if (copyBtn) copyBtn._currentCode = formatted;
+      }).catch(function () { /* not valid JS — keep raw */ });
+    }
+
+    // Explain box — added dynamically once, reused on subsequent opens
+    var modalBody = codeContent.parentElement;
+    var explainBox = document.getElementById('ruleCodeModalExplainBox');
+    if (!explainBox && modalBody) {
+      explainBox = document.createElement('div');
+      explainBox.id = 'ruleCodeModalExplainBox';
+      explainBox.className = 'de-explain-panel';
+      explainBox.style.marginTop = '12px';
+      explainBox.style.display = 'none';
+      modalBody.appendChild(explainBox);
+    }
+
+    // Explain button — inserted once before copy button
+    var footer = copyBtn && copyBtn.parentElement ? copyBtn.parentElement : null;
+    var explainBtn = document.getElementById('ruleCodeModalExplainBtn');
+    if (!explainBtn && footer) {
+      explainBtn = document.createElement('button');
+      explainBtn.type = 'button';
+      explainBtn.id = 'ruleCodeModalExplainBtn';
+      explainBtn.className = 'btn-explain';
+      explainBtn.innerHTML = '<i class="fas fa-lightbulb"></i> Explain';
+      footer.insertBefore(explainBtn, copyBtn);
+    }
+
+    if (explainBtn) {
+      explainBtn.onclick = async function () {
+        if (!explainBox) return;
+        explainBtn.disabled = true;
+        var origHtml = explainBtn.innerHTML;
+        explainBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing\u2026';
+        try {
+          // Try Bedrock first (credentials stored from Summary page)
+          var bedrockCfg = null;
+          try { bedrockCfg = JSON.parse(localStorage.getItem('tagscanner_bedrock_config') || 'null'); } catch(e) {}
+          if ((bedrockCfg && (bedrockCfg.proxyUrl || bedrockCfg.accessKeyId)) &&
+              window.TagScannerBedrock && window.TagScannerBedrock.explainCode) {
+            var userInfo = null;
+            try { userInfo = JSON.parse(localStorage.getItem('tagscanner_user') || 'null'); } catch(e) {}
+            var explainCfg = Object.assign({}, bedrockCfg, { email: (userInfo && userInfo.email) || '' });
+            try {
+              var brResult = await window.TagScannerBedrock.explainCode(
+                rawCode, { name: title || '', type: 'rule' }, explainCfg
+              );
+              explainBox.innerHTML = window.TagScannerBedrock.renderBedrockCodeExplanation(brResult.explanation);
+              explainBox.style.display = 'block';
+              return;
+            } catch(bedrockErr) {
+              console.warn('Bedrock explain failed, falling back to static analysis:', bedrockErr);
+            }
+          }
+          // Fallback: Ollama / backend / static analysis
+          var aiExplanation = null;
+          if (typeof getAIExplanationOrNull === 'function') {
+            aiExplanation = await getAIExplanationOrNull(rawCode, { title: title || '' });
+          } else if (typeof explainCustomCodeWithAI === 'function') {
+            var fallbackAI = await explainCustomCodeWithAI(rawCode, { title: title || '' });
+            if (fallbackAI && fallbackAI.indexOf('AI explanation is unavailable') === -1) {
+              aiExplanation = fallbackAI;
+            }
+          }
+          if (aiExplanation) {
+            explainBox.innerHTML = '<pre class="code-block" style="margin:0;background:transparent;border:none;padding:0">' +
+              aiExplanation.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</pre>';
+          } else {
+            explainBox.innerHTML = analyzeCodeWithoutAI(rawCode);
+          }
+          explainBox.style.display = 'block';
+        } finally {
+          explainBtn.disabled = false;
+          explainBtn.innerHTML = origHtml;
+        }
+      };
+    }
+
+    // Reset explain panel on each open
+    if (explainBox) {
+      explainBox.style.display = 'none';
+      explainBox.innerHTML = '';
+    }
+
     if (copyBtn) {
-      copyBtn._currentCode = code;
+      copyBtn._currentCode = rawCode;
       copyBtn.classList.remove('copied');
       copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
       copyBtn.onclick = function () {
@@ -3576,6 +3252,54 @@ document.addEventListener('keydown', function(event) {
   }
 });
 
+// Production Launch libraries often replace modulePath with a full Adobe CDN URL to an RC*-source.min.js bundle.
+function hostBundleLabelFromModulePath(path) {
+  if (!path || typeof path !== 'string') return null;
+  if (!/^https?:\/\//i.test(path)) return null;
+  var m = path.match(/\/(RC[a-f0-9]{32})-source/i);
+  if (m) return 'Hosted component (RC ' + m[1].slice(0, 8) + '…)';
+  if (/assets\.adobedtm\.com/i.test(path) || /assets\.adobe\.com/i.test(path)) return 'Hosted component (Adobe CDN)';
+  return null;
+}
+
+// Replace long Adobe CDN URLs in settings JSON shown in modals (readable summary; full URL is still on the wire in the library).
+function shortenAdobeCdnUrlsInObject(obj, depth) {
+  if (depth == null) depth = 0;
+  if (depth > 12 || obj == null) return obj;
+  if (typeof obj === 'string') {
+    if (/^https?:\/\//i.test(obj) && (/assets\.adobedtm\.com/i.test(obj) || /assets\.adobe\.com/i.test(obj))) {
+      var m = obj.match(/(RC[a-f0-9]{32})/i);
+      return m
+        ? '[Adobe hosted script — RC ' + m[1].slice(0, 10) + '…]'
+        : '[Adobe hosted script]';
+    }
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    var arr = [];
+    for (var i = 0; i < obj.length; i++) arr.push(shortenAdobeCdnUrlsInObject(obj[i], depth + 1));
+    return arr;
+  }
+  if (typeof obj === 'object') {
+    var o = {};
+    for (var k in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, k))
+        o[k] = shortenAdobeCdnUrlsInObject(obj[k], depth + 1);
+    }
+    return o;
+  }
+  return obj;
+}
+
+function settingsJsonForModal(settings) {
+  if (!settings || typeof settings !== 'object') return '{}';
+  try {
+    return JSON.stringify(shortenAdobeCdnUrlsInObject(JSON.parse(JSON.stringify(settings))), null, 2);
+  } catch (e) {
+    return JSON.stringify(settings, null, 2);
+  }
+}
+
 // Toggle expand: show rule details in a row below (expandable row)
 function toggleExpand(icon, rowIndex) {
   const currentRow = icon.closest('tr');
@@ -3603,16 +3327,26 @@ function toggleExpand(icon, rowIndex) {
       if (ev.modulePath && ev.modulePath.indexOf('directCall') !== -1) {
         return (ev.settings && ev.settings.identifier) ? 'Direct Call: ' + ev.settings.identifier : 'Direct Call';
       }
-      if (ev.modulePath) return ev.modulePath.split('/').pop().replace('.js', '');
+      if (ev.modulePath) {
+        var hostedEv = hostBundleLabelFromModulePath(ev.modulePath);
+        if (hostedEv) return hostedEv;
+        return ev.modulePath.split('/').pop().replace('.js', '');
+      }
       return ev.name || ev.type || 'Event';
     }
     function conditionLabel(c) {
-      if (c.modulePath) return c.modulePath.split('/').pop().replace('.js', '');
+      if (c.modulePath) {
+        var hostedC = hostBundleLabelFromModulePath(c.modulePath);
+        if (hostedC) return hostedC;
+        return c.modulePath.split('/').pop().replace('.js', '');
+      }
       return c.name || c.type || 'Condition';
     }
     function actionLabel(a) {
       if (a.modulePath) {
         var path = a.modulePath;
+        var hostedA = hostBundleLabelFromModulePath(path);
+        if (hostedA) return hostedA;
         var name = path.split('/').pop().replace('.js', '');
         // When path ends with index.js, "name" is "index" – derive label from full path
         if (name === 'index') {
@@ -3664,6 +3398,9 @@ function toggleExpand(icon, rowIndex) {
       if (ev.modulePath && ev.modulePath.indexOf('directCall') !== -1) {
         return s.identifier ? 'Direct Call: ' + s.identifier : 'Direct Call';
       }
+      if (s.name && typeof s.name === 'string' && s.name.trim()) {
+        return typeLabel + ': ' + s.name.trim();
+      }
       var target = '';
       if (s.selector && typeof s.selector === 'string' && s.selector.trim()) {
         target = s.selector.trim();
@@ -3713,6 +3450,7 @@ function toggleExpand(icon, rowIndex) {
       if (s.eventName && typeof s.eventName === 'string') parts.push('Event: ' + s.eventName);
       else if (s.eventType && typeof s.eventType === 'string') parts.push('Event: ' + s.eventType);
       else if (s.trigger && typeof s.trigger === 'string') parts.push('Trigger: ' + s.trigger);
+      if (s.name && typeof s.name === 'string' && s.name.trim()) parts.push('Data element / key: ' + s.name.trim());
       return parts.join(' \u00B7 ');
     }
 
@@ -3723,9 +3461,14 @@ function toggleExpand(icon, rowIndex) {
       if (path.indexOf('value-comparison') !== -1 || path.indexOf('valuecomparison') !== -1) {
         var left = p.leftOperand != null ? String(p.leftOperand) : (p.leftValue != null ? String(p.leftValue) : '');
         var right = p.rightOperand != null ? String(p.rightOperand) : (p.rightValue != null ? String(p.rightValue) : '');
-        var op = p.comparisonOperator || p.operator || 'equals';
+        var op = (p.comparison && p.comparison.operator) ? p.comparison.operator : (p.comparisonOperator || p.operator || 'equals');
         if (!left && !right) return '';
-        return left + ' \u2014 ' + op + ' \u2014 ' + right;
+        return left + ' \u2014 ' + op + (right ? ' \u2014 ' + right : '');
+      }
+      if (path.indexOf('/variable') !== -1 || path.indexOf('variable.js') !== -1) {
+        var vn = p.name != null ? String(p.name) : '';
+        var vv = p.value != null ? String(p.value) : '';
+        if (vn || vv) return (vn ? vn : '?') + (p.negate ? ' (negated)' : '') + (vv !== '' ? ' = ' + vv : '');
       }
       return '';
     }
@@ -3806,7 +3549,7 @@ function toggleExpand(icon, rowIndex) {
           var buttons = [];
           if (ev.settings && Object.keys(ev.settings).length > 0) {
             var settingsTitle = 'View event settings';
-            var settingsJson = JSON.stringify(ev.settings, null, 2);
+            var settingsJson = settingsJsonForModal(ev.settings);
             buttons.push({ className: 'btn-config', title: settingsTitle, ariaLabel: settingsTitle, iconClass: 'fa-search', onclick: (function (j, t) { return function () { showCodeModal(t, j); }; })(settingsJson, settingsTitle) });
           }
           addDetailBlock(section, lbl, detail, buttons);
@@ -3831,6 +3574,7 @@ function toggleExpand(icon, rowIndex) {
       } else {
         conditions.forEach(function (cond) {
           var lbl = conditionLabel(cond);
+          var condDetail = getConditionDetailText(cond);
           var isCustomCode = cond.modulePath && (cond.modulePath.indexOf('customCode') !== -1 || cond.modulePath.indexOf('custom-code') !== -1);
           var buttons = [];
           if (isCustomCode && customCodeConds[customCodeIdx]) {
@@ -3843,10 +3587,10 @@ function toggleExpand(icon, rowIndex) {
             }
           } else if (cond.settings && Object.keys(cond.settings).length > 0) {
             var settingsTitle = 'View condition settings';
-            var settingsJson = JSON.stringify(cond.settings, null, 2);
+            var settingsJson = settingsJsonForModal(cond.settings);
             buttons.push({ className: 'btn-config', title: settingsTitle, ariaLabel: settingsTitle, iconClass: 'fa-search', onclick: (function (j, t) { return function () { showCodeModal(t, j); }; })(settingsJson, settingsTitle) });
           }
-          addDetailBlock(section, lbl, '', buttons);
+          addDetailBlock(section, lbl, condDetail, buttons);
         });
       }
       return section;
@@ -3871,6 +3615,7 @@ function toggleExpand(icon, rowIndex) {
           var path = (action.modulePath || '').toLowerCase();
           var isSendEvent = path.indexOf('sendevent') !== -1 || path.indexOf('send-event') !== -1;
           var isCustomCode = path.indexOf('customcode') !== -1 || path.indexOf('custom-code') !== -1;
+          var actionDetail = getActionDetailText(action);
           var buttons = [];
           if (isCustomCode && customCodeActions[customActionIdx]) {
             var codeObj = customCodeActions[customActionIdx];
@@ -3886,15 +3631,15 @@ function toggleExpand(icon, rowIndex) {
             if (action.settings.xdm) config.xdm = action.settings.xdm;
             if (action.settings.data) config.data = action.settings.data;
             var configTitle = 'View XDM/Config';
-            var configJson = JSON.stringify(config, null, 2);
+            var configJson = settingsJsonForModal(config);
             buttons.push({ className: 'btn-config', title: configTitle, ariaLabel: configTitle, iconClass: 'fa-file-code', onclick: (function (j, t) { return function () { showCodeModal(t, j); }; })(configJson, configTitle) });
           } else if (action.settings && Object.keys(action.settings).length > 0) {
             var settingsTitle = 'View action settings';
             var cleaned = cleanActionSettingsForDisplay(action.settings);
-            var settingsJson = JSON.stringify(cleaned, null, 2);
+            var settingsJson = settingsJsonForModal(cleaned);
             buttons.push({ className: 'btn-config', title: settingsTitle, ariaLabel: settingsTitle, iconClass: 'fa-search', onclick: (function (j, t) { return function () { showCodeModal(t, j); }; })(settingsJson, settingsTitle) });
           }
-          addDetailBlock(section, lbl, '', buttons);
+          addDetailBlock(section, lbl, actionDetail, buttons);
         });
       }
       return section;

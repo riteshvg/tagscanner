@@ -1,15 +1,32 @@
+// Chrome Web Store: do not load remote scripts (script-src 'self'). Provide _satellite from sessionStorage instead.
+(function () {
+  try {
+    var rulesStr = sessionStorage.getItem('_satellite._container.rules');
+    var rules = rulesStr ? JSON.parse(rulesStr) : [];
+    window._satellite = window._satellite || {};
+    window._satellite._container = window._satellite._container || {};
+    window._satellite._container.rules = Array.isArray(rules) ? rules : (rules.rules && Array.isArray(rules.rules) ? rules.rules : []);
+  } catch (e) {}
+})();
+
 var appendScript = sessionStorage.getItem('unique_launch_code');
   let value = document.getElementById('original_launch_code');
-  if(appendScript){
+  // Do not inject remote script (Chrome Web Store policy: no remotely hosted code)
+  if (appendScript && (appendScript.indexOf('http://') !== 0 && appendScript.indexOf('https://') !== 0)) {
     var head_node = document.getElementsByTagName("head")[0];
-  var launch_script = document.createElement("script");
-  launch_script.src = appendScript;
-  launch_script.id = "original_launch_code";
-  head_node.appendChild(launch_script);
-    var view_aa_variables = document.getElementsByClassName('view_analytics_variables')[0];
+    if (head_node) {
+      var launch_script = document.createElement("script");
+      launch_script.src = appendScript;
+      launch_script.id = "original_launch_code";
+      head_node.appendChild(launch_script);
+    }
+  }
+  var view_aa_variables = document.getElementsByClassName('view_analytics_variables')[0];
+  if (view_aa_variables) {
     view_aa_variables.id = 'analytics_variables';
     view_aa_variables.innerHTML = 'View AA Variables';
     document.getElementById('analytics_variables').addEventListener("click", aaVariables);
+  }
     function aaVariables() {
       var set_display = document.getElementById('set_display');
       set_display.style="display: flex;"

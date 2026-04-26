@@ -33,20 +33,8 @@
 
     console.log('Initializing tour for page:', pageName);
 
-    // Initialize tour with the existing button
+    // Initialize tour with the existing button (no auto-tour on first load)
     initializeTourButton(pageName);
-    
-    // Only run auto-tour for the summary page
-    if (pageName === 'summary') {
-      const tourShownKey = `tagScannerTourShown_${pageName}`;
-      if (!localStorage.getItem(tourShownKey)) {
-        // Set a small delay to ensure UI is fully rendered
-        setTimeout(function () {
-          startAutoTour(pageName);
-          localStorage.setItem(tourShownKey, 'true');
-        }, 2000);
-      }
-    }
   });
 
   // Initialize tour using the existing button in HTML
@@ -104,32 +92,27 @@
         },
         {
           element: '#rule_details',
-          intro: 'This table displays all your Launch rules. Each row represents a rule with details about its events, conditions, and actions.',
+          intro: 'This table displays all your rules. Each row shows a rule with its events, conditions, and actions. Columns can be sorted by clicking the header.',
           position: 'bottom',
         },
         {
-          element: '#rule_details th:first-child',
+          element: '#rule_details th.rule-col-id',
           intro: 'Click on any column header to sort the table by that column. This helps you find specific rules quickly.',
           position: 'bottom',
         },
         {
-          element: '#rule_details td:first-child a',
-          intro: 'Click on any rule name to view detailed information about that specific rule, including all its configurations.',
+          element: '#rule_details .rule-name-cell',
+          intro: 'Click on any rule name to expand the row and view events, conditions, and actions in detail. Click again to collapse.',
           position: 'right',
+        },
+        {
+          element: '#ruleSearchInput',
+          intro: 'Use the search box to quickly find rules by name.',
+          position: 'bottom',
         },
         {
           element: '.download-button',
           intro: 'Export the rules data to CSV format for analysis in Excel or other tools.',
-          position: 'left',
-        },
-        {
-          element: '#ruleSearchInput',
-          intro: 'Use the search box to quickly find specific rules by name.',
-          position: 'bottom',
-        },
-        {
-          element: '#apply-filter',
-          intro: 'Apply filters to show only rules that meet specific criteria, helping you focus on relevant rules.',
           position: 'left',
         },
       ],
@@ -137,22 +120,22 @@
       // Data Elements page tour
       dataElements: [
         {
-          intro: 'Welcome to the Data Elements page! This page shows all data elements defined in your Adobe Tags property. Data elements are reusable values that can be used across multiple rules.',
+          intro: 'Welcome to the Data Elements page! This page shows all data elements defined in your Adobe Tags property. Data elements are reusable values used across rules and extensions.',
           position: 'center',
         },
         {
           element: '#dataelement_details',
-          intro: 'This table displays all data elements in your property. Each row shows a data element with its configuration and usage information.',
+          intro: 'This table displays all data elements. Each row shows type, usage in rules and extensions, and size. Click column headers to sort.',
           position: 'bottom',
         },
         {
-          element: '#dataelement_details th:first-child',
+          element: '#dataelement_details th.de-col-id',
           intro: 'Click on any column header to sort the table by that column. This helps you find specific data elements quickly.',
           position: 'bottom',
         },
         {
-          element: '#dataelement_details td:first-child a',
-          intro: 'Click on any data element name to view detailed information about that specific data element.',
+          element: '#dataelement_details .de-name-cell',
+          intro: 'Click on any data element name to expand the row and view where it is used in rules and extensions.',
           position: 'right',
         },
         {
@@ -170,17 +153,17 @@
         },
         {
           element: '#extension_details',
-          intro: 'This table displays all extensions in your property. Each row shows an extension with its configuration and usage information.',
+          intro: 'This table displays all extensions. Each row shows an extension with usage in rules, events, conditions, and data elements. Click column headers to sort.',
           position: 'bottom',
         },
         {
-          element: '#extension_details th:first-child',
+          element: '#extension_details th.ext-col-id',
           intro: 'Click on any column header to sort the table by that column. This helps you find specific extensions quickly.',
           position: 'bottom',
         },
         {
-          element: '#extension_details td:first-child a',
-          intro: 'Click on any extension name to view detailed information about that specific extension.',
+          element: '#extension_details .ext-name-cell',
+          intro: 'Click on any extension name to expand the row and view detailed usage in rules and data elements.',
           position: 'right',
         },
         {
@@ -193,22 +176,22 @@
       // Summary page tour
       summary: [
         {
-          intro: 'Welcome to the Summary page! This page provides a comprehensive overview of your Adobe Tags property and helps you identify optimization opportunities.',
+          intro: 'Welcome to the Summary page! This page provides an overview of your Adobe Tags property and helps you identify optimization opportunities.',
           position: 'center',
         },
         {
           element: '.data-element-card',
-          intro: 'This card shows data elements usage. It displays the count of unused data elements and lists them, helping you identify components that can be removed to reduce property size.',
+          intro: 'This card shows data element usage: counts of unused vs total, and a list of unused data elements you can consider removing to reduce property size.',
           position: 'bottom',
         },
         {
           element: '.rule-card',
-          intro: 'This card shows rules usage. It displays the count of unused rules and lists them, helping you identify rules that can be removed to optimize performance.',
+          intro: 'This card shows rules usage: counts of unused vs total, and a list of unused rules you can consider removing to optimize performance.',
           position: 'bottom',
         },
         {
           element: '.extension-card',
-          intro: 'This card shows extensions usage. It displays the count of unused extensions and lists them, helping you identify extensions that can be removed to reduce property size.',
+          intro: 'This card shows extensions usage: counts of unused vs total, and a list of unused extensions you can consider removing.',
           position: 'bottom',
         },
         {
@@ -222,81 +205,45 @@
           position: 'left',
         },
         {
-          intro: 'The summary page helps you identify unused components that are adding unnecessary weight to your property. Removing these can improve page load times and reduce costs.',
+          intro: 'The summary helps you identify unused components that add weight to your property. Removing them can improve page load times and reduce costs.',
           position: 'center',
         },
       ],
 
-      // Mapping page tour
+      // Mapping page tour (Rule & Data Element Relationships)
       mapping: [
         {
-          intro: 'Welcome to the Relationship Diagram page! This page shows the connections between different components in your Adobe Tags property, helping you understand dependencies.',
+          intro: 'Welcome to the Rule & Data Element Relationships page! Here you can see how rules connect to data elements in your Adobe Tags property.',
           position: 'center',
         },
         {
+          element: '.tab-buttons',
+          intro: 'Switch between Rules and Data Elements tabs to view the list of components. Select a tab to load the corresponding list.',
+          position: 'bottom',
+        },
+        {
           element: '.relationship-container',
-          intro: 'This interactive diagram visualizes the relationships between rules, data elements, and extensions in your property. It helps you understand how components are connected.',
+          intro: 'The left panel lists rules or data elements. The right panel shows relationship details for the selected item.',
           position: 'bottom',
         },
         {
           element: '.list-section',
-          intro: 'Browse and select components from these lists to explore their relationships in the diagram. This helps you understand dependencies and impact of changes.',
+          intro: 'Browse and click a rule or data element in this list. The details panel on the right will show where it is used and how it connects to other components.',
           position: 'right',
         },
         {
-          element: '.download-button',
-          intro: 'Export the relationship data to CSV format for analysis or documentation.',
+          element: '#searchInput',
+          intro: 'Use the search box to filter the list and quickly find a specific rule or data element.',
+          position: 'bottom',
+        },
+        {
+          element: '.details-section',
+          intro: 'When you select an item from the list, this panel shows its relationships: which data elements a rule uses, or which rules use a data element.',
           position: 'left',
         },
       ],
     };
 
     return tourSteps[pageName] || [];
-  }
-  
-  // Function to start auto tour for first-time users
-  function startAutoTour(pageName) {
-    console.log('Starting auto tour for first-time user on page:', pageName);
-    
-    if (typeof introJs !== 'function') {
-      console.error('introJs not available for auto tour');
-      return;
-    }
-    
-    const tourSteps = getTourStepsForPage(pageName);
-    if (!tourSteps || tourSteps.length === 0) {
-      console.error('No tour steps defined for auto tour on page:', pageName);
-      return;
-    }
-    
-    const tour = introJs();
-    tour.setOptions({
-      steps: tourSteps,
-      showStepNumbers: true,
-      showBullets: true,
-      showProgress: true,
-      exitOnOverlayClick: true,
-      nextLabel: 'Next',
-      prevLabel: 'Back',
-      skipLabel: 'Skip',
-      doneLabel: 'Done',
-      tooltipClass: 'customTooltip',
-      highlightClass: 'customHighlight',
-    });
-    
-    // Add welcome message for first-time users
-    tour.onbeforechange(function(targetElement) {
-      if (tour._currentStep === 0) {
-        // First step - add welcome message
-        const tooltip = document.querySelector('.introjs-tooltip');
-        if (tooltip) {
-          const welcomeDiv = document.createElement('div');
-          welcomeDiv.innerHTML = '<div style="background: #e3f2fd; padding: 10px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #2196f3;"><strong>Welcome to TagScanner!</strong><br>This is your first visit. Let us show you around!</div>';
-          tooltip.insertBefore(welcomeDiv, tooltip.firstChild);
-        }
-      }
-    });
-    
-    tour.start();
   }
 })();

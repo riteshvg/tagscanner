@@ -37,13 +37,24 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   try {
+    function normalizeToObjectMap(raw, getKey) {
+      if (!raw) return {};
+      // If already an object map, return it
+      if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+      // If array, convert to map using getKey
+      if (Array.isArray(raw)) {
+        return raw.reduce((acc, item, idx) => {
+          const k = (item && typeof item === 'object') ? (getKey(item) || '') : '';
+          const key = k || String(idx);
+          acc[key] = item;
+          return acc;
+        }, {});
+      }
+      return {};
+    }
+
     const dataElementsRaw = JSON.parse(de_value);
-    const dataElements =
-      dataElementsRaw &&
-      typeof dataElementsRaw === 'object' &&
-      !Array.isArray(dataElementsRaw)
-        ? dataElementsRaw
-        : {};
+    const dataElements = normalizeToObjectMap(dataElementsRaw, (de) => de.name || de.id);
     const rulesRaw = JSON.parse(rule_value);
     const rules = Array.isArray(rulesRaw)
       ? rulesRaw
@@ -54,7 +65,8 @@ document.addEventListener('DOMContentLoaded', function () {
               (item) => item && typeof item === 'object'
             )
           : [];
-    let extensions = extension_value ? JSON.parse(extension_value) : {};
+    let extensionsRaw = extension_value ? JSON.parse(extension_value) : {};
+    let extensions = normalizeToObjectMap(extensionsRaw, (ext) => ext.name || ext.displayName || ext.id);
     if (typeof extensions !== 'object' || extensions === null) extensions = {};
 
     console.log('Data elements parsed:', Object.keys(dataElements).length);
@@ -67,6 +79,47 @@ document.addEventListener('DOMContentLoaded', function () {
       rules: {},
       extensions: {},
     };
+
+    function getCustomCodeStringsFromComponent(comp) {
+      const out = [];
+      if (!comp || typeof comp !== 'object') return out;
+      // Common places custom code lives in Launch components
+      try {
+        if (comp.settings) {
+          if (typeof comp.settings.source === 'string') out.push(comp.settings.source);
+          if (typeof comp.settings.script === 'string') out.push(comp.settings.script);
+          if (typeof comp.settings.customCode === 'string') out.push(comp.settings.customCode);
+          if (typeof comp.settings.code === 'string') out.push(comp.settings.code);
+        }
+        if (typeof comp.source === 'string') out.push(comp.source);
+      } catch (e) {}
+      return out.filter(Boolean);
+    }
+
+    function markExtensionsUsedFromCustomCode(codeStr, ruleNameOrId) {
+      if (!codeStr || typeof codeStr !== 'string') return;
+      // Heuristic: turbine APIs are the common way to call extensions from custom code.
+      // We look for extension keys inside turbine.getExtensionSettings('extKey') or turbine.getSharedModule('extKey', ...)
+      const extKeys = Object.keys(usageData.extensions);
+      if (!extKeys.length) return;
+      const lower = codeStr.toLowerCase();
+      extKeys.forEach((extKey) => {
+        const k = String(extKey || '').toLowerCase();
+        if (!k) return;
+        // Require both "turbine" and the extension key to reduce false positives.
+        if (lower.indexOf('turbine') === -1) return;
+        // Match common call patterns
+        const hasKey =
+          lower.indexOf("turbine.getextensionsettings('" + k + "')") > -1 ||
+          lower.indexOf('turbine.getextensionsettings(\"' + k + '\")') > -1 ||
+          lower.indexOf("turbine.getsharedmodule('" + k + "'") > -1 ||
+          lower.indexOf('turbine.getsharedmodule(\"' + k + '\"') > -1;
+        if (hasKey && usageData.extensions[extKey]) {
+          usageData.extensions[extKey].used = true;
+          if (ruleNameOrId) usageData.extensions[extKey].usedInRules.push(ruleNameOrId);
+        }
+      });
+    }
 
     // Calculate size function
     const calculateSize = (obj) => {
@@ -178,270 +231,98 @@ document.addEventListener('DOMContentLoaded', function () {
               );
             }
           }
+          // Also scan custom code in actions for turbine-based extension usage
+          getCustomCodeStringsFromComponent(action).forEach((s) => {
+            markExtensionsUsedFromCustomCode(s, rule.name || ruleKey);
+          });
         });
       }
     });
 
-    // Function to find data element references in an object
-    function findDataElementReferences(
-      obj,
-      ruleId,
-      ruleName,
-      dataElements,
-      usageData
-    ) {
-      if (!obj) return;
+    // Match dataelement.js: same DE reference detection as the Data Elements tab
+    function stringContainsDERef(str, deName) {
+      if (!str || typeof str !== 'string' || !deName) return false;
+      const value = '%' + deName + '%';
+      const check1 = '_satellite.getVar("' + deName + '")';
+      const check2 = "_satellite.getVar('" + deName + "')";
+      return (
+        str.indexOf(value) > -1 ||
+        str.indexOf(check1) > -1 ||
+        str.indexOf(check2) > -1
+      );
+    }
 
-      // If it's a string, check for data element syntax
-      if (typeof obj === 'string') {
-        // Check for %...% syntax
-        if (obj.indexOf('%') > -1) {
-          const matches = obj.match(/%([^%]+)%/g);
-          if (matches) {
-            matches.forEach((match) => {
-              const dataElementName = match.replace(/%/g, '');
-              if (dataElementName && dataElements[dataElementName]) {
-                usageData.dataElements[dataElementName].used = true;
-                usageData.dataElements[dataElementName].usedInRules.push(
-                  ruleName
-                );
-              }
-            });
-          }
-        }
-
-        // Check for _satellite.getVar syntax
-        if (obj.indexOf('_satellite.getVar') > -1) {
-          const matches = obj.match(/_satellite\.getVar\(['"](.*?)['"]\)/g);
-          if (matches) {
-            matches.forEach((match) => {
-              const dataElementName = match.replace(
-                /_satellite\.getVar\(['"](.*?)['"]\)/,
-                '$1'
-              );
-              if (dataElementName && dataElements[dataElementName]) {
-                usageData.dataElements[dataElementName].used = true;
-                usageData.dataElements[dataElementName].usedInRules.push(
-                  ruleName
-                );
-              }
-            });
-          }
-        }
-
-        return;
-      }
-
-      // If it's not an object, return
-      if (typeof obj !== 'object') return;
-
-      // If it's an array, process each item
-      if (Array.isArray(obj)) {
-        obj.forEach((item) =>
-          findDataElementReferences(
-            item,
-            ruleId,
-            ruleName,
-            dataElements,
-            usageData
-          )
-        );
-        return;
-      }
-
-      // Process object properties
-      for (const key in obj) {
-        // Skip if not own property
-        if (!obj.hasOwnProperty(key)) continue;
-
-        // Check if the key itself contains a data element reference
-        if (typeof key === 'string' && key.indexOf('%') > -1) {
-          const matches = key.match(/%([^%]+)%/g);
-          if (matches) {
-            matches.forEach((match) => {
-              const dataElementName = match.replace(/%/g, '');
-              if (dataElementName && dataElements[dataElementName]) {
-                usageData.dataElements[dataElementName].used = true;
-                usageData.dataElements[dataElementName].usedInRules.push(
-                  ruleName
-                );
-              }
-            });
-          }
-        }
-
-        // Check the value
-        findDataElementReferences(
-          obj[key],
-          ruleId,
-          ruleName,
-          dataElements,
-          usageData
-        );
+    function markDataElementUsedInRule(deName, ruleName) {
+      const entry = usageData.dataElements[deName];
+      if (!entry) return;
+      entry.used = true;
+      if (ruleName && !entry.usedInRules.includes(ruleName)) {
+        entry.usedInRules.push(ruleName);
       }
     }
 
-    // Function to find data element references in data elements
-    function findDataElementReferencesInDataElement(
-      obj,
-      sourceDeName,
-      dataElements,
-      usageData
-    ) {
-      if (!obj) return;
-
-      // If it's a string, check for data element syntax
-      if (typeof obj === 'string') {
-        // Check for %...% syntax
-        if (obj.indexOf('%') > -1) {
-          const matches = obj.match(/%([^%]+)%/g);
-          if (matches) {
-            matches.forEach((match) => {
-              const dataElementName = match.replace(/%/g, '');
-              if (
-                dataElementName &&
-                dataElements[dataElementName] &&
-                dataElementName !== sourceDeName
-              ) {
-                usageData.dataElements[dataElementName].used = true;
-                usageData.dataElements[dataElementName].usedInDataElements.push(
-                  sourceDeName
-                );
-              }
-            });
+    rules.forEach((rule, ruleIndex) => {
+      const ruleName = rule.name || rule.id || 'Rule ' + (ruleIndex + 1);
+      if (
+        typeof window !== 'undefined' &&
+        window.TagScannerDataElementRefs &&
+        window.TagScannerDataElementRefs.getDENamesReferencedInRule
+      ) {
+        window.TagScannerDataElementRefs
+          .getDENamesReferencedInRule(rule, dataElements)
+          .forEach((deName) => {
+            markDataElementUsedInRule(deName, ruleName);
+          });
+      } else {
+        Object.keys(dataElements).forEach((deName) => {
+          const actionStr = JSON.stringify(rule.actions || []);
+          const conditionStr = JSON.stringify(rule.conditions || []);
+          const eventStr = JSON.stringify(rule.events || []);
+          if (
+            stringContainsDERef(actionStr, deName) ||
+            stringContainsDERef(conditionStr, deName) ||
+            stringContainsDERef(eventStr, deName) ||
+            eventStr.indexOf(deName) > -1
+          ) {
+            markDataElementUsedInRule(deName, ruleName);
           }
-        }
-
-        // Check for _satellite.getVar syntax
-        if (obj.indexOf('_satellite.getVar') > -1) {
-          const matches = obj.match(/_satellite\.getVar\(['"](.*?)['"]\)/g);
-          if (matches) {
-            matches.forEach((match) => {
-              const dataElementName = match.replace(
-                /_satellite\.getVar\(['"](.*?)['"]\)/,
-                '$1'
-              );
-              if (
-                dataElementName &&
-                dataElements[dataElementName] &&
-                dataElementName !== sourceDeName
-              ) {
-                usageData.dataElements[dataElementName].used = true;
-                usageData.dataElements[dataElementName].usedInDataElements.push(
-                  sourceDeName
-                );
-              }
-            });
-          }
-        }
-
-        return;
-      }
-
-      // If it's not an object, return
-      if (typeof obj !== 'object') return;
-
-      // If it's an array, process each item
-      if (Array.isArray(obj)) {
-        obj.forEach((item) =>
-          findDataElementReferencesInDataElement(
-            item,
-            sourceDeName,
-            dataElements,
-            usageData
-          )
-        );
-        return;
-      }
-
-      // Process object properties
-      for (const key in obj) {
-        // Skip if not own property
-        if (!obj.hasOwnProperty(key)) continue;
-
-        // Check if the key itself contains a data element reference
-        if (typeof key === 'string' && key.indexOf('%') > -1) {
-          const matches = key.match(/%([^%]+)%/g);
-          if (matches) {
-            matches.forEach((match) => {
-              const dataElementName = match.replace(/%/g, '');
-              if (
-                dataElementName &&
-                dataElements[dataElementName] &&
-                dataElementName !== sourceDeName
-              ) {
-                usageData.dataElements[dataElementName].used = true;
-                usageData.dataElements[dataElementName].usedInDataElements.push(
-                  sourceDeName
-                );
-              }
-            });
-          }
-        }
-
-        // Check the value
-        findDataElementReferencesInDataElement(
-          obj[key],
-          sourceDeName,
-          dataElements,
-          usageData
-        );
-      }
-    }
-
-    // Analyze data element usage in rules
-    rules.forEach((rule) => {
-      // Check rule actions
-      if (rule.actions && rule.actions.length) {
-        rule.actions.forEach((action) => {
-          findDataElementReferences(
-            action,
-            rule.id,
-            rule.name,
-            dataElements,
-            usageData
-          );
-        });
-      }
-
-      // Check rule conditions
-      if (rule.conditions && rule.conditions.length) {
-        rule.conditions.forEach((condition) => {
-          findDataElementReferences(
-            condition,
-            rule.id,
-            rule.name,
-            dataElements,
-            usageData
-          );
-        });
-      }
-
-      // Check rule events
-      if (rule.events && rule.events.length) {
-        rule.events.forEach((event) => {
-          findDataElementReferences(
-            event,
-            rule.id,
-            rule.name,
-            dataElements,
-            usageData
-          );
         });
       }
     });
 
-    // Analyze data element references in other data elements
+    function jsonMentionsDE(str, deName) {
+      if (
+        typeof window !== 'undefined' &&
+        window.TagScannerDataElementRefs &&
+        window.TagScannerDataElementRefs.jsonMentionsDataElement
+      ) {
+        return window.TagScannerDataElementRefs.jsonMentionsDataElement(str, deName);
+      }
+      return stringContainsDERef(str, deName);
+    }
+
     Object.keys(dataElements).forEach((deName) => {
-      const de = dataElements[deName];
-      if (de.settings) {
-        findDataElementReferencesInDataElement(
-          de.settings,
-          deName,
-          dataElements,
-          usageData
-        );
-      }
+      Object.keys(extensions).forEach((extKey) => {
+        const extStr = JSON.stringify(extensions[extKey]);
+        if (jsonMentionsDE(extStr, deName)) {
+          usageData.dataElements[deName].used = true;
+        }
+      });
+    });
+
+    Object.keys(dataElements).forEach((deName) => {
+      Object.keys(dataElements).forEach((otherKey) => {
+        if (otherKey === deName) return;
+        const other = dataElements[otherKey];
+        const otherStr = JSON.stringify(other.settings || other);
+        if (jsonMentionsDE(otherStr, deName)) {
+          usageData.dataElements[deName].used = true;
+          const entry = usageData.dataElements[deName];
+          if (!entry.usedInDataElements.includes(otherKey)) {
+            entry.usedInDataElements.push(otherKey);
+          }
+        }
+      });
     });
 
     // Count unused components and their sizes
@@ -522,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Property details: use sessionStorage when set by popup, otherwise fallbacks
     const propertyName = sessionStorage.getItem('launch_property_name') || 'Unknown Property';
     const propertyEnvironment = sessionStorage.getItem('launch_property_environment') || 'Production';
-    const tagScannerVersion = sessionStorage.getItem('tagScanner_version') || '2.0.0';
+    const tagScannerVersion = sessionStorage.getItem('tagScanner_version') || '2.3.0';
     const summaryGenerated = new Date().toLocaleString();
 
     const deCount = Object.keys(dataElements).length;
@@ -643,8 +524,10 @@ document.addEventListener('DOMContentLoaded', function () {
     secondRow.appendChild(extCol);
     secondRow.appendChild(propertyCol);
 
-    // Add the rows to the parent container
+    // Add the rows to the parent container (hidden — AI section only)
     const container = parentRow.parentNode;
+    firstRow.style.display  = 'none';
+    secondRow.style.display = 'none';
     container.appendChild(firstRow);
     container.appendChild(secondRow);
 
@@ -937,7 +820,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Add TagScanner version
     const printVersion = document.createElement('p');
     printVersion.id = 'print-version';
-    printVersion.textContent = `TagScanner Version: 2.0.0`;
+    printVersion.textContent = `TagScanner Version: 2.3.0`;
     printStats.after(printVersion);
 
     document.getElementById(
@@ -1103,6 +986,25 @@ document.addEventListener('DOMContentLoaded', function () {
         window.print();
       });
 
+    // ── AI Health Analysis ─────────────────────────────────────────
+    initAIScanSection({
+      dataElements:       dataElements,
+      rules:              rules,
+      extensions:         extensions,
+      usageData:          usageData,
+      unusedDataElements: unusedDataElements,
+      unusedRules:        unusedRules,
+      unusedExtensions:   unusedExtensions,
+      sizes: {
+        totalDeSize:    totalDeSize,
+        totalRuleSize:  totalRuleSize,
+        totalExtSize:   totalExtSize,
+        unusedDeSize:   unusedDeSize,
+        unusedRuleSize: unusedRuleSize,
+        unusedExtSize:  unusedExtSize
+      }
+    });
+
     // Hide loading spinner
     document.getElementById('set_display').style.display = 'none';
 
@@ -1193,7 +1095,447 @@ function copyTableToClipboard(table, componentType) {
   });
 }
 
-// Function to copy card content to clipboard
+// ── AI Health Analysis ──────────────────────────────────────────────────────
+
+var AI_CACHE_VERSION = 1;
+var _aiHealthData = null; // set by initAIScanSection so rescan can re-use it
+
+function getAICacheKey() {
+  var p = sessionStorage.getItem('launch_property_name') || 'Unknown';
+  var e = sessionStorage.getItem('launch_property_environment') || 'Production';
+  return 'ts_health_' + p.replace(/[^a-z0-9]/gi, '_') + '_' + e.replace(/[^a-z0-9]/gi, '_');
+}
+
+function loadCachedAIReport() {
+  try {
+    var raw = localStorage.getItem(getAICacheKey());
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    return (obj && obj.v === AI_CACHE_VERSION) ? obj : null;
+  } catch (e) { return null; }
+}
+
+function saveCachedAIReport(report, tokens, costUsd) {
+  try {
+    localStorage.setItem(getAICacheKey(), JSON.stringify({
+      v:       AI_CACHE_VERSION,
+      ts:      Date.now(),
+      report:  report,
+      tokens:  tokens,
+      costUsd: costUsd
+    }));
+  } catch (e) {}
+}
+
+function getBedrockConfig() {
+  try {
+    var raw = localStorage.getItem('tagscanner_bedrock_config');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function getUserInfo() {
+  try {
+    var raw = localStorage.getItem('tagscanner_user');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+// ── Modal helpers ─────────────────────────────────────────────────────────
+
+function showAIModal(id) {
+  var el = document.getElementById(id);
+  if (el) el.classList.add('show');
+}
+function hideAIModal(id) {
+  var el = document.getElementById(id);
+  if (el) el.classList.remove('show');
+}
+
+function showBedrockSettingsModal() {
+  var cfg = getBedrockConfig();
+  if (cfg) {
+    document.getElementById('inputAccessKeyId').value = cfg.accessKeyId    || '';
+    document.getElementById('inputSecretKey').value   = cfg.secretAccessKey || '';
+    var rSel = document.getElementById('inputRegion');
+    if (cfg.region) rSel.value = cfg.region;
+    var mSel = document.getElementById('inputModelId');
+    if (cfg.modelId) mSel.value = cfg.modelId;
+  }
+  showAIModal('bedrockSettingsModal');
+}
+
+// ── State helpers ─────────────────────────────────────────────────────────
+
+function showAIState(state) {
+  // state: 'prompt' | 'scanning' | 'report'
+  document.getElementById('aiScanPrompt').style.display     = (state === 'prompt')   ? '' : 'none';
+  document.getElementById('aiScanning').style.display       = (state === 'scanning') ? '' : 'none';
+  document.getElementById('aiReportContainer').style.display = (state === 'report')   ? '' : 'none';
+}
+
+function setAIScanError(msg) {
+  var el = document.getElementById('aiScanPromptMsg');
+  if (el) el.innerHTML = '<span style="color:#ef4444"><i class="fas fa-exclamation-circle" style="margin-right:6px"></i>' + escAIHtml(msg) + '</span>';
+}
+
+function escAIHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── Entry point ───────────────────────────────────────────────────────────
+
+function initAIScanSection(healthData) {
+  _aiHealthData = healthData;
+  var cached = loadCachedAIReport();
+  var config = getBedrockConfig();
+
+  // Settings button
+  document.getElementById('btnBedrockSettings').addEventListener('click', showBedrockSettingsModal);
+
+  // Bedrock settings modal
+  document.getElementById('bedrockSettingsClose').addEventListener('click', function() { hideAIModal('bedrockSettingsModal'); });
+  document.getElementById('bedrockSettingsCancel').addEventListener('click', function() { hideAIModal('bedrockSettingsModal'); });
+  document.getElementById('bedrockSettingsSave').addEventListener('click', function() { saveBedrockSettings(); });
+
+  // Email gate modal
+  document.getElementById('emailGateClose').addEventListener('click', function() { hideAIModal('emailGateModal'); });
+  document.getElementById('emailGateCancel').addEventListener('click', function() { hideAIModal('emailGateModal'); });
+  document.getElementById('emailGateSubmit').addEventListener('click', submitEmailGate);
+
+  // Scan button
+  document.getElementById('btnRunAIScan').addEventListener('click', handleScanClick);
+
+  // Always show scan prompt — no cache enforcement
+  showAIState('prompt');
+}
+
+// ── Scan click handler ────────────────────────────────────────────────────
+
+function handleScanClick() {
+  var user   = getUserInfo();
+  var config = getBedrockConfig();
+  if (!user || !user.email) {
+    showAIModal('emailGateModal');
+    return;
+  }
+  if (!config || (!config.proxyUrl && !config.accessKeyId)) {
+    showBedrockSettingsModal();
+    return;
+  }
+  runAIScan(user, config);
+}
+
+// ── Form submissions ──────────────────────────────────────────────────────
+
+function submitEmailGate() {
+  var emailEl = document.getElementById('inputEmail');
+  var email = (emailEl.value || '').trim();
+  if (!email || email.indexOf('@') === -1) {
+    emailEl.style.borderColor = '#ef4444';
+    emailEl.focus();
+    return;
+  }
+  emailEl.style.borderColor = '';
+  var user = {
+    email:   email,
+    role:    document.getElementById('inputRole').value || '',
+    concern: document.getElementById('inputConcern').value || ''
+  };
+  try { localStorage.setItem('tagscanner_user', JSON.stringify(user)); } catch (e) {}
+  hideAIModal('emailGateModal');
+
+  var config = getBedrockConfig();
+  if (!config || (!config.proxyUrl && !config.accessKeyId)) {
+    showBedrockSettingsModal();
+  } else {
+    runAIScan(user, config);
+  }
+}
+
+function saveBedrockSettings() {
+  var keyId  = (document.getElementById('inputAccessKeyId').value || '').trim();
+  var secret = (document.getElementById('inputSecretKey').value || '').trim();
+
+  // Own credentials: both must be provided together, or both left blank (use shared proxy)
+  if ((keyId && !secret) || (!keyId && secret)) {
+    if (!keyId)   document.getElementById('inputAccessKeyId').style.borderColor = '#ef4444';
+    if (!secret)  document.getElementById('inputSecretKey').style.borderColor   = '#ef4444';
+    return;
+  }
+  document.getElementById('inputAccessKeyId').style.borderColor = '';
+  document.getElementById('inputSecretKey').style.borderColor   = '';
+
+  var config = {
+    accessKeyId:     keyId   || null,
+    secretAccessKey: secret  || null,
+    region:      document.getElementById('inputRegion').value  || 'us-east-1',
+    modelId:     document.getElementById('inputModelId').value || 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
+    maxTokens:   1500,
+    temperature: 0.3
+  };
+  try { localStorage.setItem('tagscanner_bedrock_config', JSON.stringify(config)); } catch (e) {}
+  hideAIModal('bedrockSettingsModal');
+
+  var user = getUserInfo();
+  if (user && user.email) runAIScan(user, config);
+}
+
+// ── Core scan execution ───────────────────────────────────────────────────
+
+async function runAIScan(user, config) {
+  showAIState('scanning');
+  // Attach email to config so proxy can validate it
+  var effectiveConfig = Object.assign({}, config, { email: user.email || '' });
+  try {
+    var payload = window.TagScannerHealthPayload.build({
+      dataElements:       _aiHealthData.dataElements,
+      rules:              _aiHealthData.rules,
+      extensions:         _aiHealthData.extensions,
+      usageData:          _aiHealthData.usageData,
+      unusedDataElements: _aiHealthData.unusedDataElements,
+      unusedRules:        _aiHealthData.unusedRules,
+      unusedExtensions:   _aiHealthData.unusedExtensions,
+      sizes:              _aiHealthData.sizes
+    });
+    var userContext = {
+      email:   user.email,
+      role:    user.role || '',
+      concern: user.concern || ''
+    };
+    var result = await window.TagScannerBedrock.analyzeProperty(payload, userContext, effectiveConfig);
+    saveCachedAIReport(result.report, result.tokens, result.cost_usd);
+    renderHealthReport(result.report, result.tokens, result.cost_usd, false, Date.now());
+    showAIState('report');
+  } catch (err) {
+    console.error('AI scan failed:', err);
+    showAIState('prompt');
+    setAIScanError('Scan failed: ' + (err.message || 'Unknown error') + '. Check your AWS credentials and region.');
+  }
+}
+
+// ── Report renderer ───────────────────────────────────────────────────────
+
+function renderHealthReport(report, tokens, costUsd, fromCache, ts) {
+  var container = document.getElementById('aiReportContainer');
+  container.innerHTML = '';
+
+  var grade = report.health_grade || '?';
+  var score = (typeof report.health_score === 'number') ? report.health_score : 0;
+
+  // Meta row
+  var meta = document.createElement('div');
+  meta.className = 'ai-report-meta';
+  var leftMeta = fromCache && ts ? 'Cached &middot; analyzed ' + new Date(ts).toLocaleString() : 'Just analyzed';
+  var rightMeta = tokens ? ((tokens.input || 0) + ' in / ' + (tokens.output || 0) + ' out tokens &middot; $' + (costUsd || 0).toFixed(4)) : '';
+  meta.innerHTML = '<span>' + leftMeta + '</span><span>' + rightMeta + '</span>';
+  container.appendChild(meta);
+
+  // Score + executive summary
+  var scoreRow = document.createElement('div');
+  scoreRow.className = 'ai-score-row';
+
+  var circle = document.createElement('div');
+  circle.className = 'ai-score-circle ai-score-' + grade;
+  circle.innerHTML = '<span class="ai-score-number">' + score + '</span><span class="ai-score-grade">Grade ' + escAIHtml(grade) + '</span>';
+  scoreRow.appendChild(circle);
+
+  var sumDiv = document.createElement('div');
+  sumDiv.className = 'ai-executive-summary';
+  sumDiv.textContent = report.executive_summary || '';
+  scoreRow.appendChild(sumDiv);
+  container.appendChild(scoreRow);
+
+  // Reasoning box — explains what drove the score
+  var reasonBox = document.createElement('div');
+  reasonBox.className = 'ai-reasoning-box';
+  var critTitles = (report.critical_issues || []).slice(0, 2).map(function(i) { return i.title; }).join(' · ');
+  reasonBox.innerHTML =
+    '<strong>How this score is calculated:</strong> The AI evaluated four dimensions of your Adobe Tags property — ' +
+    'rule structure (conditions, custom code, action counts), data element health (unused ratio, type spread, DE-to-DE chains), ' +
+    'extension bloat, and overall payload performance. Each dimension contributes to the category scores below.' +
+    (critTitles ? ' <strong>Primary issues identified:</strong> ' + escAIHtml(critTitles) + '.' : '');
+  var factors = [
+    { icon: 'fas fa-wrench',       label: 'Rule complexity' },
+    { icon: 'fas fa-database',     label: 'Unused component ratio' },
+    { icon: 'fas fa-code',         label: 'Custom code prevalence' },
+    { icon: 'fas fa-puzzle-piece', label: 'Extension usage' },
+    { icon: 'fas fa-tachometer-alt', label: 'Payload size' }
+  ];
+  var factorsRow = document.createElement('div');
+  factorsRow.className = 'ai-reasoning-factors';
+  factors.forEach(function(f) {
+    var chip = document.createElement('div');
+    chip.className = 'ai-reasoning-factor';
+    chip.innerHTML = '<i class="' + f.icon + '"></i>' + escAIHtml(f.label);
+    factorsRow.appendChild(chip);
+  });
+  reasonBox.appendChild(factorsRow);
+  container.appendChild(reasonBox);
+
+  // Category scores
+  var catScores = report.category_scores || {};
+  var cats = [
+    { key: 'rules',         label: 'Rules' },
+    { key: 'data_elements', label: 'Data Elements' },
+    { key: 'extensions',    label: 'Extensions' },
+    { key: 'performance',   label: 'Performance' }
+  ];
+  var catGrid = document.createElement('div');
+  catGrid.className = 'ai-category-scores';
+  cats.forEach(function(cat) {
+    var val = catScores[cat.key] || 0;
+    var color = val >= 90 ? '#10b981' : val >= 80 ? '#3b82f6' : val >= 70 ? '#f59e0b' : val >= 60 ? '#f97316' : '#ef4444';
+    var cell = document.createElement('div');
+    cell.className = 'ai-cat-score';
+    cell.innerHTML =
+      '<div class="ai-cat-label">' + escAIHtml(cat.label) + '</div>' +
+      '<div class="ai-cat-bar-wrap"><div class="ai-cat-bar" style="width:' + val + '%;background:' + color + '"></div></div>' +
+      '<div class="ai-cat-value" style="color:' + color + '">' + val + '</div>';
+    catGrid.appendChild(cell);
+  });
+  container.appendChild(catGrid);
+
+  // Critical issues
+  var critical = report.critical_issues || [];
+  if (critical.length) {
+    addAISubHeading(container, 'fas fa-exclamation-circle', 'Critical Issues');
+    var grid = document.createElement('div');
+    grid.className = 'ai-issues-grid';
+    critical.forEach(function(issue) {
+      var card = document.createElement('div');
+      card.className = 'ai-issue-card ai-issue-critical';
+      card.innerHTML =
+        '<div class="ai-issue-title">' + escAIHtml(issue.title || '') + '</div>' +
+        '<div class="ai-issue-body">' + escAIHtml(issue.description || '') + '</div>' +
+        (issue.fix ? '<div class="ai-issue-fix"><i class="fas fa-wrench"></i> ' + escAIHtml(issue.fix) + '</div>' : '');
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
+  }
+
+  // Warnings
+  var warnings = report.warnings || [];
+  if (warnings.length) {
+    addAISubHeading(container, 'fas fa-exclamation-triangle', 'Warnings');
+    var wgrid = document.createElement('div');
+    wgrid.className = 'ai-issues-grid';
+    warnings.forEach(function(w) {
+      var card = document.createElement('div');
+      card.className = 'ai-issue-card ai-issue-warning';
+      card.innerHTML =
+        '<div class="ai-issue-title">' + escAIHtml(w.title || '') + '</div>' +
+        '<div class="ai-issue-body">' + escAIHtml(w.description || '') + '</div>' +
+        (w.recommendation ? '<div class="ai-issue-fix"><i class="fas fa-lightbulb"></i> ' + escAIHtml(w.recommendation) + '</div>' : '');
+      wgrid.appendChild(card);
+    });
+    container.appendChild(wgrid);
+  }
+
+  // Quick wins
+  var wins = report.quick_wins || [];
+  if (wins.length) {
+    addAISubHeading(container, 'fas fa-bolt', 'Quick Wins');
+    var wingrid = document.createElement('div');
+    wingrid.className = 'ai-issues-grid';
+    wins.forEach(function(win) {
+      var card = document.createElement('div');
+      card.className = 'ai-issue-card ai-issue-win';
+      card.innerHTML =
+        '<div class="ai-issue-title">' + escAIHtml(win.title || '') + '</div>' +
+        '<div class="ai-issue-body">' + escAIHtml(win.description || '') + '</div>' +
+        (win.estimated_savings_kb ? '<span class="ai-issue-savings">~' + win.estimated_savings_kb + ' KB saved</span>' : '');
+      wingrid.appendChild(card);
+    });
+    container.appendChild(wingrid);
+  }
+
+  // Top recommendations — styled priority cards
+  var recs = report.top_recommendations || [];
+  if (recs.length) {
+    addAISubHeading(container, 'fas fa-list-ol', 'Top Recommendations');
+    var recsDiv = document.createElement('div');
+    recs.forEach(function(rec, idx) {
+      var card = document.createElement('div');
+      card.className = 'ai-rec-card';
+
+      var num = document.createElement('div');
+      num.className = 'ai-rec-num';
+      num.textContent = idx + 1;
+      card.appendChild(num);
+
+      var meta = inferRecMeta(rec);
+      var body = document.createElement('div');
+      body.className = 'ai-rec-body';
+      body.innerHTML =
+        '<i class="' + meta.icon + '" style="margin-right:6px;color:' + meta.color + '"></i>' +
+        escAIHtml(rec) +
+        '<br><span class="ai-rec-tag" style="background:' + meta.tagBg + ';color:' + meta.tagColor + '">' + meta.label + '</span>';
+      card.appendChild(body);
+      recsDiv.appendChild(card);
+    });
+    container.appendChild(recsDiv);
+  }
+
+  // Cleanup impact
+  var impact = report.cleanup_impact || {};
+  if (impact.total_kb) {
+    addAISubHeading(container, 'fas fa-tachometer-alt', 'Estimated Cleanup Impact');
+    var impactDiv = document.createElement('div');
+    impactDiv.style.cssText = 'background:#f8f9fc;border:1px solid #e3e6f0;border-radius:8px;padding:12px 16px;font-size:13px;color:#374151;';
+    impactDiv.innerHTML =
+      'Removing unused components could free <strong>' + impact.total_kb + ' KB</strong> ' +
+      '(' + (impact.total_pct || 0) + '% of total). ' +
+      'Rules: ' + (impact.rules_kb || 0) + ' KB &middot; Data Elements: ' + (impact.data_elements_kb || 0) + ' KB.';
+    container.appendChild(impactDiv);
+  }
+
+  // Footer: rescan link for logged-in users on cached reports
+  if (fromCache) {
+    var footerRow = document.createElement('div');
+    footerRow.style.cssText = 'text-align:right;margin-top:14px;padding-top:10px;border-top:1px solid #f3f4f6;font-size:11.5px;color:#9ca3af;';
+    footerRow.innerHTML = '<button id="btnRescan" style="font-size:11.5px;color:#27c5c1;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;">Re-analyze</button>';
+    container.appendChild(footerRow);
+    document.getElementById('btnRescan').addEventListener('click', function() {
+      localStorage.removeItem(getAICacheKey());
+      var cfg = getBedrockConfig();
+      var usr = getUserInfo();
+      if (cfg && cfg.accessKeyId && usr && usr.email) {
+        runAIScan(usr, cfg);
+      } else {
+        showAIState('prompt');
+      }
+    });
+  }
+}
+
+function inferRecMeta(text) {
+  var t = (text || '').toLowerCase();
+  if (t.indexOf('unused') > -1 || t.indexOf('remov') > -1 || t.indexOf('clean') > -1 || t.indexOf('delet') > -1)
+    return { icon: 'fas fa-trash-alt',      color: '#10b981', label: 'Cleanup',     tagBg: '#d1fae5', tagColor: '#065f46' };
+  if (t.indexOf('custom code') > -1 || t.indexOf('hardcod') > -1 || t.indexOf('script') > -1)
+    return { icon: 'fas fa-code',           color: '#8b5cf6', label: 'Custom Code', tagBg: '#ede9fe', tagColor: '#5b21b6' };
+  if (t.indexOf('condition') > -1 || t.indexOf('rule') > -1 || t.indexOf('event') > -1)
+    return { icon: 'fas fa-wrench',         color: '#f59e0b', label: 'Rules',       tagBg: '#fef3c7', tagColor: '#92400e' };
+  if (t.indexOf('extension') > -1)
+    return { icon: 'fas fa-puzzle-piece',   color: '#4e73df', label: 'Extensions',  tagBg: '#dbeafe', tagColor: '#1e40af' };
+  if (t.indexOf('performance') > -1 || t.indexOf('size') > -1 || t.indexOf('kb') > -1 || t.indexOf('load') > -1)
+    return { icon: 'fas fa-tachometer-alt', color: '#f97316', label: 'Performance', tagBg: '#ffedd5', tagColor: '#9a3412' };
+  if (t.indexOf('data element') > -1 || t.indexOf('variable') > -1)
+    return { icon: 'fas fa-database',       color: '#27c5c1', label: 'Data Layer',  tagBg: '#ccfbf1', tagColor: '#065f46' };
+  if (t.indexOf('audit') > -1 || t.indexOf('review') > -1 || t.indexOf('document') > -1)
+    return { icon: 'fas fa-clipboard-check',color: '#6b7280', label: 'Governance',  tagBg: '#f3f4f6', tagColor: '#374151' };
+  return   { icon: 'fas fa-lightbulb',      color: '#4e73df', label: 'Best Practice', tagBg: '#eff6ff', tagColor: '#1e40af' };
+}
+
+function addAISubHeading(container, iconClass, label) {
+  var h = document.createElement('div');
+  h.className = 'ai-sub-heading';
+  h.innerHTML = '<i class="' + iconClass + '"></i> ' + escAIHtml(label);
+  container.appendChild(h);
+}
+
+// ── Function to copy card content to clipboard
 function copyCardToClipboard(cardBody, cardType) {
   // Show processing message
   const message = document.createElement('div');

@@ -74,6 +74,73 @@
         margin-top: 10px;
         margin-bottom: 15px;
       }
+      .de-deep-scan-panel {
+        border: 1px solid #d1d3e2;
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        background: #f8f9fc;
+      }
+      /* Legend sits above the flex row (not inside it) so columns keep width */
+      .expanded-content {
+        width: 100%;
+      }
+      .expanded-content .de-deep-scan-legend {
+        margin: 0 0 12px 0;
+        padding: 8px 10px;
+        background: #fffbeb;
+        border: 1px solid #fcd34d;
+        border-radius: 6px;
+        color: #78350f;
+        font-size: 12px;
+        line-height: 1.4;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .de-legend-swatch {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        margin-right: 5px;
+        vertical-align: middle;
+      }
+      .de-legend-swatch-deep {
+        background: #f59e0b;
+      }
+      .de-legend-swatch-lib {
+        background: #e5e7eb;
+        border: 1px solid #9ca3af;
+      }
+      .expanded-detail-list li.de-detail-item-deep-scan {
+        border-left: 3px solid #f59e0b;
+        padding-left: 10px;
+        margin-left: -2px;
+        background: rgba(245, 158, 11, 0.06);
+        border-radius: 0 4px 4px 0;
+      }
+      .expanded-detail-list li.de-detail-item-deep-scan .rule-usage-link {
+        color: #b45309;
+        font-weight: 600;
+      }
+      .expanded-detail-list li.de-detail-item-deep-scan a {
+        color: #b45309;
+        font-weight: 600;
+      }
+      .de-col-icon-deep-hint {
+        position: relative;
+      }
+      .de-col-icon-deep-hint::after {
+        content: '';
+        position: absolute;
+        top: -2px;
+        right: -4px;
+        width: 7px;
+        height: 7px;
+        background: #f59e0b;
+        border-radius: 50%;
+        border: 1px solid #fff;
+      }
 
       /* Page header – same style as Rules / display landing */
       .de-page-header {
@@ -94,6 +161,23 @@
         display: flex;
         align-items: center;
         gap: 8px;
+      }
+      /* Disabled components in compiled library */
+      #de_details tr.component-disabled {
+        opacity: 0.75;
+        background-color: rgba(0, 0, 0, 0.03);
+      }
+      .component-disabled-badge {
+        display: inline-block;
+        margin-left: 8px;
+        padding: 2px 6px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #856404;
+        background-color: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 4px;
+        vertical-align: middle;
       }
       /* Spinner – same blue as main color scheme */
       .spinner {
@@ -138,12 +222,61 @@
         max-width: 100%;
         margin-bottom: 20px;
       }
-      /* Shrink ID column */
+      /* Column widths – same pattern as Rules and Extensions tabs */
       #dataelement_details th.de-col-id,
       #dataelement_details td.de-col-id {
         width: 1%;
         max-width: 52px;
+        min-width: 40px;
         white-space: nowrap;
+        text-align: center;
+        font-weight: 600;
+      }
+      #dataelement_details th:nth-child(1),
+      #dataelement_details td:nth-child(1) {
+        text-align: center;
+        font-weight: 600;
+      }
+      /* Data Element Name – same proportion as Rules/Extensions name column */
+      #dataelement_details th:nth-child(2),
+      #dataelement_details td:nth-child(2) {
+        width: 18%;
+        min-width: 140px;
+        max-width: 240px;
+        white-space: normal;
+        word-wrap: break-word;
+      }
+      /* Used in Rules, Used in Extensions, Used in Data Elements – compact columns */
+      #dataelement_details th:nth-child(3),
+      #dataelement_details td:nth-child(3),
+      #dataelement_details th:nth-child(4),
+      #dataelement_details td:nth-child(4),
+      #dataelement_details th:nth-child(5),
+      #dataelement_details td:nth-child(5) {
+        width: 8%;
+        min-width: 80px;
+        max-width: 110px;
+        white-space: nowrap;
+        text-overflow: unset;
+        overflow: visible;
+        text-align: center;
+      }
+      /* Extra left padding on col 3 to create visual gap after name column */
+      #dataelement_details th:nth-child(3),
+      #dataelement_details td:nth-child(3) {
+        padding-left: 16px;
+      }
+      /* Custom Code column – narrow centered icon (matches Rules tab column 6) */
+      #dataelement_details th:nth-child(6),
+      #dataelement_details td:nth-child(6) {
+        width: 1%;
+        min-width: 72px;
+        max-width: 90px;
+        text-align: center;
+        white-space: nowrap;
+      }
+      #dataelement_details .de-col-icon {
+        position: relative;
       }
       /* Table header icons – same style as Rules page */
       .de-th-icon {
@@ -209,7 +342,9 @@
       .expanded-content-columns {
         display: flex;
         flex-direction: row;
+        flex-wrap: wrap;
         gap: 24px;
+        width: 100%;
       }
       .expanded-section {
         margin-bottom: 15px;
@@ -243,15 +378,17 @@
         list-style: none;
         margin: 0;
         padding: 0;
+        text-align: left;
       }
       .expanded-detail-list li {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 8px;
         padding: 6px 0;
         font-size: 13px;
         color: #5a5c69;
         border-bottom: 1px solid #eee;
+        text-align: left;
       }
       .expanded-detail-list li:last-child {
         border-bottom: none;
@@ -261,6 +398,10 @@
         font-size: 10px;
         width: 1em;
         flex-shrink: 0;
+        margin-top: 3px;
+      }
+      .expanded-section-column {
+        text-align: left;
       }
 
       /* Rule usage modal (same pattern as Rules tab) */
@@ -321,46 +462,62 @@
         min-height: 0;
         flex: 1;
       }
-      .de-modal-body .usage-section {
-        margin-bottom: 20px;
+      /* Compact DE-references-DE card */
+      .de-ref-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        background: #f8f9fc;
+        border: 1px solid #d1d3e2;
+        border-radius: 8px;
+        padding: 14px 18px;
       }
-      .de-modal-body .usage-section h4 {
-        font-size: 14px;
-        margin: 0 0 10px 0;
-        color: #333;
+      .de-ref-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
       }
-      .de-modal-body .usage-section h4 i {
-        margin-right: 8px;
-        color: #27c5c1;
-      }
-      .de-usage-block {
-        background: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-radius: 6px;
-        padding: 12px 16px;
-        margin-bottom: 8px;
-      }
-      .de-usage-block .label {
+      .de-ref-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11.5px;
         font-weight: 600;
-        margin-bottom: 4px;
       }
-      .de-usage-block .detail {
-        font-size: 13px;
-        color: #555;
-        margin-bottom: 8px;
+      .de-ref-badge-type {
+        background: #e8f0fe;
+        color: #1a56a0;
       }
-      .de-usage-block button.btn-view {
-        padding: 4px 10px;
-        font-size: 12px;
+      .de-ref-badge-ext {
+        background: #e6f9f8;
+        color: #0e9490;
+      }
+      .de-ref-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+      }
+      .de-ref-actions .btn-view {
+        padding: 6px 14px;
+        font-size: 12.5px;
         background: #27c5c1;
         color: white;
         border: none;
-        border-radius: 4px;
+        border-radius: 5px;
         cursor: pointer;
+        white-space: nowrap;
       }
-      .de-usage-block button.btn-view:hover {
-        background: #1fb3af;
+      .de-ref-actions .btn-view:hover { background: #1fb3af; }
+      .de-ref-link {
+        font-size: 13px;
+        color: #27c5c1;
+        text-decoration: none;
+        white-space: nowrap;
       }
+      .de-ref-link:hover { text-decoration: underline; }
       .rule-usage-link {
         background: none;
         border: none;
@@ -369,6 +526,9 @@
         padding: 0;
         text-decoration: underline;
         font-size: inherit;
+        text-align: left;
+        white-space: normal;
+        word-break: break-word;
       }
       .rule-usage-link:hover {
         color: #1fb3af;
@@ -399,6 +559,222 @@
         border-radius: 3px;
         font-weight: 600;
       }
+
+      /* Explain panel */
+      .de-explain-panel {
+        background: #f8f9fc;
+        border: 1px solid #d1d3e2;
+        border-radius: 6px;
+        padding: 14px 16px;
+        font-size: 13px;
+        font-family: inherit;
+      }
+      .de-analysis-section {
+        margin-bottom: 14px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid #e3e6f0;
+      }
+      .de-analysis-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+      }
+      .de-analysis-heading {
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #495057;
+        margin-bottom: 8px;
+      }
+      .de-analysis-heading i {
+        margin-right: 6px;
+        color: #4e73df;
+      }
+      /* Prose summary */
+      .de-analysis-prose {
+        margin: 0;
+        line-height: 1.65;
+        color: #444;
+        font-size: 13px;
+      }
+      .de-analysis-prose strong { color: #333; }
+      .de-analysis-prose code {
+        background: #e8f0fe;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 12px;
+        color: #1a56a0;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+      }
+      /* Data flow */
+      .de-analysis-flow {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+      .de-flow-col {
+        flex: 1;
+        min-width: 0;
+      }
+      .de-flow-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #999;
+        margin-bottom: 6px;
+      }
+      .de-flow-item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 4px 8px;
+        margin-bottom: 4px;
+        border-radius: 0 4px 4px 0;
+        background: #fafbfc;
+        overflow: hidden;
+      }
+      .de-flow-item code {
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 12px;
+        color: #333;
+        background: none;
+        padding: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        min-width: 0;
+      }
+      .de-flow-ret {
+        max-width: 100%;
+        display: block;
+      }
+      .de-flow-type {
+        display: inline-block;
+        font-size: 9px;
+        font-weight: 700;
+        padding: 1px 5px;
+        border-radius: 3px;
+        letter-spacing: 0.3px;
+        flex-shrink: 0;
+        white-space: nowrap;
+        text-transform: uppercase;
+      }
+      .de-flow-none {
+        color: #aaa;
+        font-style: italic;
+        font-size: 12px;
+        border-left: 3px solid #e0e0e0 !important;
+      }
+      .de-flow-arrow {
+        display: flex;
+        align-items: center;
+        padding-top: 26px;
+        font-size: 16px;
+        color: #ccc;
+        flex-shrink: 0;
+      }
+      /* Debug console */
+      .de-debug-hint {
+        color: #777;
+        font-size: 11.5px;
+        margin-bottom: 8px;
+        font-style: italic;
+      }
+      .de-debug-list {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .de-debug-cmd {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #1a1d23;
+        border-radius: 5px;
+        padding: 6px 10px;
+        min-width: 0;
+      }
+      .de-debug-cmd-comment {
+        background: #22262f;
+      }
+      .de-debug-label {
+        font-size: 11px;
+        color: #6b7280;
+        flex-shrink: 0;
+        width: 130px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .de-debug-code-wrap {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .de-debug-code {
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 11.5px;
+        color: #61dafb;
+        background: none;
+        padding: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        min-width: 0;
+      }
+      .de-debug-cmd-comment .de-debug-code {
+        color: #6a9955;
+      }
+      .de-debug-copy {
+        background: none;
+        border: none;
+        color: #4b5563;
+        cursor: pointer;
+        padding: 2px 5px;
+        font-size: 11px;
+        flex-shrink: 0;
+        border-radius: 3px;
+      }
+      .de-debug-copy:hover { color: #27c5c1; }
+      /* Risk flags */
+      .de-risk-item {
+        border-radius: 0 4px 4px 0;
+        padding: 8px 12px;
+        margin-bottom: 6px;
+      }
+      .de-risk-item:last-child { margin-bottom: 0; }
+      .de-risk-text {
+        font-size: 12.5px;
+        line-height: 1.5;
+      }
+      .de-risk-text code {
+        background: rgba(0,0,0,0.08);
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 11.5px;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+      }
+      .de-risk-fix {
+        font-size: 12px;
+        color: #555;
+        margin-top: 5px;
+        line-height: 1.5;
+        padding-left: 20px;
+      }
+      .de-risk-fix code {
+        background: rgba(0,0,0,0.06);
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 11px;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+      }
     </style>
   </head>
   <body>
@@ -424,7 +800,6 @@
         This page shows all data elements defined in your Adobe Tags property.
         You can sort the table by clicking on any column header.
       </div>
-
       <div class="summary-card data-element-card">
         <div class="summary-card-body">
           <div class="search-container" style="margin-bottom: 20px">
@@ -506,6 +881,13 @@
     <script src="jquery.js"></script>
     <script src="tablesorter.js"></script>
     <script src="initTableSorter.js"></script>
+    <script src="aiClient.js"></script>
+    <script src="bedrockClient.js"></script>
+    <script src="data-element-rule-refs.js"></script>
+    <script src="deep-scan-hosted-code.js"></script>
+    <script src="prettier.standalone.js"></script>
+    <script src="prettier-babel.js"></script>
+    <script src="prettier-estree.js"></script>
     <script src="dataelement.js"></script>
     <script src="tour-initializer.js"></script>
     <script src="dataelement-tour.js"></script>

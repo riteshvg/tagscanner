@@ -82,13 +82,13 @@
         white-space: normal;
         word-wrap: break-word;
       }
-      /* Icon columns: Actions, Events, Conditions, Data Elements */
+      /* Icon columns: Actions, Events, Conditions, Data Elements – same as Rules/Data Elements */
       #extension_details th:nth-child(3), #extension_details td:nth-child(3),
       #extension_details th:nth-child(4), #extension_details td:nth-child(4),
       #extension_details th:nth-child(5), #extension_details td:nth-child(5),
       #extension_details th:nth-child(6), #extension_details td:nth-child(6) {
         width: 12%;
-        min-width: 100px;
+        min-width: 90px;
         max-width: 140px;
         white-space: normal;
         word-wrap: break-word;
@@ -158,6 +158,23 @@
       .ext-expanded-table th, .ext-expanded-table td { padding: 6px 8px; border: 1px solid #e3e6f0; text-align: left; width: 25%; box-sizing: border-box; }
       .ext-expanded-table th { background: #eaecf4; font-weight: 600; position: sticky; top: 0; z-index: 1; }
       .ext-expanded-table td { white-space: normal; word-break: break-word; overflow-wrap: break-word; }
+      /* Disabled components in compiled library */
+      #extension_details tr.component-disabled {
+        opacity: 0.75;
+        background-color: rgba(0, 0, 0, 0.03);
+      }
+      .component-disabled-badge {
+        display: inline-block;
+        margin-left: 8px;
+        padding: 2px 6px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #856404;
+        background-color: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 4px;
+        vertical-align: middle;
+      }
       .spinner {
         width: 64px;
         height: 64px;

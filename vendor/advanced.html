@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Advanced Mode – TagScanner</title>
+    <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
+    <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+    <link href="../css/styles.css" rel="stylesheet" />
+    <style>
+      .advanced-page-header {
+        background-color: #4e73df;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .advanced-page-header h5 {
+        color: white;
+        padding: 10px;
+        margin-bottom: 0;
+      }
+      .advanced-page-header .btn-back {
+        margin-right: 10px;
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.5);
+      }
+      .advanced-page-header .btn-back:hover {
+        background: rgba(255,255,255,0.3);
+        color: white;
+        border-color: white;
+      }
+      .advanced-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #f68d2e;
+        color: white;
+        border-radius: 4px;
+        margin-left: 10px;
+        vertical-align: middle;
+      }
+      .description-text {
+        margin-top: 10px;
+        margin-bottom: 15px;
+        color: #5a5c69;
+      }
+      .summary-card {
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .summary-card-header {
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+        font-weight: bold;
+        color: white;
+      }
+      .summary-card-body { padding: 20px; }
+      .credentials-card .summary-card-header { background-color: #4e73df; }
+      .fetch-options-card .summary-card-header { background-color: #27c5c1; }
+      .results-card .summary-card-header { background-color: #1cc88a; }
+      .form-group label { font-weight: 600; color: #5a5c69; }
+      .validate-msg {
+        margin-top: 10px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        display: none;
+        max-width: 820px;
+        font-size: 0.85rem;
+        line-height: 1.2;
+      }
+      .validate-msg.success { display: inline-block; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+      .validate-msg.error { display: inline-block; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+      #fetch-options-section { opacity: 0.6; pointer-events: none; }
+      #fetch-options-section.ready { opacity: 1; pointer-events: auto; }
+      .option-group { margin-bottom: 14px; }
+      .option-group label { font-weight: 500; margin-bottom: 4px; }
+      .option-group .form-check { margin-left: 1rem; }
+      #advanced-results { min-height: 80px; padding: 16px; background: #f8f9fc; border-radius: 6px; border: 1px solid #e3e6f0; }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div class="advanced-page-header">
+        <div>
+          <h5><i class="fas fa-cog mr-2"></i> Advanced Mode <span class="advanced-badge">Reactor API</span></h5>
+        </div>
+        <a id="back-to-simple" href="../display.html" target="iframe2" class="btn btn-sm btn-back">
+          <i class="fas fa-arrow-left mr-1"></i> Back to Simple mode
+        </a>
+      </div>
+
+      <p class="description-text">
+        Use your Adobe Reactor API credentials to see property-level data that is not in the compiled library (e.g. total rules, disabled rules, libraries). Same look and feel as Simple mode; credentials are only used in this session.
+      </p>
+
+      <!-- Step 1: Credentials (Client ID + Client Secret + Org ID → generate access token) -->
+      <div class="summary-card credentials-card">
+        <div class="summary-card-header">
+          <i class="fas fa-key mr-2"></i> API credentials
+        </div>
+        <div class="summary-card-body">
+          <p class="text-muted small mb-3">Enter your OAuth Server-to-Server credentials from the Adobe Developer Console (Experience Platform Launch API). The app will request an access token from Adobe IMS and then validate it against the Reactor API.</p>
+          <div class="form-group">
+            <label for="adv-client-id">Client ID (API Key)</label>
+            <input type="text" class="form-control" id="adv-client-id" placeholder="From Adobe Developer Console" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label for="adv-client-secret">Client Secret</label>
+            <input type="password" class="form-control" id="adv-client-secret" placeholder="From OAuth Server-to-Server credential" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label for="adv-ims-org">IMS Org ID</label>
+            <input type="text" class="form-control" id="adv-ims-org" placeholder="Organization ID (x-gw-ims-org-id)" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label for="adv-scope">Scope <span class="text-muted font-weight-normal">(optional)</span></label>
+            <input type="text" class="form-control" id="adv-scope" placeholder="Leave blank for default Reactor scope" autocomplete="off" />
+          </div>
+          <div class="d-flex align-items-center justify-content-between flex-wrap" style="gap: 10px;">
+            <div class="form-check mb-0">
+              <input type="checkbox" class="form-check-input" id="adv-remember-creds" />
+              <label class="form-check-label" for="adv-remember-creds">Remember credentials on this device</label>
+              <div class="small text-muted">Stored locally in your browser. Use only on trusted machines.</div>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="adv-clear-creds">
+              <i class="fas fa-eraser mr-1"></i> Clear saved
+            </button>
+          </div>
+          <button type="button" class="btn btn-primary" id="adv-validate-btn">
+            <i class="fas fa-key mr-1"></i> Get access token &amp; Validate
+          </button>
+          <div id="adv-validate-msg" class="validate-msg"></div>
+        </div>
+      </div>
+
+      <!-- Step 2: What to fetch -->
+      <div id="fetch-options-section" class="summary-card fetch-options-card">
+        <div class="summary-card-header">
+          <i class="fas fa-list-check mr-2"></i> What to fetch
+        </div>
+        <div class="summary-card-body">
+          <p class="text-muted small">Select the data you want to load from the Reactor API. Defaults are pre-selected.</p>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="adv-company">Company</label>
+                <select class="form-control" id="adv-company" disabled>
+                  <option value="">Validate credentials first…</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="adv-property">Property</label>
+                <select class="form-control" id="adv-property" disabled>
+                  <option value="">Select a company first…</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="option-group">
+            <label>Libraries</label>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="opt-libraries-count" checked />
+              <label class="form-check-label" for="opt-libraries-count">Count of libraries</label>
+            </div>
+          </div>
+          <div class="option-group">
+            <label>Rules</label>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="opt-rules-total" checked />
+              <label class="form-check-label" for="opt-rules-total">Total rules in property</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="opt-rules-enabled" checked />
+              <label class="form-check-label" for="opt-rules-enabled">Enabled rules count</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="opt-rules-disabled" checked />
+              <label class="form-check-label" for="opt-rules-disabled">Disabled rules count</label>
+            </div>
+          </div>
+          <div class="option-group">
+            <label>Data elements &amp; Extensions</label>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="opt-de-count" checked />
+              <label class="form-check-label" for="opt-de-count">Data elements count</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="opt-ext-count" checked />
+              <label class="form-check-label" for="opt-ext-count">Extensions count</label>
+            </div>
+          </div>
+          <div class="option-group">
+            <label>Optional</label>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="opt-builds" />
+              <label class="form-check-label" for="opt-builds">Builds per library</label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="opt-environments" />
+              <label class="form-check-label" for="opt-environments">Environments</label>
+            </div>
+          </div>
+          <button type="button" class="btn btn-success mt-2" id="adv-fetch-btn" disabled>
+            <i class="fas fa-download mr-1"></i> Fetch selected
+          </button>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="summary-card results-card">
+        <div class="summary-card-header">
+          <i class="fas fa-table mr-2"></i> Results
+        </div>
+        <div class="summary-card-body">
+          <div id="advanced-results">
+            <span class="text-muted">Validate credentials, then choose what to fetch and click &quot;Fetch selected&quot;.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="advanced.js"></script>
+  </body>
+</html>

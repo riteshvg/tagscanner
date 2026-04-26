@@ -63,25 +63,37 @@
       ruleToDataElement[ruleName] = {};
       ruleToExtension[ruleName] = {};
 
-      function scanForDE(obj) {
-        if (!obj) return;
-        if (typeof obj === 'string') {
-          deKeys.forEach(function (deName) {
-            if (stringContainsDERef(obj, deName)) {
-              ruleToDataElement[ruleName][deName] = (ruleToDataElement[ruleName][deName] || 0) + 1;
-              dataElementToRule[deName] = dataElementToRule[deName] || {};
-              dataElementToRule[deName][ruleName] = (dataElementToRule[deName][ruleName] || 0) + 1;
-            }
-          });
-          return;
+      if (typeof window !== 'undefined' && window.TagScannerDataElementRefs && window.TagScannerDataElementRefs.getDENamesReferencedInRule) {
+        window.TagScannerDataElementRefs.getDENamesReferencedInRule(rule, dataElements).forEach(function (deName) {
+          ruleToDataElement[ruleName][deName] = (ruleToDataElement[ruleName][deName] || 0) + 1;
+          dataElementToRule[deName] = dataElementToRule[deName] || {};
+          dataElementToRule[deName][ruleName] = (dataElementToRule[deName][ruleName] || 0) + 1;
+        });
+      } else {
+        function scanForDE(obj) {
+          if (!obj) return;
+          if (typeof obj === 'string') {
+            deKeys.forEach(function (deName) {
+              if (stringContainsDERef(obj, deName)) {
+                ruleToDataElement[ruleName][deName] = (ruleToDataElement[ruleName][deName] || 0) + 1;
+                dataElementToRule[deName] = dataElementToRule[deName] || {};
+                dataElementToRule[deName][ruleName] = (dataElementToRule[deName][ruleName] || 0) + 1;
+              }
+            });
+            return;
+          }
+          if (Array.isArray(obj)) {
+            obj.forEach(scanForDE);
+            return;
+          }
+          if (typeof obj === 'object') {
+            Object.keys(obj).forEach(function (k) { scanForDE(obj[k]); });
+          }
         }
-        if (Array.isArray(obj)) {
-          obj.forEach(scanForDE);
-          return;
-        }
-        if (typeof obj === 'object') {
-          Object.keys(obj).forEach(function (k) { scanForDE(obj[k]); });
-        }
+
+        scanForDE(rule.events);
+        scanForDE(rule.conditions);
+        scanForDE(rule.actions);
       }
 
       function scanForExt(items) {
@@ -96,9 +108,6 @@
         });
       }
 
-      scanForDE(rule.events);
-      scanForDE(rule.conditions);
-      scanForDE(rule.actions);
       scanForExt(rule.events);
       scanForExt(rule.conditions);
       scanForExt(rule.actions);

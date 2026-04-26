@@ -135,7 +135,6 @@ a {
 #sidebar-click:not(.active) #sidebar-toggle-label {
   opacity: 0;
   visibility: hidden;
-  transition: all 0.3s ease;
   width: 0;
   overflow: hidden;
 }
@@ -146,44 +145,11 @@ a {
 #sidebar-click.active #sidebar-toggle-label {
   opacity: 1;
   visibility: visible;
-  transition: all 0.3s ease;
   width: auto;
 }
 
-/* Hover effect for collapsed sidebar - show text on hover */
-#sidebar-click:not(.active) .btn-toggle:hover span {
-  opacity: 1;
-  visibility: visible;
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translateY(-50%);
-  background: #333;
-  color: white;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  white-space: nowrap;
-  z-index: 1000;
-  margin-left: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  width: auto;
-}
-
-/* Add a small arrow to the tooltip */
-#sidebar-click:not(.active) .btn-toggle:hover span::before {
-  content: '';
-  position: absolute;
-  left: -5px;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 5px solid transparent;
-  border-right-color: #333;
-}
-
-/* Ensure proper positioning for hover effect */
-#sidebar-click:not(.active) .btn-toggle {
-  position: relative;
-}
+/* Hover tooltip for collapsed sidebar removed to avoid jitter.
+   Use native title tooltips on buttons instead. */
 
 /* Show only icons when collapsed */
 #sidebar-click:not(.active) .btn-toggle {

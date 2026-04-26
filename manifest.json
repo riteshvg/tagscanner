@@ -1,9 +1,9 @@
 {
   "name": "TagScanner",
   "description": "Scan your Adobe Tag property and export your library output with custom code.",
-  "version": "2.0.0",
+  "version": "2.3.0",
   "manifest_version": 3,
-  "permissions": ["activeTab", "storage"],
+  "permissions": ["activeTab", "storage", "scripting"],
   "icons": {
     "16": "images/tagscanner_16x16.png",
     "32": "images/tagscanner_32x32.png",

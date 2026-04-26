@@ -14,6 +14,10 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById(
         'feedback-button-sidebar'
       ).innerHTML = `<i class="px-1 fas fa-envelope"></i><span>Feedback</span>`;
+      if (document.getElementById('advanced-button-sidebar')) {
+        document.getElementById('advanced-button-sidebar').innerHTML =
+          '<i class="px-1 fas fa-cog"></i><span>Advanced Mode</span>';
+      }
       document.getElementById('code-button-sidebar').innerHTML =
         '<i class="px-1 fas fa-code"></i><span>Custom Code</span>';
 
@@ -41,6 +45,10 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById(
         'feedback-button-sidebar'
       ).innerHTML = `<i class="px-1 fas fa-envelope"></i><span>Feedback</span>`;
+      if (document.getElementById('advanced-button-sidebar')) {
+        document.getElementById('advanced-button-sidebar').innerHTML =
+          '<i class="px-1 fas fa-cog"></i><span>Advanced Mode</span>';
+      }
       document.getElementById(
         'collapse-click'
       ).innerHTML = `<i id="collapse-click-left" class="fas fa-angle-left text-white"></i>`;

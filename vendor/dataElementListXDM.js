@@ -242,35 +242,54 @@ document.addEventListener('DOMContentLoaded', function () {
     processSpecificXDMPaths(deName, de.settings.data);
   }
 
+  function addRuleRefsForDataElements(ruleName, deNames) {
+    deNames.forEach((deName) => {
+      if (!rulesByDataElement[deName]) {
+        rulesByDataElement[deName] = [];
+      }
+      if (!rulesByDataElement[deName].includes(ruleName)) {
+        rulesByDataElement[deName].push(ruleName);
+      }
+    });
+  }
+
   // Function to process rules and map them to data elements
   function processRules(rules, dataElements) {
     console.log('Processing rules to find data element references...');
 
-    // For each rule
     rules.forEach((rule) => {
       const ruleName = rule.name;
 
-      // Convert the entire rule to a string to search for data element references
+      if (
+        typeof window !== 'undefined' &&
+        window.TagScannerDataElementRefs &&
+        window.TagScannerDataElementRefs.getDENamesReferencedInRule
+      ) {
+        addRuleRefsForDataElements(
+          ruleName,
+          window.TagScannerDataElementRefs.getDENamesReferencedInRule(
+            rule,
+            dataElements
+          )
+        );
+        return;
+      }
+
       const ruleStr = JSON.stringify(rule);
 
-      // Method 1: Look for data element references in the format %dataElement%
       const deMatches = ruleStr.match(/%([^%]+)%/g);
       if (deMatches) {
-        // Create a Set to store unique data element names
         const uniqueDataElements = new Set();
 
         deMatches.forEach((match) => {
           const deName = match.replace(/%/g, '');
-          // Only process if we haven't seen this data element yet
           if (!uniqueDataElements.has(deName)) {
             uniqueDataElements.add(deName);
 
-            // Add this rule to the data element's rule list
             if (!rulesByDataElement[deName]) {
               rulesByDataElement[deName] = [];
             }
 
-            // Check if this rule is already in the list
             if (!rulesByDataElement[deName].includes(ruleName)) {
               rulesByDataElement[deName].push(ruleName);
             }
@@ -278,12 +297,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
 
-      // Method 2: Look for data element references in the format _satellite.getVar("dataElement")
       const getVarMatches = ruleStr.match(
         /_satellite\.getVar\(["']([^"']+)["']\)/g
       );
       if (getVarMatches) {
-        // Create a Set to store unique data element names
         const uniqueDataElements = new Set();
 
         getVarMatches.forEach((match) => {
@@ -292,16 +309,13 @@ document.addEventListener('DOMContentLoaded', function () {
           );
           if (deNameMatch && deNameMatch[1]) {
             const deName = deNameMatch[1];
-            // Only process if we haven't seen this data element yet
             if (!uniqueDataElements.has(deName)) {
               uniqueDataElements.add(deName);
 
-              // Add this rule to the data element's rule list
               if (!rulesByDataElement[deName]) {
                 rulesByDataElement[deName] = [];
               }
 
-              // Check if this rule is already in the list
               if (!rulesByDataElement[deName].includes(ruleName)) {
                 rulesByDataElement[deName].push(ruleName);
               }
@@ -310,24 +324,19 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
 
-      // Method 3: Check for data element references in conditions
       if (rule.conditions) {
         const conditionsStr = JSON.stringify(rule.conditions);
 
-        // Look for data element references in conditions
         for (const deName in dataElements) {
-          // Check for exact matches of the data element name
           if (
             conditionsStr.includes(`"${deName}"`) ||
             conditionsStr.includes(`'${deName}'`) ||
             conditionsStr.includes(`%${deName}%`)
           ) {
-            // Add this rule to the data element's rule list
             if (!rulesByDataElement[deName]) {
               rulesByDataElement[deName] = [];
             }
 
-            // Check if this rule is already in the list
             if (!rulesByDataElement[deName].includes(ruleName)) {
               rulesByDataElement[deName].push(ruleName);
             }

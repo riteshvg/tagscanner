@@ -739,13 +739,38 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  function addRuleRefsForDataElements(ruleName, deNames) {
+    deNames.forEach((deName) => {
+      if (!rulesByDataElement[deName]) {
+        rulesByDataElement[deName] = [];
+      }
+      if (!rulesByDataElement[deName].includes(ruleName)) {
+        rulesByDataElement[deName].push(ruleName);
+      }
+    });
+  }
+
   // Function to process rules and find data element references
   function processRules(rules, dataElements) {
     rules.forEach((rule) => {
       const ruleName = rule.name;
+      if (
+        typeof window !== 'undefined' &&
+        window.TagScannerDataElementRefs &&
+        window.TagScannerDataElementRefs.getDENamesReferencedInRule
+      ) {
+        addRuleRefsForDataElements(
+          ruleName,
+          window.TagScannerDataElementRefs.getDENamesReferencedInRule(
+            rule,
+            dataElements
+          )
+        );
+        return;
+      }
+
       const ruleStr = JSON.stringify(rule);
 
-      // Method 1: Look for data element references in the format %dataElement%
       const deMatches = ruleStr.match(/%([^%]+)%/g);
       if (deMatches) {
         const uniqueDataElements = new Set();
@@ -764,7 +789,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
 
-      // Method 2: Look for data element references in the format _satellite.getVar("dataElement")
       const getVarMatches = ruleStr.match(
         /_satellite\.getVar\(["']([^"']+)["']\)/g
       );

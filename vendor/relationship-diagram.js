@@ -162,38 +162,55 @@ document.addEventListener('DOMContentLoaded', function () {
         relationships.dataElementToDataElement[deKey] = new Set();
       });
 
-      // Analyze rules for data element references
       Object.keys(rules).forEach((ruleKey) => {
         const rule = rules[ruleKey];
-
-        // Check rule actions
-        if (rule.actions && rule.actions.length) {
-          rule.actions.forEach((action) => {
-            findDataElementReferences(action, ruleKey, dataElements);
-          });
-        }
-
-        // Check rule conditions
-        if (rule.conditions && rule.conditions.length) {
-          rule.conditions.forEach((condition) => {
-            findDataElementReferences(condition, ruleKey, dataElements);
-          });
-        }
-
-        // Check rule events
-        if (rule.events && rule.events.length) {
-          rule.events.forEach((event) => {
-            findDataElementReferences(event, ruleKey, dataElements);
-          });
+        if (
+          typeof window !== 'undefined' &&
+          window.TagScannerDataElementRefs &&
+          window.TagScannerDataElementRefs.getDENamesReferencedInRule
+        ) {
+          window.TagScannerDataElementRefs
+            .getDENamesReferencedInRule(rule, dataElements)
+            .forEach((deName) => {
+              relationships.ruleToDataElement[ruleKey].add(deName);
+              relationships.dataElementToRule[deName]?.add(ruleKey);
+            });
+        } else {
+          if (rule.actions && rule.actions.length) {
+            rule.actions.forEach((action) => {
+              findDataElementReferences(action, ruleKey, dataElements);
+            });
+          }
+          if (rule.conditions && rule.conditions.length) {
+            rule.conditions.forEach((condition) => {
+              findDataElementReferences(condition, ruleKey, dataElements);
+            });
+          }
+          if (rule.events && rule.events.length) {
+            rule.events.forEach((event) => {
+              findDataElementReferences(event, ruleKey, dataElements);
+            });
+          }
         }
       });
 
-      // Analyze data elements for references to other data elements
       Object.keys(dataElements).forEach((deKey) => {
         const de = dataElements[deKey];
-
-        // Check if this data element references other data elements
-        if (de.settings) {
+        if (!de || !de.settings) return;
+        if (
+          typeof window !== 'undefined' &&
+          window.TagScannerDataElementRefs &&
+          window.TagScannerDataElementRefs.collectLiteralRefsFromJsonString
+        ) {
+          const lit = window.TagScannerDataElementRefs.collectLiteralRefsFromJsonString(
+            JSON.stringify(de.settings)
+          );
+          Object.keys(lit).forEach((name) => {
+            if (name !== deKey && dataElements[name]) {
+              relationships.dataElementToDataElement[deKey].add(name);
+            }
+          });
+        } else {
           findDataElementReferencesInDataElement(
             de.settings,
             deKey,

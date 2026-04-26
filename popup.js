@@ -18,12 +18,21 @@ var satellite = {};
   // });
   //console.log('in line 19 pop up ' + tab.id);
   if (tab.id) {
+    // Ensure content script is injected even if the tab was open before the extension was installed
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content_scripts.js'],
+      });
+    } catch (e) {
+      console.warn('Unable to inject content_scripts.js via scripting API:', e);
+    }
     //console.log('in line 14 pop up ' + tab.id);
     var response;
     // console.log()
     try {
       //console.log('inside try ' + tab.id);
-      await new Promise((resolve) => setTimeout(resolve, 3000)); // 3-second delay
+      await new Promise((resolve) => setTimeout(resolve, 3000)); // small delay to let injected script run
 
       response = await chrome.tabs.sendMessage(tab.id, {
         greeting: 'hello',
@@ -495,7 +504,7 @@ function toTable(headers, data) {
 if (window.location.href.indexOf('page_url=') > -1) {
   sessionStorage.setItem('launch_page_url', window.location.href);
 }
-sessionStorage.setItem('tagScanner_version', '2.0.0');
+sessionStorage.setItem('tagScanner_version', '2.3.0');
 // document.getElementById('feed_back_form').addEventListener('click', newwindow);
 // function newwindow() {
 //   window.open(

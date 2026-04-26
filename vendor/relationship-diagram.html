@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>Rule & Data Element Relationships</title>
+    <link href="fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
     <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
     <link href="../css/fonts-2.css" rel="stylesheet" />
     <link href="intro.css" rel="stylesheet" />
@@ -174,8 +175,11 @@
           <img style="height: 24px" src="../img/left-arrow.png" />
         </a>
       </div>
-      <div class="header-section">
-        <h5>Rule & Data Element Relationships</h5>
+      <div class="header-section" style="display: flex; justify-content: space-between; align-items: center;">
+        <h5 style="margin: 0;">Rule & Data Element Relationships</h5>
+        <button id="start-tour" class="btn btn-light btn-sm" style="margin-left: 10px;">
+          <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
+        </button>
       </div>
 
       <div class="tab-buttons">
@@ -213,6 +217,7 @@
     <script src="jquery.js"></script>
     <script src="d3.js"></script>
     <script src="intro.js"></script>
+    <script src="data-element-rule-refs.js"></script>
     <script src="relationship-diagram.js"></script>
     <script src="tour-initializer.js"></script>
     <script src="mapping-tour.js"></script>

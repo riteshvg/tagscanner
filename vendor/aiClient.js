@@ -1,55 +1,136 @@
-// Simple AI client for explaining custom code.
-// Update AI_EXPLAIN_CUSTOM_CODE_ENDPOINT to point to your backend.
+// AI explainer client with open-source LLM support.
+// Priority:
+// 1) Local Ollama (Llama/OpenSeek/etc) via http://127.0.0.1:11434
+// 2) Optional custom backend endpoint (legacy behavior)
+// Configurable via localStorage:
+// - aiExplain_provider: "auto" | "ollama" | "backend"
+// - aiExplain_ollamaEndpoint: default "http://127.0.0.1:11434"
+// - aiExplain_ollamaModel: default "llama3.1:8b"
+// - aiExplain_backendEndpoint: optional custom endpoint
 
-const AI_EXPLAIN_CUSTOM_CODE_ENDPOINT =
-  'https://your-backend.example.com/ai/explain-custom-code';
+const DEFAULT_BACKEND_ENDPOINT = 'https://your-backend.example.com/ai/explain-custom-code';
+const DEFAULT_OLLAMA_ENDPOINT = 'http://127.0.0.1:11434';
+const DEFAULT_OLLAMA_MODEL = 'llama3.1:8b';
+
+function getExplainConfig() {
+  var ls = typeof localStorage !== 'undefined' ? localStorage : null;
+  var provider = (ls && ls.getItem('aiExplain_provider')) || 'auto';
+  var ollamaEndpoint = (ls && ls.getItem('aiExplain_ollamaEndpoint')) || DEFAULT_OLLAMA_ENDPOINT;
+  var ollamaModel = (ls && ls.getItem('aiExplain_ollamaModel')) || DEFAULT_OLLAMA_MODEL;
+  var backendEndpoint = (ls && ls.getItem('aiExplain_backendEndpoint')) || DEFAULT_BACKEND_ENDPOINT;
+  return {
+    provider: String(provider || 'auto').toLowerCase(),
+    ollamaEndpoint: String(ollamaEndpoint || '').replace(/\/+$/, ''),
+    ollamaModel: String(ollamaModel || '').trim(),
+    backendEndpoint: String(backendEndpoint || '').trim()
+  };
+}
+
+function buildExplainPrompt(code, metadata) {
+  var md = metadata || {};
+  return [
+    'You are a senior Adobe Tags/Launch implementation analyst.',
+    'Explain this custom code for non-developers in plain language.',
+    'Use exactly these sections:',
+    '1) Purpose',
+    '2) How it works (step-by-step)',
+    '3) Inputs used',
+    '4) Output / side effects',
+    '5) Risks / caveats',
+    '6) Suggested validation checklist',
+    '',
+    'Keep the explanation concise but meaningful. Mention unknowns when code is minified.',
+    '',
+    'Metadata:',
+    JSON.stringify(md, null, 2),
+    '',
+    'Code:',
+    code
+  ].join('\n');
+}
+
+async function explainViaOllama(code, metadata, cfg) {
+  var prompt = buildExplainPrompt(code, metadata);
+  var response = await fetch(cfg.ollamaEndpoint + '/api/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: cfg.ollamaModel,
+      prompt: prompt,
+      stream: false
+    })
+  });
+  if (!response.ok) throw new Error('Ollama HTTP ' + response.status);
+  var data = await response.json();
+  var text = data && typeof data.response === 'string' ? data.response.trim() : '';
+  if (!text) throw new Error('Ollama returned empty explanation');
+  return text;
+}
+
+async function explainViaBackend(code, metadata, cfg) {
+  if (!cfg.backendEndpoint || cfg.backendEndpoint.indexOf('your-backend.example.com') > -1) {
+    throw new Error('Backend endpoint not configured');
+  }
+  var response = await fetch(cfg.backendEndpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: code, metadata: metadata || {} })
+  });
+  if (!response.ok) throw new Error('Backend HTTP ' + response.status);
+  var data = await response.json();
+  if (data && typeof data.explanation === 'string' && data.explanation.trim()) {
+    return data.explanation.trim();
+  }
+  if (data && typeof data.message === 'string' && data.message.trim()) {
+    return data.message.trim();
+  }
+  throw new Error('Backend returned no usable explanation');
+}
 
 /**
- * Request an AI explanation for a piece of custom code.
- * @param {string} code - The code snippet to explain.
- * @param {Object} [metadata] - Optional context like name/type/extension.
- * @returns {Promise<string>} - Explanation text or a user-friendly error.
+ * Best-effort AI explanation.
+ * Returns null when no provider succeeds.
  */
-async function explainCustomCodeWithAI(code, metadata) {
-  if (!code || typeof code !== 'string') {
-    return 'No custom code available to explain.';
-  }
+async function getAIExplanationOrNull(code, metadata) {
+  if (!code || typeof code !== 'string' || !code.trim()) return null;
+  var cfg = getExplainConfig();
+  var tried = [];
 
-  if (!AI_EXPLAIN_CUSTOM_CODE_ENDPOINT) {
-    return 'AI explanation service is not configured.';
+  async function tryOllama() {
+    tried.push('ollama');
+    return explainViaOllama(code, metadata, cfg);
+  }
+  async function tryBackend() {
+    tried.push('backend');
+    return explainViaBackend(code, metadata, cfg);
   }
 
   try {
-    const response = await fetch(AI_EXPLAIN_CUSTOM_CODE_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        code,
-        metadata: metadata || {},
-      }),
-    });
-
-    if (!response.ok) {
-      return 'Unable to get AI explanation right now.';
+    if (cfg.provider === 'ollama') return await tryOllama();
+    if (cfg.provider === 'backend') return await tryBackend();
+    // auto mode
+    try {
+      return await tryOllama();
+    } catch (e1) {
+      console.warn('Ollama explain failed, trying backend:', e1);
+      return await tryBackend();
     }
-
-    const data = await response.json();
-
-    if (data && typeof data.explanation === 'string' && data.explanation.trim()) {
-      return data.explanation.trim();
-    }
-
-    // Fallback if backend shape is different
-    if (data && typeof data.message === 'string') {
-      return data.message.trim();
-    }
-
-    return 'AI did not return a usable explanation.';
-  } catch (error) {
-    console.error('Error while calling AI explanation endpoint:', error);
-    return 'An error occurred while requesting AI explanation.';
+  } catch (e) {
+    console.warn('AI explanation unavailable. Tried:', tried.join(', '), e);
+    return null;
   }
+}
+
+/**
+ * Backward-compatible helper used by existing pages.
+ * Returns user-friendly text even when AI is unavailable.
+ */
+async function explainCustomCodeWithAI(code, metadata) {
+  if (!code || typeof code !== 'string' || !code.trim()) {
+    return 'No custom code available to explain.';
+  }
+  var aiText = await getAIExplanationOrNull(code, metadata);
+  if (aiText) return aiText;
+  return 'AI explanation is unavailable. To use local open-source models, run Ollama and set `aiExplain_ollamaModel` (e.g., llama3.1:8b or deepseek-r1) in localStorage.';
 }
 

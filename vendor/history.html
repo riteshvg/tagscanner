@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TagScanner — AI Query History</title>
+  <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet" />
+  <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+  <style>
+    body { background:#f8f9fc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin:0; padding:20px; }
+
+    .page-header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid #e3e6f0;
+    }
+    .page-header h1 { font-size:16px; font-weight:700; color:#1a1a2e; margin:0; }
+    .user-chip {
+      display:flex; align-items:center; gap:7px;
+      background:#fff; border:1px solid #e3e6f0; border-radius:20px;
+      padding:4px 10px; font-size:12px; color:#374151;
+    }
+    .user-chip img { width:20px; height:20px; border-radius:50%; }
+
+    .filter-bar { display:flex; gap:8px; margin-bottom:16px; }
+    .filter-btn {
+      padding:5px 12px; font-size:12px; border:1px solid #d1d3e2; border-radius:20px;
+      background:#fff; color:#6b7280; cursor:pointer; transition:all 0.15s;
+    }
+    .filter-btn.active { background:#4e73df; color:#fff; border-color:#4e73df; }
+
+    .history-list { display:flex; flex-direction:column; gap:8px; }
+
+    .query-card {
+      background:#fff; border:1px solid #e3e6f0; border-radius:8px;
+      padding:12px 14px; transition:box-shadow 0.15s;
+    }
+    .query-card:hover { box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+
+    .query-card-header { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+    .query-type-badge {
+      font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px;
+      padding:2px 7px; border-radius:10px; flex-shrink:0;
+    }
+    .badge-scan    { background:#dbeafe; color:#1d4ed8; }
+    .badge-explain { background:#d1fae5; color:#065f46; }
+
+    .query-summary { font-size:13px; color:#374151; font-weight:500; flex:1; }
+    .query-time { font-size:11px; color:#9ca3af; flex-shrink:0; white-space:nowrap; }
+
+    .query-tokens { font-size:11px; color:#9ca3af; margin-top:4px; }
+
+    .btn-download {
+      background: none; border: 1px solid #e3e6f0; border-radius: 5px;
+      color: #9ca3af; cursor: pointer; font-size: 11px; padding: 3px 7px;
+      flex-shrink: 0; transition: all 0.15s; line-height: 1;
+    }
+    .btn-download:hover { border-color: #4e73df; color: #4e73df; background: #eff4ff; }
+    .btn-download:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .feedback-bar { display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:8px; border-top:1px solid #f3f4f6; }
+    .feedback-label { font-size:11px; color:#9ca3af; }
+    .feedback-btn {
+      padding:3px 10px; font-size:12px; border-radius:14px; border:1px solid #e3e6f0;
+      background:#fff; cursor:pointer; transition:all 0.15s; display:flex; align-items:center; gap:4px;
+    }
+    .feedback-btn:hover { border-color:#4e73df; color:#4e73df; }
+    .feedback-btn.voted-positive { background:#d1fae5; border-color:#10b981; color:#065f46; }
+    .feedback-btn.voted-negative { background:#fee2e2; border-color:#ef4444; color:#991b1b; }
+    .feedback-text-input {
+      flex:1; font-size:12px; border:1px solid #e3e6f0; border-radius:4px;
+      padding:3px 8px; outline:none; display:none;
+    }
+    .feedback-text-input:focus { border-color:#4e73df; }
+    .feedback-submit { display:none; }
+
+    .load-more-btn {
+      width:100%; padding:10px; background:#fff; border:1px dashed #d1d3e2;
+      border-radius:8px; font-size:13px; color:#6b7280; cursor:pointer; margin-top:8px;
+    }
+    .load-more-btn:hover { background:#f8f9fc; }
+
+    .empty-state { text-align:center; padding:40px 20px; color:#9ca3af; }
+    .empty-state i { font-size:32px; margin-bottom:12px; display:block; }
+
+    .sign-in-prompt {
+      text-align:center; padding:40px 20px;
+      background:#fff; border:1px solid #e3e6f0; border-radius:8px;
+    }
+    .sign-in-prompt i { font-size:32px; color:#4285f4; margin-bottom:12px; display:block; }
+    .go-to-summary {
+      display:inline-block; margin-top:12px; padding:8px 18px;
+      background:#4e73df; color:#fff; border-radius:6px; font-size:13px;
+      text-decoration:none; cursor:pointer; border:none;
+    }
+
+    #loading { text-align:center; padding:30px; color:#9ca3af; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <h1><i class="fas fa-history" style="color:#4e73df;margin-right:8px"></i>AI Query History</h1>
+    <div id="userChip" class="user-chip" style="display:none"></div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="scan">Scans</button>
+    <button class="filter-btn" data-filter="explain">Explains</button>
+  </div>
+
+  <div id="loading"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
+  <div id="historyList" class="history-list" style="display:none"></div>
+  <div id="emptyState" class="empty-state" style="display:none">
+    <i class="fas fa-search"></i>
+    No queries yet. Run a scan or explain code to see history here.
+  </div>
+  <div id="signInPrompt" class="sign-in-prompt" style="display:none">
+    <i class="fab fa-google"></i>
+    <div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:6px">Sign in required</div>
+    <div style="font-size:13px;color:#6b7280">Please sign in via the Summary page to view your query history.</div>
+    <button id="btnGoToSummary" class="go-to-summary">Go to Summary</button>
+  </div>
+
+  <button id="loadMoreBtn" class="load-more-btn" style="display:none">Load more</button>
+
+  <script src="jspdf.umd.min.js"></script>
+  <script src="jspdf.plugin.autotable.min.js"></script>
+  <script src="auth.js"></script>
+  <script src="history.js"></script>
+</body>
+</html>

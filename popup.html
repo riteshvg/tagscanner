@@ -300,7 +300,7 @@
             <div class="sidebar-brand-icon">
               <img src="./images/tagscanner_32x32.png" />
             </div>
-            <div class="sidebar-brand-text">TagScanner | 2.3.0</div>
+            <div class="sidebar-brand-text">TagScanner | 2.4</div>
           </div>
           <!-- <p class="sidebar-brand-description"> A tool to understand the structure and components of your Adobe Tags
             property!</p> -->
@@ -384,6 +384,35 @@
               </button>
             </a>
           </li>
+
+          <li class="mb-1">
+            <a id="history-menu-link" href="vendor/history.html" target="iframe2">
+              <button id="history-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Scan History">
+                <i class="px-1 fas fa-history"></i>
+                <span>Scan History</span>
+              </button>
+            </a>
+          </li>
+
+          <hr style="border-color:rgba(255,255,255,0.15);margin:8px 0" />
+
+          <li class="mb-1">
+            <a id="dashboard-menu-link" href="vendor/dashboard.html" target="iframe2">
+              <button id="dashboard-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Activity Dashboard">
+                <i class="px-1 fas fa-tachometer-alt"></i>
+                <span>Dashboard</span>
+              </button>
+            </a>
+          </li>
+
+          <hr id="signout-divider" style="border-color:rgba(255,255,255,0.15);margin:8px 0" />
+
+          <li class="mb-1">
+            <button id="signout-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Sign In" style="width:100%;color:#86efac">
+              <i class="px-1 fas fa-sign-in-alt"></i>
+              <span>Sign In</span>
+            </button>
+          </li>
         </ul>
       </div>
       <!-- End of Sidebar -->
@@ -417,6 +446,14 @@
                     <div class="h5 mb-0 font-weight-bold text-gray-800"></div>
                   </div>
                 </a>
+              </li>
+
+              <div id="topbar-user-divider" class="topbar-divider d-none d-sm-block" style="display:none!important"></div>
+              <li class="nav-item no-arrow d-flex align-items-center" id="topbar-user-info" style="display:none!important">
+                <div style="display:flex;align-items:center;gap:8px;padding:0 10px">
+                  <img id="topbar-user-avatar" src="" alt="" style="width:24px;height:24px;border-radius:50%;display:none">
+                  <span id="topbar-user-name" class="text-xs font-weight-bold text-gray-700" style="white-space:nowrap"></span>
+                </div>
               </li>
 
               <div class="topbar-divider d-none d-sm-block"></div>
@@ -584,6 +621,7 @@
   <!-- Custom scripts for all pages-->
   <script src="js/sb-admin-2.min.js"></script>
 
+  <script src="vendor/auth.js"></script>
   <script src="popup.js"></script>
   <script src="sidebar.js"></script>
   <!-- <script src="sform.js"></script> -->

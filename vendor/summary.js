@@ -1127,14 +1127,12 @@ function saveCachedAIReport(report, tokens, costUsd) {
   } catch (e) {}
 }
 
-function getBedrockConfig() {
-  try {
-    var raw = localStorage.getItem('tagscanner_bedrock_config');
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) { return null; }
-}
-
 function getUserInfo() {
+  // Prefer OAuth session
+  if (window.TagScannerAuth && window.TagScannerAuth.isSignedIn()) {
+    return window.TagScannerAuth.getSession();
+  }
+  // Legacy fallback
   try {
     var raw = localStorage.getItem('tagscanner_user');
     return raw ? JSON.parse(raw) : null;
@@ -1150,19 +1148,6 @@ function showAIModal(id) {
 function hideAIModal(id) {
   var el = document.getElementById(id);
   if (el) el.classList.remove('show');
-}
-
-function showBedrockSettingsModal() {
-  var cfg = getBedrockConfig();
-  if (cfg) {
-    document.getElementById('inputAccessKeyId').value = cfg.accessKeyId    || '';
-    document.getElementById('inputSecretKey').value   = cfg.secretAccessKey || '';
-    var rSel = document.getElementById('inputRegion');
-    if (cfg.region) rSel.value = cfg.region;
-    var mSel = document.getElementById('inputModelId');
-    if (cfg.modelId) mSel.value = cfg.modelId;
-  }
-  showAIModal('bedrockSettingsModal');
 }
 
 // ── State helpers ─────────────────────────────────────────────────────────
@@ -1188,105 +1173,77 @@ function escAIHtml(s) {
 function initAIScanSection(healthData) {
   _aiHealthData = healthData;
   var cached = loadCachedAIReport();
-  var config = getBedrockConfig();
 
-  // Settings button
-  document.getElementById('btnBedrockSettings').addEventListener('click', showBedrockSettingsModal);
+  // Clear legacy email-only auth if no OAuth session exists
+  if (window.TagScannerAuth && !window.TagScannerAuth.isSignedIn()) {
+    try { localStorage.removeItem('tagscanner_user'); } catch (e) {}
+  }
 
-  // Bedrock settings modal
-  document.getElementById('bedrockSettingsClose').addEventListener('click', function() { hideAIModal('bedrockSettingsModal'); });
-  document.getElementById('bedrockSettingsCancel').addEventListener('click', function() { hideAIModal('bedrockSettingsModal'); });
-  document.getElementById('bedrockSettingsSave').addEventListener('click', function() { saveBedrockSettings(); });
-
-  // Email gate modal
-  document.getElementById('emailGateClose').addEventListener('click', function() { hideAIModal('emailGateModal'); });
-  document.getElementById('emailGateCancel').addEventListener('click', function() { hideAIModal('emailGateModal'); });
-  document.getElementById('emailGateSubmit').addEventListener('click', submitEmailGate);
+  // Google Sign-In modal
+  document.getElementById('googleSignInClose').addEventListener('click', function() { hideAIModal('googleSignInModal'); });
+  document.getElementById('btnGoogleSignIn').addEventListener('click', handleGoogleSignIn);
 
   // Scan button
   document.getElementById('btnRunAIScan').addEventListener('click', handleScanClick);
 
-  // Always show scan prompt — no cache enforcement
+  // Render user badge if already signed in
+  renderUserBadge();
+
+  // Always show scan prompt
   showAIState('prompt');
+}
+
+function renderUserBadge() {
+  // User info is now shown in the popup topbar; nothing to render here.
 }
 
 // ── Scan click handler ────────────────────────────────────────────────────
 
 function handleScanClick() {
-  var user   = getUserInfo();
-  var config = getBedrockConfig();
-  if (!user || !user.email) {
-    showAIModal('emailGateModal');
+  // Always require a Google OAuth session — ignore legacy localStorage email
+  var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
+  if (!session) {
+    showAIModal('googleSignInModal');
     return;
   }
-  if (!config || (!config.proxyUrl && !config.accessKeyId)) {
-    showBedrockSettingsModal();
-    return;
-  }
-  runAIScan(user, config);
+  runAIScan(session, {});
 }
 
-// ── Form submissions ──────────────────────────────────────────────────────
+async function handleGoogleSignIn() {
+  var btn = document.getElementById('btnGoogleSignIn');
+  var errEl = document.getElementById('googleSignInError');
+  if (!btn) return;
 
-function submitEmailGate() {
-  var emailEl = document.getElementById('inputEmail');
-  var email = (emailEl.value || '').trim();
-  if (!email || email.indexOf('@') === -1) {
-    emailEl.style.borderColor = '#ef4444';
-    emailEl.focus();
-    return;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:8px"></i>Signing in…';
+  if (errEl) errEl.style.display = 'none';
+
+  try {
+    var session = await window.TagScannerAuth.signInWithGoogle();
+    hideAIModal('googleSignInModal');
+    renderUserBadge();
+    // Proceed directly to scan
+    runAIScan(session, {});
+  } catch (err) {
+    if (errEl) {
+      errEl.textContent = err.message || 'Sign-in failed. Please try again.';
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M47.53 24.56c0-1.6-.14-3.14-.4-4.62H24v8.73h13.2c-.57 3.03-2.3 5.59-4.9 7.32v6.08h7.93c4.64-4.28 7.3-10.58 7.3-17.51z"/><path fill="#34A853" d="M24 48c6.66 0 12.24-2.21 16.32-5.98l-7.93-6.08c-2.2 1.47-5.01 2.34-8.39 2.34-6.45 0-11.91-4.35-13.86-10.21H2.08v6.28C6.14 42.62 14.43 48 24 48z"/><path fill="#FBBC05" d="M10.14 28.07A14.42 14.42 0 0 1 9.6 24c0-1.41.24-2.78.54-4.07v-6.28H2.08A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.08 10.35l8.06-6.28z"/><path fill="#EA4335" d="M24 9.52c3.63 0 6.88 1.25 9.44 3.7l7.08-7.08C36.23 2.19 30.65 0 24 0 14.43 0 6.14 5.38 2.08 13.65l8.06 6.28C12.09 13.87 17.55 9.52 24 9.52z"/></svg> Continue with Google';
   }
-  emailEl.style.borderColor = '';
-  var user = {
-    email:   email,
-    role:    document.getElementById('inputRole').value || '',
-    concern: document.getElementById('inputConcern').value || ''
-  };
-  try { localStorage.setItem('tagscanner_user', JSON.stringify(user)); } catch (e) {}
-  hideAIModal('emailGateModal');
-
-  var config = getBedrockConfig();
-  if (!config || (!config.proxyUrl && !config.accessKeyId)) {
-    showBedrockSettingsModal();
-  } else {
-    runAIScan(user, config);
-  }
-}
-
-function saveBedrockSettings() {
-  var keyId  = (document.getElementById('inputAccessKeyId').value || '').trim();
-  var secret = (document.getElementById('inputSecretKey').value || '').trim();
-
-  // Own credentials: both must be provided together, or both left blank (use shared proxy)
-  if ((keyId && !secret) || (!keyId && secret)) {
-    if (!keyId)   document.getElementById('inputAccessKeyId').style.borderColor = '#ef4444';
-    if (!secret)  document.getElementById('inputSecretKey').style.borderColor   = '#ef4444';
-    return;
-  }
-  document.getElementById('inputAccessKeyId').style.borderColor = '';
-  document.getElementById('inputSecretKey').style.borderColor   = '';
-
-  var config = {
-    accessKeyId:     keyId   || null,
-    secretAccessKey: secret  || null,
-    region:      document.getElementById('inputRegion').value  || 'us-east-1',
-    modelId:     document.getElementById('inputModelId').value || 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
-    maxTokens:   1500,
-    temperature: 0.3
-  };
-  try { localStorage.setItem('tagscanner_bedrock_config', JSON.stringify(config)); } catch (e) {}
-  hideAIModal('bedrockSettingsModal');
-
-  var user = getUserInfo();
-  if (user && user.email) runAIScan(user, config);
 }
 
 // ── Core scan execution ───────────────────────────────────────────────────
 
 async function runAIScan(user, config) {
   showAIState('scanning');
-  // Attach email to config so proxy can validate it
-  var effectiveConfig = Object.assign({}, config, { email: user.email || '' });
+  // Pass sessionToken (OAuth) or fall back to email
+  var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
+  var effectiveConfig = Object.assign({}, config, {
+    email:        user.email || '',
+    sessionToken: session ? session.sessionToken : null
+  });
   try {
     var payload = window.TagScannerHealthPayload.build({
       dataElements:       _aiHealthData.dataElements,
@@ -1304,13 +1261,17 @@ async function runAIScan(user, config) {
       concern: user.concern || ''
     };
     var result = await window.TagScannerBedrock.analyzeProperty(payload, userContext, effectiveConfig);
+    if (result.queryId) {
+      // Store queryId so feedback button can reference it
+      try { localStorage.setItem('tagscanner_last_query_id', result.queryId); } catch(e) {}
+    }
     saveCachedAIReport(result.report, result.tokens, result.cost_usd);
     renderHealthReport(result.report, result.tokens, result.cost_usd, false, Date.now());
     showAIState('report');
   } catch (err) {
     console.error('AI scan failed:', err);
     showAIState('prompt');
-    setAIScanError('Scan failed: ' + (err.message || 'Unknown error') + '. Check your AWS credentials and region.');
+    setAIScanError('Scan failed: ' + (err.message || 'Unknown error'));
   }
 }
 
@@ -1498,13 +1459,7 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts) {
     container.appendChild(footerRow);
     document.getElementById('btnRescan').addEventListener('click', function() {
       localStorage.removeItem(getAICacheKey());
-      var cfg = getBedrockConfig();
-      var usr = getUserInfo();
-      if (cfg && cfg.accessKeyId && usr && usr.email) {
-        runAIScan(usr, cfg);
-      } else {
-        showAIState('prompt');
-      }
+      showAIState('prompt');
     });
   }
 }

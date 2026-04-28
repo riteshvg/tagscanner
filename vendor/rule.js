@@ -3118,23 +3118,54 @@ function showCodeModal(title, code) {
         var origHtml = explainBtn.innerHTML;
         explainBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing\u2026';
         try {
-          // Try Bedrock first (credentials stored from Summary page)
-          var bedrockCfg = null;
-          try { bedrockCfg = JSON.parse(localStorage.getItem('tagscanner_bedrock_config') || 'null'); } catch(e) {}
-          if ((bedrockCfg && (bedrockCfg.proxyUrl || bedrockCfg.accessKeyId)) &&
-              window.TagScannerBedrock && window.TagScannerBedrock.explainCode) {
-            var userInfo = null;
-            try { userInfo = JSON.parse(localStorage.getItem('tagscanner_user') || 'null'); } catch(e) {}
-            var explainCfg = Object.assign({}, bedrockCfg, { email: (userInfo && userInfo.email) || '' });
+          // Try Bedrock proxy — require OAuth session
+          var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
+          if (!session) {
+            explainBox.innerHTML = [
+              '<div style="padding:18px;text-align:center;background:#f8f9fc;border-radius:8px;border:1px solid #e5e7eb">',
+              '<div style="font-size:15px;font-weight:600;color:#1f2937;margin-bottom:6px"><i class="fas fa-lock" style="margin-right:7px;color:#6b7280"></i>Sign in to use AI Explain</div>',
+              '<div style="font-size:12px;color:#6b7280;margin-bottom:14px">A free account is required to use AI-powered features.</div>',
+              '<button class="rule-explain-signin-btn" style="display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:#fff;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:500;color:#374151;cursor:pointer">',
+              '<svg width="16" height="16" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"/></svg>',
+              'Continue with Google</button>',
+              '<div class="rule-explain-signin-error" style="display:none;margin-top:10px;font-size:12px;color:#ef4444"></div>',
+              '</div>'
+            ].join('');
+            explainBox.style.display = 'block';
+            explainBtn.disabled = false;
+            explainBtn.innerHTML = origHtml;
+            var signinBtn = explainBox.querySelector('.rule-explain-signin-btn');
+            signinBtn.addEventListener('click', async function () {
+              signinBtn.disabled = true;
+              signinBtn.textContent = 'Signing in\u2026';
+              try {
+                session = await window.TagScannerAuth.signInWithGoogle();
+                explainBox.innerHTML = '';
+                explainBox.style.display = 'none';
+                explainBtn.click();
+              } catch (authErr) {
+                var errDiv = explainBox.querySelector('.rule-explain-signin-error');
+                if (errDiv) { errDiv.style.display = 'block'; errDiv.textContent = authErr.message || 'Sign-in failed. Please try again.'; }
+                signinBtn.disabled = false;
+                signinBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"/></svg> Continue with Google';
+              }
+            });
+            return;
+          }
+          if (window.TagScannerBedrock && window.TagScannerBedrock.explainCode) {
             try {
               var brResult = await window.TagScannerBedrock.explainCode(
-                rawCode, { name: title || '', type: 'rule' }, explainCfg
+                rawCode, { name: title || '', type: 'rule' },
+                { email: session.email, sessionToken: session.sessionToken }
               );
               explainBox.innerHTML = window.TagScannerBedrock.renderBedrockCodeExplanation(brResult.explanation);
               explainBox.style.display = 'block';
               return;
             } catch(bedrockErr) {
               console.warn('Bedrock explain failed, falling back to static analysis:', bedrockErr);
+              explainBox.innerHTML = '<div style="padding:8px;color:#ef4444;font-size:12px"><i class="fas fa-exclamation-circle" style="margin-right:5px"></i>' + (bedrockErr.message || 'AI explain failed') + '</div>';
+              explainBox.style.display = 'block';
+              return;
             }
           }
           // Fallback: Ollama / backend / static analysis

@@ -1,29 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Sandbox for loading unminified js</title>  
+  <title>Sandbox for loading unminified js</title>
 </head>
-
 <body>
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const script_URL = urlParams.get("scriptURL");
-    
-        if (script_URL) {
-            fetch(script_URL)
-                .then(response => response.text())
-                .then(jsCode => {
-                    jsCode = jsCode.replace("console.log", "alert"); // Modify the script
-    
-                    // Send the modified script back to the parent
-                    // console.log(window._satellite._container)
-                    window.parent.postMessage({ type: "INJECT_SCRIPT", payload: jsCode }, "*");
-                })
-                .catch(error => console.error("Script fetch failed:", error));
-        } else {
-            console.warn("No scriptURL provided.");
-        }
-    </script>
-    
+  <script src="satellite_sandbox.js"></script>
 </body>
 </html>

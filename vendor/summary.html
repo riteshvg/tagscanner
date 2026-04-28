@@ -123,17 +123,6 @@
         font-size: 11.5px;
         color: #aaa;
       }
-      /* Settings link */
-      .ai-settings-link {
-        font-size: 12px;
-        color: #6b7280;
-        cursor: pointer;
-        background: none;
-        border: none;
-        padding: 0;
-        text-decoration: underline;
-      }
-      .ai-settings-link:hover { color: #374151; }
       /* Scanning spinner */
       .ai-scanning {
         text-align: center;
@@ -620,12 +609,9 @@
     <div class="container-fluid" style="margin-bottom:20px">
       <div class="ai-section">
         <div class="ai-section-header">
-          <h5><i class="fas fa-brain"></i> AI Property Health Analysis
+          <h5><i class="fas fa-brain"></i> Summary. Powered by AI
             <span style="margin-left:10px;font-size:10px;font-weight:600;background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;letter-spacing:0.3px;vertical-align:middle">LIMITED PREVIEW</span>
           </h5>
-          <button class="ai-settings-link" id="btnBedrockSettings">
-            <i class="fas fa-cog" style="margin-right:4px"></i>Settings
-          </button>
         </div>
         <div class="ai-section-body" id="aiSectionBody">
           <!-- State 1: Scan prompt -->
@@ -638,6 +624,10 @@
             <div style="margin-top:10px;font-size:11px;color:#f59e0b;font-weight:600">
               <i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>
               Limited preview &mdash; powered by TagScanner&rsquo;s shared API. Access may be revoked at any time.
+            </div>
+            <div style="margin-top:12px;font-size:11px;color:#6b7280;background:#f8f9fc;border:1px solid #e3e6f0;border-left:3px solid #9ca3af;border-radius:0 6px 6px 0;padding:8px 12px;max-width:500px;margin-left:auto;margin-right:auto;text-align:left">
+              <i class="fas fa-info-circle" style="margin-right:5px;color:#9ca3af"></i>
+              AI-generated results are based on large language models and may contain inaccuracies or hallucinations. Always validate recommendations against your actual implementation before making changes.
             </div>
           </div>
           <!-- State 2: Scanning spinner -->
@@ -688,95 +678,26 @@
       <ol id="print-recommendations"></ol>
     </div>
 
-    <!-- Email Gate Modal -->
-    <div class="ts-modal-overlay" id="emailGateModal">
-      <div class="ts-modal">
+    <!-- Google Sign-In Modal -->
+    <div class="ts-modal-overlay" id="googleSignInModal">
+      <div class="ts-modal" style="max-width:380px">
         <div class="ts-modal-header">
-          <h3><i class="fas fa-envelope"></i> One quick step before your scan</h3>
-          <button class="ts-modal-close" id="emailGateClose">&times;</button>
+          <h3><i class="fab fa-google" style="color:#4285f4"></i> Sign in to continue</h3>
+          <button class="ts-modal-close" id="googleSignInClose">&times;</button>
         </div>
-        <div class="ts-modal-body">
-          <p style="font-size:13px;color:#6b7280;margin-bottom:16px;">We collect your email to reach out about TagScanner quality and improvements. No spam, ever.</p>
-          <div class="ts-form-group">
-            <label for="inputEmail">Work email <span style="color:#ef4444">*</span></label>
-            <input type="email" id="inputEmail" placeholder="you@company.com" autocomplete="email" />
-          </div>
-          <div class="ts-form-group">
-            <label for="inputRole">Your role <span class="ts-optional">(optional)</span></label>
-            <select id="inputRole">
-              <option value="">Select your role&hellip;</option>
-              <option value="developer">Developer / Engineer</option>
-              <option value="analyst">Analytics / Data</option>
-              <option value="marketer">Marketer / Campaign</option>
-              <option value="consultant">Consultant / Agency</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div class="ts-form-group">
-            <label for="inputConcern">Main concern for this property <span class="ts-optional">(optional)</span></label>
-            <select id="inputConcern">
-              <option value="">Any / General health check</option>
-              <option value="performance">Page load performance</option>
-              <option value="bloat">Unused component cleanup</option>
-              <option value="custom_code">Custom code quality</option>
-              <option value="data_quality">Data quality / accuracy</option>
-              <option value="maintenance">Maintainability</option>
-            </select>
-          </div>
-        </div>
-        <div class="ts-modal-footer">
-          <button class="ts-btn-secondary" id="emailGateCancel">Cancel</button>
-          <button class="ts-btn-primary" id="emailGateSubmit"><i class="fas fa-magic" style="margin-right:6px"></i>Run Scan</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Bedrock Settings Modal -->
-    <div class="ts-modal-overlay" id="bedrockSettingsModal">
-      <div class="ts-modal">
-        <div class="ts-modal-header">
-          <h3><i class="fas fa-key"></i> AWS Bedrock Configuration</h3>
-          <button class="ts-modal-close" id="bedrockSettingsClose">&times;</button>
-        </div>
-        <div class="ts-modal-body">
-          <div class="ts-credentials-warning">
+        <div class="ts-modal-body" style="text-align:center;padding:24px 20px">
+          <div style="font-size:40px;margin-bottom:12px">🔍</div>
+          <p style="font-size:14px;color:#374151;font-weight:600;margin-bottom:6px">TagScanner AI Preview</p>
+          <p style="font-size:12px;color:#6b7280;margin-bottom:20px;line-height:1.5">Sign in with Google to run AI-powered health scans and get code explanations. Your usage is tracked to improve TagScanner.</p>
+          <div class="ts-credentials-warning" style="margin-bottom:20px">
             <i class="fas fa-exclamation-triangle"></i>
-            This is a limited-time preview powered by TagScanner&rsquo;s shared API. Access may be revoked at any time.
+            This is a <strong>Limited Preview</strong> — powered by TagScanner&rsquo;s shared API. Access may be revoked at any time.
           </div>
-          <div class="ts-form-group">
-            <label for="inputAccessKeyId">AWS Access Key ID <span class="ts-optional">(own credentials — optional)</span></label>
-            <input type="text" id="inputAccessKeyId" placeholder="Leave blank to use TagScanner shared API" autocomplete="off" />
-          </div>
-          <div class="ts-form-group">
-            <label for="inputSecretKey">AWS Secret Access Key <span class="ts-optional">(own credentials — optional)</span></label>
-            <input type="password" id="inputSecretKey" placeholder="Leave blank to use TagScanner shared API" autocomplete="off" />
-          </div>
-          <div class="ts-form-group">
-            <label for="inputRegion">AWS Region</label>
-            <select id="inputRegion">
-              <option value="us-east-1">us-east-1 (N. Virginia)</option>
-              <option value="us-west-2">us-west-2 (Oregon)</option>
-              <option value="eu-west-1">eu-west-1 (Ireland)</option>
-              <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
-              <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
-            </select>
-          </div>
-          <div class="ts-form-group">
-            <label for="inputModelId">AI Model</label>
-            <select id="inputModelId">
-              <option value="us.anthropic.claude-3-5-haiku-20241022-v1:0">Claude 3.5 Haiku — cross-region (fast · ~$0.001/scan)</option>
-              <option value="anthropic.claude-3-5-haiku-20241022-v1:0">Claude 3.5 Haiku — direct (fast · ~$0.001/scan)</option>
-              <option value="us.anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2 — cross-region (~$0.004/scan)</option>
-              <option value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2 — direct (~$0.004/scan)</option>
-              <option value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku — direct (cheapest · ~$0.0003/scan)</option>
-              <option value="amazon.nova-pro-v1:0">Amazon Nova Pro (~$0.002/scan)</option>
-              <option value="amazon.nova-lite-v1:0">Amazon Nova Lite (cheapest · ~$0.0001/scan)</option>
-            </select>
-          </div>
-        </div>
-        <div class="ts-modal-footer">
-          <button class="ts-btn-secondary" id="bedrockSettingsCancel">Cancel</button>
-          <button class="ts-btn-primary" id="bedrockSettingsSave"><i class="fas fa-save" style="margin-right:6px"></i>Save &amp; Continue</button>
+          <button id="btnGoogleSignIn" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px 16px;background:#fff;border:1px solid #d1d3e2;border-radius:6px;font-size:14px;font-weight:500;color:#374151;cursor:pointer;transition:background 0.15s">
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M47.53 24.56c0-1.6-.14-3.14-.4-4.62H24v8.73h13.2c-.57 3.03-2.3 5.59-4.9 7.32v6.08h7.93c4.64-4.28 7.3-10.58 7.3-17.51z"/><path fill="#34A853" d="M24 48c6.66 0 12.24-2.21 16.32-5.98l-7.93-6.08c-2.2 1.47-5.01 2.34-8.39 2.34-6.45 0-11.91-4.35-13.86-10.21H2.08v6.28C6.14 42.62 14.43 48 24 48z"/><path fill="#FBBC05" d="M10.14 28.07A14.42 14.42 0 0 1 9.6 24c0-1.41.24-2.78.54-4.07v-6.28H2.08A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.08 10.35l8.06-6.28z"/><path fill="#EA4335" d="M24 9.52c3.63 0 6.88 1.25 9.44 3.7l7.08-7.08C36.23 2.19 30.65 0 24 0 14.43 0 6.14 5.38 2.08 13.65l8.06 6.28C12.09 13.87 17.55 9.52 24 9.52z"/></svg>
+            Continue with Google
+          </button>
+          <div id="googleSignInError" style="display:none;margin-top:12px;font-size:12px;color:#ef4444;padding:8px;background:#fef2f2;border-radius:4px"></div>
         </div>
       </div>
     </div>
@@ -784,6 +705,7 @@
     <script src="jquery-3.2.1.min.js"></script>
     <script src="jquery.tablesorter.min.js"></script>
     <script src="data-element-rule-refs.js"></script>
+    <script src="auth.js"></script>
     <script src="bedrockClient.js"></script>
     <script src="healthPayload.js"></script>
     <script src="summary.js"></script>

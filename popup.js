@@ -66,16 +66,10 @@ var satellite = {};
       satellite_sandbox.style.display = 'none';
       document.body.appendChild(satellite_sandbox);
 
-      // Listen for messages from the iframe
+      // Listen for messages from the iframe — validate by source reference,
+      // not origin, because sandboxed iframes always have origin "null".
       window.addEventListener('message', (event) => {
-        if (
-          event.origin !== 'null' &&
-          event.origin !== chrome.runtime.getURL('').slice(0, -1)
-        ) {
-          console.warn(
-            'Received message from unauthorized origin:',
-            event.origin
-          );
+        if (event.source !== satellite_sandbox.contentWindow) {
           return;
         }
 
@@ -504,7 +498,7 @@ function toTable(headers, data) {
 if (window.location.href.indexOf('page_url=') > -1) {
   sessionStorage.setItem('launch_page_url', window.location.href);
 }
-sessionStorage.setItem('tagScanner_version', '2.3.0');
+sessionStorage.setItem('tagScanner_version', '2.4.0');
 // document.getElementById('feed_back_form').addEventListener('click', newwindow);
 // function newwindow() {
 //   window.open(

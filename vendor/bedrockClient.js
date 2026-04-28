@@ -293,6 +293,7 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
     if (TS_PROXY_URL && !TS_PROXY_URL.includes('YOUR_LAMBDA')) {
       const data = await callProxy(TS_PROXY_URL, {
         type: 'explain',
+        sessionToken: config.sessionToken || null,
         email: config.email || '',
         code: code,
         metadata: metadata || {},
@@ -301,6 +302,7 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
         explanation: data.explanation,
         inputTokens: data.tokens?.input || 0,
         outputTokens: data.tokens?.output || 0,
+        queryId: data.queryId || null,
       };
     }
     // Direct Bedrock mode
@@ -397,20 +399,12 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
           .map((src) => {
             const color = kindColors[src.kind] || '#6b7280';
             return (
-              '<div class="de-flow-item" style="border-left-color:' +
-              color +
-              '">' +
-              '<span class="de-flow-label">' +
-              esc(src.kind || '') +
-              '</span>' +
-              '<span class="de-flow-type">' +
-              esc(src.path || '') +
-              '</span>' +
-              (src.description
-                ? '<div style="font-size:11.5px;color:#6b7280;margin-top:2px">' +
-                  esc(src.description) +
-                  '</div>'
-                : '') +
+              '<div class="de-flow-item" style="border-left-color:' + color + '">' +
+              '<div class="de-flow-item-header">' +
+              '<span class="de-flow-label" style="margin-bottom:0;flex-shrink:0">' + esc(src.kind || '') + '</span>' +
+              '<code style="font-family:\'SFMono-Regular\',Consolas,monospace;font-size:11px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">' + esc(src.path || '') + '</code>' +
+              '</div>' +
+              (src.description ? '<div class="de-flow-desc">' + esc(src.description) + '</div>' : '') +
               '</div>'
             );
           })
@@ -419,12 +413,12 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
 
       const retItem =
         '<div class="de-flow-item" style="border-left-color:#4e73df">' +
-        '<span class="de-flow-label">' +
+        '<div class="de-flow-item-header">' +
+        '<span class="de-flow-label" style="margin-bottom:0;font-size:11px;font-weight:700;color:#4e73df;background:#e8f0fe;padding:1px 6px;border-radius:3px;text-transform:uppercase">' +
         esc(json.return_type || 'unknown') +
         '</span>' +
-        '<span class="de-flow-type" style="white-space:normal">' +
-        esc(json.return_description || '') +
-        '</span>' +
+        '</div>' +
+        '<div class="de-flow-desc">' + esc(json.return_description || '') + '</div>' +
         '</div>';
 
       parts.push(
@@ -510,6 +504,7 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
     if (TS_PROXY_URL && !TS_PROXY_URL.includes('YOUR_LAMBDA')) {
       const data = await callProxy(TS_PROXY_URL, {
         type: 'scan',
+        sessionToken: config.sessionToken || null,
         email: config.email || '',
         payload: healthPayload,
         userContext: userContext || {},
@@ -517,7 +512,7 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
       if (!data.report) {
         throw new Error('Proxy response missing report. Got: ' + JSON.stringify(data).slice(0, 300));
       }
-      return { report: data.report, tokens: data.tokens || {}, cost_usd: 0 };
+      return { report: data.report, tokens: data.tokens || {}, cost_usd: 0, queryId: data.queryId || null };
     }
     // Direct Bedrock mode
     const userMessage = JSON.stringify(

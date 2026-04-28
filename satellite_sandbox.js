@@ -1,20 +1,18 @@
-const urlParams = new URLSearchParams(window.location.search);
-console.log(urlParams)
-        const script_URL = urlParams.get("scriptURL");
+(function () {
+  var urlParams  = new URLSearchParams(window.location.search);
+  var script_URL = urlParams.get('scriptURL');
 
-        if (script_URL) {
-            fetch(script_URL)
-                .then(response => response.text())
-                .then(jsCode => {
-                    // 🔹 Modify the script content here
-                    jsCode = jsCode.replace("console.log", "alert"); // Example modification
+  if (!script_URL) {
+    console.warn('satellite_sandbox: no scriptURL provided.');
+    return;
+  }
 
-                    // 🔹 Execute the modified script
-                    const script = document.createElement("script");
-                    script.textContent = jsCode;
-                    document.body.appendChild(script);
-                })
-                .catch(error => console.error("Script fetch failed:", error));
-        } else {
-            console.warn("No scriptURL provided.");
-        }
+  fetch(script_URL)
+    .then(function (response) { return response.text(); })
+    .then(function (jsCode) {
+      window.parent.postMessage({ type: 'INJECT_SCRIPT', payload: jsCode }, '*');
+    })
+    .catch(function (error) {
+      console.error('satellite_sandbox: fetch failed:', error);
+    });
+})();

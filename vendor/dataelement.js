@@ -1326,23 +1326,53 @@ if (de_details_node) {
           var originalHtml = explainBtn.innerHTML;
           explainBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Explaining...';
           try {
-            // Try Bedrock first (credentials stored from Summary page)
-            var bedrockCfg = null;
-            try { bedrockCfg = JSON.parse(localStorage.getItem('tagscanner_bedrock_config') || 'null'); } catch(e) {}
-            if ((bedrockCfg && (bedrockCfg.proxyUrl || bedrockCfg.accessKeyId)) &&
-                window.TagScannerBedrock && window.TagScannerBedrock.explainCode) {
-              var userInfo = null;
-              try { userInfo = JSON.parse(localStorage.getItem('tagscanner_user') || 'null'); } catch(e) {}
-              var explainCfg = Object.assign({}, bedrockCfg, { email: (userInfo && userInfo.email) || '' });
+            var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
+            if (window.TagScannerBedrock && window.TagScannerBedrock.explainCode) {
+              if (!session) {
+                // Show inline sign-in gate
+                explainBox.innerHTML =
+                  '<div style="padding:18px;text-align:center;background:#f8f9fc;border-radius:8px;border:1px solid #e3e6f0">' +
+                  '<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">Sign in to use AI Explain</div>' +
+                  '<div style="font-size:12px;color:#6b7280;margin-bottom:14px">AI-powered code explanation requires a Google account.</div>' +
+                  '<button class="de-explain-signin-btn" style="display:flex;align-items:center;gap:8px;margin:0 auto;padding:8px 16px;background:#fff;border:1px solid #d1d3e2;border-radius:6px;font-size:13px;font-weight:500;color:#374151;cursor:pointer">' +
+                  '<svg width="16" height="16" viewBox="0 0 48 48"><path fill="#4285F4" d="M47.53 24.56c0-1.6-.14-3.14-.4-4.62H24v8.73h13.2c-.57 3.03-2.3 5.59-4.9 7.32v6.08h7.93c4.64-4.28 7.3-10.58 7.3-17.51z"/><path fill="#34A853" d="M24 48c6.66 0 12.24-2.21 16.32-5.98l-7.93-6.08c-2.2 1.47-5.01 2.34-8.39 2.34-6.45 0-11.91-4.35-13.86-10.21H2.08v6.28C6.14 42.62 14.43 48 24 48z"/><path fill="#FBBC05" d="M10.14 28.07A14.42 14.42 0 0 1 9.6 24c0-1.41.24-2.78.54-4.07v-6.28H2.08A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.08 10.35l8.06-6.28z"/><path fill="#EA4335" d="M24 9.52c3.63 0 6.88 1.25 9.44 3.7l7.08-7.08C36.23 2.19 30.65 0 24 0 14.43 0 6.14 5.38 2.08 13.65l8.06 6.28C12.09 13.87 17.55 9.52 24 9.52z"/></svg>' +
+                  'Continue with Google</button>' +
+                  '<div class="de-explain-signin-err" style="display:none;margin-top:8px;font-size:11px;color:#ef4444"></div>' +
+                  '</div>';
+                explainBox.style.display = 'block';
+                var signinBtn = explainBox.querySelector('.de-explain-signin-btn');
+                var signinErr = explainBox.querySelector('.de-explain-signin-err');
+                signinBtn.addEventListener('click', async function () {
+                  signinBtn.disabled = true;
+                  signinBtn.textContent = 'Signing in…';
+                  signinErr.style.display = 'none';
+                  try {
+                    session = await window.TagScannerAuth.signInWithGoogle();
+                    explainBox.innerHTML = '';
+                    explainBox.style.display = 'none';
+                    explainBtn.click(); // re-trigger explain now signed in
+                  } catch (authErr) {
+                    signinErr.textContent = authErr.message || 'Sign-in failed. Please try again.';
+                    signinErr.style.display = 'block';
+                    signinBtn.disabled = false;
+                    signinBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 48 48"><path fill="#4285F4" d="M47.53 24.56c0-1.6-.14-3.14-.4-4.62H24v8.73h13.2c-.57 3.03-2.3 5.59-4.9 7.32v6.08h7.93c4.64-4.28 7.3-10.58 7.3-17.51z"/><path fill="#34A853" d="M24 48c6.66 0 12.24-2.21 16.32-5.98l-7.93-6.08c-2.2 1.47-5.01 2.34-8.39 2.34-6.45 0-11.91-4.35-13.86-10.21H2.08v6.28C6.14 42.62 14.43 48 24 48z"/><path fill="#FBBC05" d="M10.14 28.07A14.42 14.42 0 0 1 9.6 24c0-1.41.24-2.78.54-4.07v-6.28H2.08A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.08 10.35l8.06-6.28z"/><path fill="#EA4335" d="M24 9.52c3.63 0 6.88 1.25 9.44 3.7l7.08-7.08C36.23 2.19 30.65 0 24 0 14.43 0 6.14 5.38 2.08 13.65l8.06 6.28C12.09 13.87 17.55 9.52 24 9.52z"/></svg> Continue with Google';
+                  }
+                });
+                return;
+              }
               try {
                 var brResult = await window.TagScannerBedrock.explainCode(
-                  rawCode, { name: title || '', type: 'dataElement' }, explainCfg
+                  rawCode, { name: title || '', type: 'dataElement' },
+                  { email: session.email, sessionToken: session.sessionToken }
                 );
                 explainBox.innerHTML = window.TagScannerBedrock.renderBedrockCodeExplanation(brResult.explanation);
                 explainBox.style.display = 'block';
                 return;
               } catch(bedrockErr) {
                 console.warn('Bedrock explain failed, falling back to static analysis:', bedrockErr);
+                explainBox.innerHTML = '<div style="padding:8px;color:#ef4444;font-size:12px"><i class="fas fa-exclamation-circle" style="margin-right:5px"></i>' + (bedrockErr.message || 'AI explain failed') + '</div>';
+                explainBox.style.display = 'block';
+                return;
               }
             }
             // Fallback: Ollama / backend / static analysis

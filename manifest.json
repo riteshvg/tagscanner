@@ -1,9 +1,10 @@
 {
   "name": "TagScanner",
   "description": "Scan your Adobe Tag property and export your library output with custom code.",
-  "version": "2.3.0",
+  "version": "2.4.0",
+  "homepage_url": "https://github.com/riteshg-adobe/tagscanner",
   "manifest_version": 3,
-  "permissions": ["activeTab", "storage", "scripting"],
+  "permissions": ["activeTab", "storage", "scripting", "identity"],
   "icons": {
     "16": "images/tagscanner_16x16.png",
     "32": "images/tagscanner_32x32.png",
@@ -37,7 +38,7 @@
   "host_permissions": ["<all_urls>"],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'",
-    "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals; script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'self'"
+    "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals; script-src 'self'; child-src 'self'"
   },
   "sandbox": {
     "pages": ["satellite_sandbox.html"]

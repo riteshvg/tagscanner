@@ -400,6 +400,99 @@ document.addEventListener('DOMContentLoaded', function () {
     `;
     ruleCardBody.querySelector('.row').after(ruleSizeInfo);
 
+    // ── Unused components quick-list (always-visible static section) ─────────
+    (function renderUnusedSummary() {
+      var section  = document.getElementById('unusedSummarySection');
+      if (!section) return;
+
+      var deList   = document.getElementById('unusedDeQuickList');
+      var ruleList = document.getElementById('unusedRuleQuickList');
+      var extList  = document.getElementById('unusedExtQuickList');
+      var deBadge  = document.getElementById('unusedDeCountBadge');
+      var ruleBadge = document.getElementById('unusedRuleCountBadge');
+      var extBadge = document.getElementById('unusedExtCountBadge');
+      var pillsEl  = document.getElementById('unusedStatsPills');
+      var divider  = document.getElementById('tsAiDivider');
+
+      var totalDe  = Object.keys(dataElements).length;
+      var totalRl  = rules ? rules.length : 0;
+      var totalExt = Object.keys(extensions).length;
+      var unusedDe = unusedDataElements.length;
+      var unusedRl = unusedRules.length;
+      var unusedEx = unusedExtensions.length;
+
+      if (deBadge)  deBadge.textContent  = unusedDe;
+      if (ruleBadge) ruleBadge.textContent = unusedRl;
+      if (extBadge) extBadge.textContent  = unusedEx;
+
+      // Stats pills
+      if (pillsEl) {
+        var deColor  = unusedDe > 0 ? 'red'    : 'green';
+        var rlColor  = unusedRl > 0 ? 'orange' : 'green';
+        var extColor = unusedEx > 0 ? 'orange' : 'green';
+        pillsEl.innerHTML = [
+          '<div class="ts-stat-pill"><span class="ts-stat-pill-num blue">'  + totalDe  + '</span> Data Elements</div>',
+          '<div class="ts-stat-pill"><span class="ts-stat-pill-num ' + deColor  + '">' + unusedDe + '</span> Unused DEs</div>',
+          '<div class="ts-stat-pill"><span class="ts-stat-pill-num blue">'  + totalRl  + '</span> Rules</div>',
+          '<div class="ts-stat-pill"><span class="ts-stat-pill-num ' + rlColor  + '">' + unusedRl + '</span> Unused Rules</div>',
+          '<div class="ts-stat-pill"><span class="ts-stat-pill-num blue">'  + totalExt + '</span> Extensions</div>',
+          '<div class="ts-stat-pill"><span class="ts-stat-pill-num ' + extColor + '">' + unusedEx + '</span> Unused Ext</div>',
+        ].join('');
+      }
+
+      // Unused DE list
+      if (deList) {
+        if (unusedDe === 0) {
+          deList.innerHTML = '<div class="ts-unused-empty"><i class="fas fa-check-circle"></i>None — all data elements are referenced.</div>';
+        } else {
+          deList.innerHTML = unusedDataElements.map(function(deName) {
+            var size = usageData.dataElements[deName] ? usageData.dataElements[deName].size : '';
+            return '<div class="ts-unused-row">' +
+              '<span class="ts-unused-row-name">' + deName.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span>' +
+              (size !== '' ? '<span class="ts-unused-row-size">' + size + ' KB</span>' : '') +
+              '</div>';
+          }).join('');
+        }
+      }
+
+      // Unused Rule list
+      if (ruleList) {
+        if (unusedRl === 0) {
+          ruleList.innerHTML = '<div class="ts-unused-empty"><i class="fas fa-check-circle"></i>None — all rules are active.</div>';
+        } else {
+          ruleList.innerHTML = unusedRules.map(function(ruleId) {
+            var entry = usageData.rules[ruleId];
+            var name  = entry ? (entry.name || ruleId) : ruleId;
+            var size  = entry ? entry.size : '';
+            return '<div class="ts-unused-row">' +
+              '<span class="ts-unused-row-name">' + name.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span>' +
+              (size !== '' ? '<span class="ts-unused-row-size">' + size + ' KB</span>' : '') +
+              '</div>';
+          }).join('');
+        }
+      }
+
+      // Unused Extension list
+      if (extList) {
+        if (unusedEx === 0) {
+          extList.innerHTML = '<div class="ts-unused-empty"><i class="fas fa-check-circle"></i>None — all extensions are referenced.</div>';
+        } else {
+          extList.innerHTML = unusedExtensions.map(function(extKey) {
+            var entry = usageData.extensions[extKey];
+            var name  = entry ? (entry.name || extKey) : extKey;
+            var size  = entry ? entry.size : '';
+            return '<div class="ts-unused-row">' +
+              '<span class="ts-unused-row-name">' + name.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</span>' +
+              (size !== '' ? '<span class="ts-unused-row-size">' + size + ' KB</span>' : '') +
+              '</div>';
+          }).join('');
+        }
+      }
+
+      section.style.display = '';
+      if (divider) divider.style.display = '';
+    })();
+
     // Property details: use sessionStorage when set by popup, otherwise fallbacks
     const propertyName = sessionStorage.getItem('launch_property_name') || 'Unknown Property';
     const propertyEnvironment = sessionStorage.getItem('launch_property_environment') || 'Production';
@@ -925,18 +1018,19 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Populate extension table
-    unusedExtensions.forEach((extName) => {
-      const row = document.createElement('tr');
-      const nameCell = document.createElement('td');
-      const sizeCell = document.createElement('td');
-
-      nameCell.textContent = usageData.extensions[extName].name;
-      sizeCell.textContent = `${usageData.extensions[extName].size} KB`;
-
-      row.appendChild(nameCell);
-      row.appendChild(sizeCell);
-      document.getElementById('print-ext-tbody').appendChild(row);
-    });
+    var printExtTbody = document.getElementById('print-ext-tbody');
+    if (printExtTbody) {
+      unusedExtensions.forEach((extName) => {
+        const row = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        const sizeCell = document.createElement('td');
+        nameCell.textContent = usageData.extensions[extName].name;
+        sizeCell.textContent = `${usageData.extensions[extName].size} KB`;
+        row.appendChild(nameCell);
+        row.appendChild(sizeCell);
+        printExtTbody.appendChild(row);
+      });
+    }
 
     // Add recommendations
     const recommendationsList = document.getElementById(
@@ -980,11 +1074,12 @@ document.addEventListener('DOMContentLoaded', function () {
     recommendationsList.appendChild(rec5);
 
     // Set up PDF download using print functionality
-    document
-      .getElementById('download-pdf')
-      .addEventListener('click', function () {
+    var downloadBtn = document.getElementById('download-pdf');
+    if (downloadBtn) {
+      downloadBtn.addEventListener('click', function () {
         window.print();
       });
+    }
 
     // ── AI Health Analysis ─────────────────────────────────────────
     initAIScanSection({
@@ -1172,7 +1267,6 @@ function escAIHtml(s) {
 
 function initAIScanSection(healthData) {
   _aiHealthData = healthData;
-  var cached = loadCachedAIReport();
 
   // Clear legacy email-only auth if no OAuth session exists
   if (window.TagScannerAuth && !window.TagScannerAuth.isSignedIn()) {
@@ -1189,8 +1283,14 @@ function initAIScanSection(healthData) {
   // Render user badge if already signed in
   renderUserBadge();
 
-  // Always show scan prompt
-  showAIState('prompt');
+  // Auto-load a prior result from localStorage so the user doesn't have to click again
+  var cached = loadCachedAIReport();
+  if (cached && cached.report) {
+    renderHealthReport(cached.report, cached.tokens, cached.costUsd, true, cached.ts, null);
+    showAIState('report');
+  } else {
+    showAIState('prompt');
+  }
 }
 
 function renderUserBadge() {
@@ -1199,7 +1299,11 @@ function renderUserBadge() {
 
 // ── Scan click handler ────────────────────────────────────────────────────
 
-function handleScanClick() {
+async function handleScanClick() {
+  if (window.TagScannerAuth && window.TagScannerAuth.requireExplainConsent) {
+    var consented = await window.TagScannerAuth.requireExplainConsent();
+    if (!consented) return;
+  }
   // Always require a Google OAuth session — ignore legacy localStorage email
   var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
   if (!session) {
@@ -1238,13 +1342,23 @@ async function handleGoogleSignIn() {
 
 async function runAIScan(user, config) {
   showAIState('scanning');
-  // Pass sessionToken (OAuth) or fall back to email
   var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
   var effectiveConfig = Object.assign({}, config, {
     email:        user.email || '',
     sessionToken: session ? session.sessionToken : null
   });
   try {
+    // Compute composition fingerprint so Lambda can serve cached results
+    if (window.TagScannerHealthPayload.computeFingerprint) {
+      try {
+        effectiveConfig.fingerprint = await window.TagScannerHealthPayload.computeFingerprint({
+          dataElements: _aiHealthData.dataElements,
+          rules:        _aiHealthData.rules,
+          extensions:   _aiHealthData.extensions
+        });
+      } catch (e) {}
+    }
+
     var payload = window.TagScannerHealthPayload.build({
       dataElements:       _aiHealthData.dataElements,
       rules:              _aiHealthData.rules,
@@ -1262,11 +1376,17 @@ async function runAIScan(user, config) {
     };
     var result = await window.TagScannerBedrock.analyzeProperty(payload, userContext, effectiveConfig);
     if (result.queryId) {
-      // Store queryId so feedback button can reference it
       try { localStorage.setItem('tagscanner_last_query_id', result.queryId); } catch(e) {}
     }
-    saveCachedAIReport(result.report, result.tokens, result.cost_usd);
-    renderHealthReport(result.report, result.tokens, result.cost_usd, false, Date.now());
+    if (!result.cached) {
+      saveCachedAIReport(result.report, result.tokens, result.cost_usd);
+    }
+    renderHealthReport(
+      result.report, result.tokens, result.cost_usd,
+      result.cached || false,
+      result.cached_at ? new Date(result.cached_at).getTime() : Date.now(),
+      result.cached_by || null
+    );
     showAIState('report');
   } catch (err) {
     console.error('AI scan failed:', err);
@@ -1277,18 +1397,43 @@ async function runAIScan(user, config) {
 
 // ── Report renderer ───────────────────────────────────────────────────────
 
-function renderHealthReport(report, tokens, costUsd, fromCache, ts) {
+function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
   var container = document.getElementById('aiReportContainer');
   container.innerHTML = '';
 
   var grade = report.health_grade || '?';
   var score = (typeof report.health_score === 'number') ? report.health_score : 0;
 
+  // Cached-by notice banner (server cache only — when another user triggered the analysis)
+  if (fromCache && cachedBy) {
+    var cachedAtStr = ts ? new Date(ts).toLocaleString() : 'unknown time';
+    var byStr = cachedBy.name
+      ? escAIHtml(cachedBy.name) + ' &lt;' + escAIHtml(cachedBy.email || '') + '&gt;'
+      : escAIHtml(cachedBy.email || 'unknown');
+    var notice = document.createElement('div');
+    notice.className = 'ai-cache-notice';
+    notice.innerHTML =
+      '<i class="fas fa-info-circle"></i>' +
+      '<div>' +
+        '<strong>Cached Analysis</strong>' +
+        '<span>This report was originally generated on <strong>' + cachedAtStr + '</strong> by ' + byStr + '. ' +
+        'The property composition has not changed since then — no new AI call was needed.</span>' +
+      '</div>';
+    container.appendChild(notice);
+  }
+
   // Meta row
   var meta = document.createElement('div');
   meta.className = 'ai-report-meta';
-  var leftMeta = fromCache && ts ? 'Cached &middot; analyzed ' + new Date(ts).toLocaleString() : 'Just analyzed';
-  var rightMeta = tokens ? ((tokens.input || 0) + ' in / ' + (tokens.output || 0) + ' out tokens &middot; $' + (costUsd || 0).toFixed(4)) : '';
+  var leftMeta;
+  if (fromCache && cachedBy) {
+    leftMeta = 'Served from cache &middot; generated ' + (ts ? new Date(ts).toLocaleString() : '');
+  } else if (fromCache) {
+    leftMeta = 'Cached &middot; analyzed ' + (ts ? new Date(ts).toLocaleString() : '');
+  } else {
+    leftMeta = 'Just analyzed';
+  }
+  var rightMeta = (tokens && !fromCache) ? ((tokens.input || 0) + ' in / ' + (tokens.output || 0) + ' out tokens &middot; $' + (costUsd || 0).toFixed(4)) : '';
   meta.innerHTML = '<span>' + leftMeta + '</span><span>' + rightMeta + '</span>';
   container.appendChild(meta);
 
@@ -1451,8 +1596,8 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts) {
     container.appendChild(impactDiv);
   }
 
-  // Footer: rescan link for logged-in users on cached reports
-  if (fromCache) {
+  // Footer: re-analyze link only for local-cache hits (server cache = composition unchanged = no point re-running)
+  if (fromCache && !cachedBy) {
     var footerRow = document.createElement('div');
     footerRow.style.cssText = 'text-align:right;margin-top:14px;padding-top:10px;border-top:1px solid #f3f4f6;font-size:11.5px;color:#9ca3af;';
     footerRow.innerHTML = '<button id="btnRescan" style="font-size:11.5px;color:#27c5c1;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;">Re-analyze</button>';

@@ -33,6 +33,12 @@
     return data;
   }
 
+  var propertyKey = (function () {
+    var n = sessionStorage.getItem('launch_property_name') || '';
+    var e = sessionStorage.getItem('launch_property_environment') || 'Production';
+    return n ? n + '#' + e : null;
+  })();
+
   async function loadHistory(append) {
     var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
     if (!session) {
@@ -44,6 +50,7 @@
     document.getElementById('loading').style.display = '';
     try {
       var body = { type: 'history', sessionToken: session.sessionToken, limit: 25 };
+      if (propertyKey) body.propertyKey = propertyKey;
       if (append && lastKey) body.lastKey = lastKey;
 
       var data = await callLambda(body);
@@ -97,6 +104,7 @@
       btn.addEventListener('click', function () {
         handleDownload(
           btn.getAttribute('data-query-id'),
+          btn.getAttribute('data-owner-id'),
           btn.getAttribute('data-query-type'),
           btn.getAttribute('data-query-summary'),
           btn
@@ -157,7 +165,11 @@
     }
 
     var downloadBtn = q.hasResult
-      ? '<button class="btn-download" data-download data-query-id="' + esc(q.queryId) + '" data-query-type="' + esc(q.type) + '" data-query-summary="' + esc(q.requestSummary || '') + '" title="Download result as PDF"><i class="fas fa-download"></i></button>'
+      ? '<button class="btn-download" data-download data-query-id="' + esc(q.queryId) + '" data-owner-id="' + esc(q.userId || '') + '" data-query-type="' + esc(q.type) + '" data-query-summary="' + esc(q.requestSummary || '') + '" title="Download result as PDF"><i class="fas fa-download"></i></button>'
+      : '';
+
+    var userStr = (q.userName || q.email)
+      ? '<div class="query-user"><i class="fas fa-user-circle"></i>' + esc(q.userName || q.email) + '</div>'
       : '';
 
     return '<div class="query-card" id="card-' + esc(q.queryId) + '">' +
@@ -171,6 +183,7 @@
       '<span class="query-time">' + relativeTime(q.createdAt) + '</span>' +
       '</div>' +
       '</div>' +
+      userStr +
       tokensStr +
       feedbackHtml +
       '</div>';
@@ -220,7 +233,7 @@
 
   // ── Download ──────────────────────────────────────────────────────────────
 
-  async function handleDownload(queryId, type, summary, btn) {
+  async function handleDownload(queryId, ownerId, type, summary, btn) {
     var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
     if (!session) return;
 
@@ -228,7 +241,9 @@
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
     try {
-      var data = await callLambda({ type: 'detail', sessionToken: session.sessionToken, queryId: queryId });
+      var detailBody = { type: 'detail', sessionToken: session.sessionToken, queryId: queryId };
+      if (ownerId && ownerId !== session.userId) detailBody.ownerId = ownerId;
+      var data = await callLambda(detailBody);
       var result = data.item && data.item.resultJson;
       if (!result) throw new Error('No result stored for this entry.');
 

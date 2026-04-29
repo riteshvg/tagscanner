@@ -446,29 +446,36 @@
     }
     buildUsageMap();
     function toCsvCell(val) {
-      return '"' + String(val).replace(/"/g, '""') + '"';
+      return '"' + String(val == null ? '' : val).replace(/"/g, '""') + '"';
     }
-    var headers = ['ID #', 'Extension Name', 'Actions', 'Events', 'Conditions', 'Data Elements', 'Size (KB)'];
+    var headers = ['#', 'Extension Key', 'Display Name', 'Has Custom Settings', 'Settings Summary', 'Rules Used In', 'Rule Count', 'Data Elements Used In', 'Data Element Count', 'Size (KB)'];
     var keys = Object.keys(extObj).sort();
     var csvLines = [headers.map(toCsvCell).join(',')];
     keys.forEach(function (key, index) {
-      var ext = extObj[key];
-      var displayName = (ext && ext.displayName) ? ext.displayName : key;
+      var ext = extObj[key] || {};
+      var displayName = ext.displayName || key;
       var sizeKb = getSizeKb(ext);
+      var hasSettings = (ext.settings && Object.keys(ext.settings).length > 0) ? 'true' : 'false';
+      var settingsSummary = '';
+      try {
+        if (ext.settings && typeof ext.settings === 'object') {
+          var sj = JSON.stringify(ext.settings);
+          settingsSummary = sj.length > 1000 ? sj.slice(0, 1000) + '\u2026[truncated]' : sj;
+        }
+      } catch (e) {}
       var v = value_obj[key] || {};
-      var actions = 0, events = 0, conditions = 0;
+      var ruleNames = [];
       Object.keys(v).forEach(function (k) {
         if (k === 'dataelement') return;
-        var r = v[k];
-        if (r && typeof r === 'object') {
-          if (r.rule) actions++;
-          if (Array.isArray(r.events)) events += r.events.length;
-          else if (r.events) events++;
-          if (r.conditions) conditions++;
-        }
+        ruleNames.push(k);
       });
-      var deCount = (v.dataelement && Array.isArray(v.dataelement)) ? v.dataelement.length : 0;
-      csvLines.push([index + 1, displayName, actions, events, conditions, deCount, sizeKb.toFixed(2)].map(toCsvCell).join(','));
+      var deNames = (v.dataelement && Array.isArray(v.dataelement)) ? v.dataelement.map(function (d) { return d.name || ''; }).filter(Boolean) : [];
+      csvLines.push([
+        index + 1, key, displayName, hasSettings, settingsSummary,
+        ruleNames.join('; '), ruleNames.length,
+        deNames.join('; '), deNames.length,
+        sizeKb.toFixed(2)
+      ].map(toCsvCell).join(','));
     });
     var csvContent = '\uFEFF' + csvLines.join('\r\n');
     var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

@@ -1,256 +1,280 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Display Page</title>
-    <link href="fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css">
-    <link href="../css/sb-admin-2.min.css" rel="stylesheet">
-    <link href="../css/fonts.css" rel="stylesheet">
-    <!-- <link href="../css/fonts-2.css" rel="stylesheet"> -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TagScanner — Feedback</title>
+  <link href="fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
+  <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+  <link href="../css/fonts.css" rel="stylesheet" />
+  <style>
+    body {
+      background: #f8f9fc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+    }
 
+    /* ── Header ───────────────────────────────────────────────── */
+    .fb-header {
+      background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
+      padding: 16px 20px;
+    }
+    .fb-header-eyebrow {
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase; color: #61dafb; margin-bottom: 5px;
+    }
+    .fb-header-title {
+      font-size: 18px; font-weight: 800; color: #fff; margin: 0;
+    }
+    .fb-header-title span { color: #61dafb; }
+    .fb-header-sub {
+      font-size: 12px; color: #9ca3af; margin-top: 4px;
+    }
 
-    <style>
-        /* Basic table styles */
-        table {
-            font-family: arial, sans-serif;
-            border-collapse: collapse;
-            width: 100%;
-        }
-        td, th {
-            border: 1px solid #dddddd;
-            text-align: left;
-            padding: 8px;
-        }
-        tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
+    /* ── Body ─────────────────────────────────────────────────── */
+    .fb-body {
+      padding: 20px;
+      max-width: 600px;
+    }
 
-        /* Spinner for loading indicator */
-        .spinner {
-            width: 64px;
-            height: 64px;
-            border: 8px solid;
-            border-color: #3d5af1 transparent #3d5af1 transparent;
-            border-radius: 50%;
-            animation: spin-anim 1.2s linear infinite;
-        }
-        @keyframes spin-anim {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+    /* ── Form card ────────────────────────────────────────────── */
+    .fb-card {
+      background: #fff;
+      border: 1px solid #e3e6f0;
+      border-radius: 10px;
+      padding: 20px 22px;
+      margin-bottom: 16px;
+    }
 
-        /* Loader container */
-        .loader-container {
-            width: 100%;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: fixed;
-            background: white;
-            z-index: 1;
-        }
+    .fb-field { margin-bottom: 14px; }
+    .fb-label {
+      display: block;
+      font-size: 12px; font-weight: 600; color: #374151;
+      margin-bottom: 5px;
+    }
+    .fb-label .fb-optional {
+      font-weight: 400; color: #9ca3af; font-size: 11px; margin-left: 4px;
+    }
+    .fb-input, .fb-select, .fb-textarea {
+      width: 100%; box-sizing: border-box;
+      padding: 8px 11px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 13px; color: #111827;
+      background: #fff;
+      font-family: inherit;
+    }
+    .fb-input:focus, .fb-select:focus, .fb-textarea:focus {
+      outline: none;
+      border-color: #4e73df;
+      box-shadow: 0 0 0 2px rgba(78,115,223,0.12);
+    }
+    .fb-textarea { resize: vertical; min-height: 100px; line-height: 1.5; }
 
-        /* Overlay styles */
-        .overlay {
-            height: 100%;
-            width: 0;
-            position: fixed;
-            z-index: 1;
-            left: 0;
-            top: 0;
-            background-color: rgba(0,0,0,0.9);
-            overflow-x: hidden;
-            transition: 0.5s;
-        }
-        .overlay-content {
-            position: relative;
-            top: 25%;
-            width: 100%;
-            text-align: center;
-            margin-top: 30px;
-        }
-        .overlay a {
-            padding: 8px;
-            text-decoration: none;
-            font-size: 36px;
-            color: #818181;
-            display: block;
-            transition: 0.3s;
-        }
-        .overlay a:hover {
-            color: #f1f1f1;
-        }
-        .overlay .closebtn {
-            position: absolute;
-            top: 20px;
-            right: 45px;
-            font-size: 60px;
-        }
-        @media screen and (max-height: 450px) {
-            .overlay a { font-size: 20px; }
-            .overlay .closebtn {
-                font-size: 40px;
-                top: 15px;
-                right: 35px;
-            }
-        }
+    /* ── Rating pills ─────────────────────────────────────────── */
+    .fb-rating-group {
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .fb-rating-pill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px;
+      border: 2px solid #e3e6f0;
+      border-radius: 20px;
+      font-size: 12.5px; font-weight: 500; color: #374151;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .fb-rating-pill input[type="radio"] { display: none; }
+    .fb-rating-pill:has(input:checked) { border-color: #4e73df; background: #eff4ff; color: #1d4ed8; }
+    .fb-rating-pill.love:has(input:checked)  { border-color: #10b981; background: #ecfdf5; color: #065f46; }
+    .fb-rating-pill.meh:has(input:checked)   { border-color: #f59e0b; background: #fffbeb; color: #92400e; }
+    .fb-rating-pill.bad:has(input:checked)   { border-color: #ef4444; background: #fef2f2; color: #991b1b; }
 
-        /* Form styles */
-        .form-container {
-            max-width: 800px;
-            margin: auto;
-            padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-        .form-label {
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-        .form-control, .form-select, .form-textarea {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .form-control:focus, .form-select:focus, .form-textarea:focus {
-            border-color: #3d5af1;
-            outline: none;
-        }
-        .btn-primary {
-            background-color: #3d5af1;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .btn-primary:hover {
-            background-color: #2c4f8f;
-        }
-        .text-gray-400 {
-            color: #9e9e9e;
-        }
-        .text-green-500 {
-            color: #28a745;
-        }
-        .text-red-500 {
-            color: #dc3545;
-        }
-    </style>
+    /* ── Submit button ────────────────────────────────────────── */
+    .fb-submit {
+      width: 100%;
+      padding: 10px;
+      background: linear-gradient(135deg, #4e73df, #27c5c1);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13.5px; font-weight: 600;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      transition: opacity 0.15s;
+    }
+    .fb-submit:hover { opacity: 0.9; }
+    .fb-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* ── Result states ────────────────────────────────────────── */
+    .fb-result {
+      text-align: center;
+      font-size: 12.5px;
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: none;
+    }
+    .fb-result.success { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+    .fb-result.error   { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+
+    /* ── Success screen ───────────────────────────────────────── */
+    #fbSuccess {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    #fbSuccess .fb-success-icon {
+      font-size: 40px; color: #10b981; margin-bottom: 12px;
+    }
+    #fbSuccess h3 { font-size: 16px; font-weight: 700; color: #111827; margin: 0 0 6px; }
+    #fbSuccess p  { font-size: 12.5px; color: #6b7280; margin: 0; line-height: 1.6; }
+
+    /* ── Row layout ───────────────────────────────────────────── */
+    .fb-row { display: flex; gap: 12px; }
+    .fb-row .fb-field { flex: 1; }
+  </style>
 </head>
 <body>
-     <!-- Main content -->
-    <div class="flex items-center min-h-screen bg-gray-100 dark:bg-gray-900">
-        <div class="container mx-auto">
-            <div class="max-w-xl mx-auto my-10 form-container">
-                <div class="text-center">
-                    <h1 class=" bg-indigo-600  text-3xl font-semibold text-gray-700 dark:text-gray-200" style="background-color:#27c5c1">
-                        Contact Us
-                    </h1>
-                    <p class="text-gray-400 dark:text-gray-400">
-                        Fill up the form below to send us a message.
-                    </p>
-                </div>
-                <div class="m-7">
-                    <form action="https://api.web3forms.com/submit" method="POST" id="form">
-                        <input type="hidden" name="access_key" value="ab08f10f-3945-4782-b5f3-538057da804a" />
-                        <input type="hidden" name="subject" value="New Submission from Tag" />
-                        <input type="checkbox" name="botcheck" id="" style="display: none;" />
 
-                        <div class="flex mb-6 space-x-4">
-                            <div class="w-full md:w-1/2">
-                                <label for="fname" class="form-label">Full Name</label>
-                                <input type="text" name="name" id="first_name" placeholder="John Doe" required class="form-control" />
-                            </div>
-                            <!-- <div class="w-full md:w-1/2">
-                                <label for="lname" class="form-label">Last Name</label>
-                                <input type="text" name="last_name" id="lname" placeholder="Doe" required class="form-control" />
-                            </div> -->
-                        </div>
+  <!-- Header -->
+  <div class="fb-header">
+    <div class="fb-header-eyebrow">TagScanner</div>
+    <h1 class="fb-header-title">Share <span>Feedback</span></h1>
+    <p class="fb-header-sub">Help us improve — your input goes directly to the developer.</p>
+  </div>
 
-                        <div class="flex mb-6 space-x-4">
-                            <div class="w-full md:w-1/2">
-                                <label for="rating" class="form-label">How do you rate this utility?</label>
-                                <select id="rating" name="rating">
-                                    <option value="helpful">Helpful</option>
-                                    <option value="not helpful">Not Helpful</option>
-                                    <option value="uninstalling">Uninstalling</option>
-                                  </select>
-                            </div>
-                            <p></p>
-                            <div class="w-full md:w-1/2">
-                                <label for="feature" class="form-label">Feature request</label>
-                                <input type="text" name="feature" id="feature" placeholder= "what feature would you like to see added to this tool?" required class="form-control" />
-                            </div>
-                        </div> 
+  <!-- Form -->
+  <div class="fb-body">
+    <div class="fb-card" id="fbFormCard">
+      <form id="fbForm">
+        <input type="hidden" name="access_key" value="ab08f10f-3945-4782-b5f3-538057da804a" />
+        <input type="hidden" name="subject" value="TagScanner Feedback" />
+        <input type="checkbox" name="botcheck" style="display:none" />
 
-                        <div class="mb-6">
-                            <label for="message" class="form-label">Share Your Feedback</label>
-                            <textarea rows="5" name="message" id="message" class="form-textarea" required></textarea>
-                        </div>
-                        <div class="mb-6">
-                            <button type="submit" class="btn btn-primary">
-                                Send Message
-                            </button>
-                        </div>
-                        <p class="text-base text-center text-gray-400" id="result"></p>
-                    </form>
-                </div>
-            </div>
+        <!-- Name + Email row -->
+        <div class="fb-row">
+          <div class="fb-field">
+            <label class="fb-label" for="fbName">Name <span class="fb-optional">(optional)</span></label>
+            <input id="fbName" name="name" type="text" class="fb-input" placeholder="Your name" />
+          </div>
+          <div class="fb-field">
+            <label class="fb-label" for="fbEmail">Email <span class="fb-optional">(optional)</span></label>
+            <input id="fbEmail" name="email" type="email" class="fb-input" placeholder="For follow-up" />
+          </div>
         </div>
+
+        <!-- Rating -->
+        <div class="fb-field">
+          <label class="fb-label">How useful is TagScanner?</label>
+          <div class="fb-rating-group">
+            <label class="fb-rating-pill love">
+              <input type="radio" name="rating" value="Love it" />
+              <i class="fas fa-heart"></i> Love it
+            </label>
+            <label class="fb-rating-pill">
+              <input type="radio" name="rating" value="It's helpful" checked />
+              <i class="fas fa-thumbs-up"></i> It's helpful
+            </label>
+            <label class="fb-rating-pill meh">
+              <input type="radio" name="rating" value="Could be better" />
+              <i class="fas fa-meh"></i> Could be better
+            </label>
+            <label class="fb-rating-pill bad">
+              <input type="radio" name="rating" value="Not helpful" />
+              <i class="fas fa-thumbs-down"></i> Not helpful
+            </label>
+          </div>
+        </div>
+
+        <!-- Category -->
+        <div class="fb-field">
+          <label class="fb-label" for="fbCategory">Category</label>
+          <select id="fbCategory" name="category" class="fb-select">
+            <option value="General Feedback">General Feedback</option>
+            <option value="Feature Request">Feature Request</option>
+            <option value="Bug Report">Bug Report</option>
+            <option value="AI Features">AI Features</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <!-- Message -->
+        <div class="fb-field">
+          <label class="fb-label" for="fbMessage">Message <span class="fb-optional">(required)</span></label>
+          <textarea id="fbMessage" name="message" class="fb-textarea" placeholder="What's working well? What could be improved? Any features you'd love to see?" required></textarea>
+        </div>
+
+        <button type="submit" class="fb-submit" id="fbSubmitBtn">
+          <i class="fas fa-paper-plane" style="margin-right:7px"></i>Send Feedback
+        </button>
+
+        <div class="fb-result" id="fbResult"></div>
+      </form>
     </div>
-    
-    <script>
-        const form = document.getElementById("form");
-        const result = document.getElementById("result");
+  </div>
 
-        form.addEventListener("submit", function (e) {
-            const formData = new FormData(form);
-            e.preventDefault();
-            var object = {};
-            formData.forEach((value, key) => {
-                object[key] = value;
-            });
-            var json = JSON.stringify(object);
-            result.innerHTML = "Please wait...";
+  <!-- Success screen (shown after submit) -->
+  <div id="fbSuccess">
+    <div class="fb-card" style="display:inline-block;padding:32px 40px;text-align:center">
+      <div class="fb-success-icon"><i class="fas fa-check-circle"></i></div>
+      <h3>Thank you!</h3>
+      <p>Your feedback has been received.<br>We'll review it and get back to you if needed.</p>
+    </div>
+  </div>
 
-            fetch("https://api.web3forms.com/submit", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json"
-                },
-                body: json
-            })
-                .then(async (response) => {
-                    let json = await response.json();
-                    if (response.status == 200) {
-                        result.innerHTML = json.message;
-                        result.classList.remove("text-gray-500");
-                        result.classList.add("text-green-500");
-                    } else {
-                        console.log(response);
-                        result.innerHTML = json.message;
-                        result.classList.remove("text-gray-500");
-                        result.classList.add("text-red-500");
-                    }
-                })
-                .catch((error) => {
-                    console.log(error);
-                    result.innerHTML = "Something went wrong!";
-                })
-                .then(function () {
-                    form.reset();
-                    setTimeout(() => {
-                        result.style.display = "none";
-                    }, 5000);
-                });
+  <script>
+    // Pre-fill email from session if signed in
+    try {
+      var raw = localStorage.getItem('tagscanner_user');
+      if (raw) {
+        var u = JSON.parse(raw);
+        if (u && u.email) document.getElementById('fbEmail').value = u.email;
+        if (u && u.name)  document.getElementById('fbName').value  = u.name;
+      }
+    } catch (e) {}
+
+    document.getElementById('fbForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      var btn    = document.getElementById('fbSubmitBtn');
+      var result = document.getElementById('fbResult');
+      var form   = e.target;
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:7px"></i>Sending…';
+      result.style.display = 'none';
+
+      var data = {};
+      new FormData(form).forEach(function(v, k) { data[k] = v; });
+
+      try {
+        var res = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(data)
         });
-    </script>
+        var json = await res.json();
+
+        if (res.ok) {
+          document.getElementById('fbFormCard').style.display = 'none';
+          document.getElementById('fbSuccess').style.display  = 'block';
+        } else {
+          result.textContent = json.message || 'Submission failed. Please try again.';
+          result.className = 'fb-result error';
+          result.style.display = 'block';
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-paper-plane" style="margin-right:7px"></i>Send Feedback';
+        }
+      } catch (err) {
+        result.textContent = 'Network error. Please check your connection and try again.';
+        result.className = 'fb-result error';
+        result.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane" style="margin-right:7px"></i>Send Feedback';
+      }
+    });
+  </script>
 </body>
 </html>

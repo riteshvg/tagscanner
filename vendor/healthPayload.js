@@ -119,6 +119,20 @@
 
   function round2(n) { return Math.round(n * 100) / 100; }
 
-  global.TagScannerHealthPayload = { build: buildHealthPayload };
+  // Returns a 16-char SHA-256 hex prefix of the property's structural composition.
+  // Same composition (same sorted DE/rule/extension names) → same fingerprint.
+  async function computeFingerprint(p) {
+    var deNames  = Object.keys(p.dataElements || {}).sort();
+    var rlNames  = (p.rules || []).map(function(r) { return r.name || r.id || ''; }).sort();
+    var extNames = Object.keys(p.extensions || {}).sort();
+    var str = deNames.join(',') + '|' + rlNames.join(',') + '|' + extNames.join(',');
+    var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf))
+      .map(function(b) { return b.toString(16).padStart(2, '0'); })
+      .join('')
+      .slice(0, 16);
+  }
+
+  global.TagScannerHealthPayload = { build: buildHealthPayload, computeFingerprint: computeFingerprint };
 
 })(typeof window !== 'undefined' ? window : this);

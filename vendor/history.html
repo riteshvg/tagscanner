@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TagScanner — AI Query History</title>
+  <title>TagScanner — Property AI History</title>
   <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet" />
   <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
   <style>
@@ -94,11 +94,17 @@
     }
 
     #loading { text-align:center; padding:30px; color:#9ca3af; font-size:13px; }
+
+    .query-user {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 11px; color: #6b7280; margin-top: 4px;
+    }
+    .query-user i { font-size: 11px; color: #9ca3af; }
   </style>
 </head>
 <body>
   <div class="page-header">
-    <h1><i class="fas fa-history" style="color:#4e73df;margin-right:8px"></i>AI Query History</h1>
+    <h1><i class="fas fa-history" style="color:#4e73df;margin-right:8px"></i>Property AI History</h1>
     <div id="userChip" class="user-chip" style="display:none"></div>
   </div>
 
@@ -117,7 +123,7 @@
   <div id="signInPrompt" class="sign-in-prompt" style="display:none">
     <i class="fab fa-google"></i>
     <div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:6px">Sign in required</div>
-    <div style="font-size:13px;color:#6b7280">Please sign in via the Summary page to view your query history.</div>
+    <div style="font-size:13px;color:#6b7280">Please sign in via the Summary page to view this property's AI history.</div>
     <button id="btnGoToSummary" class="go-to-summary">Go to Summary</button>
   </div>
 

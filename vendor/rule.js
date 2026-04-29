@@ -2276,18 +2276,37 @@ if (rule_details_node) {
       codeIconBtn.title = snippetCount === 1 ? 'View custom code' : 'View ' + snippetCount + ' custom code snippets';
       codeIconBtn.style.color = '#27c5c1';
       codeIconBtn.style.cursor = 'pointer';
-      codeIconBtn.onclick = (function (codeItems, rName) {
-        return function () {
-          if (codeItems.length === 1) {
-            showCodeModal(codeItems[0].label + ': ' + rName, codeItems[0].code);
+      codeIconBtn.onclick = (function (codeItems, rName, btn) {
+        return async function () {
+          var origHtml = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+          // Step 1: resolve hosted-file URLs to actual code
+          var resolved = await Promise.all(codeItems.map(async function (item) {
+            var code = (item.code || '').trim();
+            if (code && (code.startsWith('http') || code.includes('assets.adobedtm.com'))) {
+              try {
+                var res = await fetch(code, { method: 'GET', mode: 'cors' });
+                if (res.ok) code = await res.text();
+              } catch (e) { /* keep URL as fallback */ }
+            }
+            return { label: item.label, code: code };
+          }));
+
+          btn.innerHTML = origHtml;
+          btn.disabled = false;
+
+          if (resolved.length === 1) {
+            showCodeModal(resolved[0].label + ': ' + rName, resolved[0].code);
           } else {
-            var combined = codeItems.map(function (item, idx) {
-              return '/* ---- ' + item.label + ' (' + (idx + 1) + ' of ' + codeItems.length + ') ---- */\n' + item.code;
+            var combined = resolved.map(function (item, idx) {
+              return '/* ---- ' + item.label + ' (' + (idx + 1) + ' of ' + resolved.length + ') ---- */\n' + item.code;
             }).join('\n\n');
-            showCodeModal('Custom Code: ' + rName + ' (' + codeItems.length + ' snippets)', combined);
+            showCodeModal('Custom Code: ' + rName + ' (' + resolved.length + ' snippets)', combined);
           }
         };
-      })(allCustomCode, rule.name || ('Rule ' + (i + 1)));
+      })(allCustomCode, rule.name || ('Rule ' + (i + 1)), codeIconBtn);
     }
     tdCode.appendChild(codeIconBtn);
     tr.appendChild(tdCode);
@@ -2637,18 +2656,80 @@ function exportMainRulesTableToCSV() {
     return a.type || 'Action';
   }
 
-  var headers = ['ID #', 'Rule Name', 'Events', 'Conditions', 'Actions', 'Size (KB)'];
-  var rows = rulesArray.map(function (rule, i) {
-    var events = (rule.events && Array.isArray(rule.events)) ? rule.events.map(eventSummary).filter(Boolean).join('; ') : '';
-    var conditions = (rule.conditions && Array.isArray(rule.conditions)) ? rule.conditions.map(conditionSummary).filter(Boolean).join('; ') : '';
-    var actions = (rule.actions && Array.isArray(rule.actions)) ? rule.actions.map(actionSummary).filter(Boolean).join('; ') : '';
-    var name = (rule.name || rule.id || 'Rule ' + (i + 1)).replace(/,/g, '');
-    return [String(i + 1), name, events, conditions, actions, ruleSizeKb(rule)];
+  function toCsvCell(val) {
+    return '"' + String(val == null ? '' : val).replace(/"/g, '""') + '"';
+  }
+
+  function moduleToDelegateDescriptor(modulePath) {
+    if (!modulePath) return '';
+    var parts = modulePath.split('/');
+    var extName = parts[0] || '';
+    var libIdx = parts.indexOf('lib');
+    if (libIdx === -1) return modulePath;
+    var typePart = parts[libIdx + 1] || '';
+    var typeMap = { actions: 'actions', events: 'events', conditions: 'conditions', dataElements: 'data-elements', data_elements: 'data-elements' };
+    var type = typeMap[typePart] || typePart;
+    var remaining = parts.slice(libIdx + 2);
+    var compFile = '';
+    if (remaining.length === 1) {
+      compFile = remaining[0].replace(/\.js$/, '');
+    } else if (remaining.length > 1) {
+      var lastFile = remaining[remaining.length - 1].replace(/\.js$/, '');
+      compFile = (lastFile === 'index') ? remaining[remaining.length - 2] : lastFile;
+    }
+    var kebab = compFile.replace(/([A-Z])/g, function (m) { return '-' + m.toLowerCase(); });
+    if (kebab.charAt(0) === '-') kebab = kebab.slice(1);
+    return extName + '::' + type + '::' + kebab;
+  }
+
+  function safeSettingsJson(settings) {
+    if (!settings || typeof settings !== 'object') return '';
+    try {
+      var copy = Object.assign({}, settings);
+      if (typeof copy.source === 'function') copy.source = '[function]';
+      if (typeof copy.source === 'string' && copy.source.length > 500) copy.source = copy.source.slice(0, 500) + '\u2026[truncated]';
+      var json = JSON.stringify(copy);
+      return json.length > 2000 ? json.slice(0, 2000) + '\u2026[truncated]' : json;
+    } catch (e) { return ''; }
+  }
+
+  function componentLabel(comp, type) {
+    if (!comp) return type;
+    if (comp.name) return comp.name;
+    if (comp.modulePath) {
+      var fn = comp.modulePath.split('/').pop().replace(/\.js$/, '');
+      if (fn === 'index' && comp.modulePath.split('/').length > 3) {
+        fn = comp.modulePath.split('/').slice(-2, -1)[0] || fn;
+      }
+      return fn.replace(/([A-Z])/g, ' $1').trim() || type;
+    }
+    return comp.type || type;
+  }
+
+  var headers = ['#', 'Rule Name', 'Component Type', 'Component Name', 'Delegate Descriptor ID', 'Component Order', 'Settings JSON'];
+  var rows = [];
+  var rowNum = 1;
+  rulesArray.forEach(function (rule) {
+    var ruleName = rule.name || rule.id || 'Unknown Rule';
+    function addComponents(arr, typeName) {
+      if (!arr || !Array.isArray(arr)) return;
+      arr.forEach(function (comp, idx) {
+        rows.push([
+          rowNum++,
+          ruleName,
+          typeName,
+          componentLabel(comp, typeName),
+          moduleToDelegateDescriptor(comp.modulePath || ''),
+          idx + 1,
+          safeSettingsJson(comp.settings)
+        ]);
+      });
+    }
+    addComponents(rule.events, 'Event');
+    addComponents(rule.conditions, 'Condition');
+    addComponents(rule.actions, 'Action');
   });
 
-  function toCsvCell(val) {
-    return '"' + String(val).replace(/"/g, '""') + '"';
-  }
   var csvLines = [headers.map(toCsvCell).join(',')].concat(rows.map(function (r) { return r.map(toCsvCell).join(','); }));
   var csvContent = '\uFEFF' + csvLines.join('\r\n');
   var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -3072,19 +3153,60 @@ function showCodeModal(title, code) {
     codeContent.textContent = rawCode;
     modal.style.display = 'block';
 
-    // Format with Prettier if available; update display and copy target on success
+    // Format with Prettier if available
     if (rawCode && typeof prettier !== 'undefined' && typeof prettierPlugins !== 'undefined') {
-      prettier.format(rawCode, {
+      var prettierOpts = {
         parser: 'babel',
         plugins: [prettierPlugins.babel, prettierPlugins.estree],
         printWidth: 80,
         tabWidth: 2,
         singleQuote: true,
         semi: true,
-      }).then(function (formatted) {
-        codeContent.textContent = formatted;
-        if (copyBtn) copyBtn._currentCode = formatted;
-      }).catch(function () { /* not valid JS — keep raw */ });
+      };
+
+      function applyFormatted(text) {
+        codeContent.textContent = text;
+        if (copyBtn) copyBtn._currentCode = text;
+      }
+
+      // Try formatting the whole string first; if it fails (e.g. combined multi-snippet
+      // isn't valid standalone JS), format each snippet individually and recombine.
+      prettier.format(rawCode, prettierOpts)
+        .then(function (formatted) { applyFormatted(formatted.trim()); })
+        .catch(function () {
+          // Split on snippet header lines: /* ---- Label (N of M) ---- */
+          var headerRe = /(\/\* ---- .+? ---- \*\/)/;
+          var parts = rawCode.split(/\n(?=\/\* ---- )/);
+          if (parts.length <= 1) {
+            // Single snippet — try wrapping in parens as a last resort
+            prettier.format('(' + rawCode + ');', prettierOpts)
+              .then(function (f) {
+                // strip the wrapping parens/semicolon Prettier adds
+                applyFormatted(f.replace(/^\s*\(/, '').replace(/\);\s*$/, '').trim());
+              })
+              .catch(function () { /* keep raw */ });
+            return;
+          }
+          // Multi-snippet: format each piece independently
+          Promise.all(parts.map(function (part) {
+            var m = part.match(/^(\/\* ---- .+? ---- \*\/\n?)([\s\S]*)$/);
+            if (!m) return Promise.resolve(part.trim());
+            var header = m[1];
+            var snippet = m[2].trim();
+            return prettier.format(snippet, prettierOpts)
+              .then(function (f) { return header + f.trim(); })
+              .catch(function () {
+                // Last-resort: wrap in parens
+                return prettier.format('(' + snippet + ');', prettierOpts)
+                  .then(function (f) {
+                    return header + f.replace(/^\s*\(/, '').replace(/\);\s*$/, '').trim();
+                  })
+                  .catch(function () { return header + snippet; });
+              });
+          })).then(function (formatted) {
+            applyFormatted(formatted.join('\n\n'));
+          });
+        });
     }
 
     // Explain box — added dynamically once, reused on subsequent opens
@@ -3114,6 +3236,10 @@ function showCodeModal(title, code) {
     if (explainBtn) {
       explainBtn.onclick = async function () {
         if (!explainBox) return;
+        if (window.TagScannerAuth && window.TagScannerAuth.requireExplainConsent) {
+          var consented = await window.TagScannerAuth.requireExplainConsent();
+          if (!consented) return;
+        }
         explainBtn.disabled = true;
         var origHtml = explainBtn.innerHTML;
         explainBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing\u2026';
@@ -3154,11 +3280,21 @@ function showCodeModal(title, code) {
           }
           if (window.TagScannerBedrock && window.TagScannerBedrock.explainCode) {
             try {
+              var propKey = (sessionStorage.getItem('launch_property_name') || '') + '#' +
+                            (sessionStorage.getItem('launch_property_environment') || 'Production');
               var brResult = await window.TagScannerBedrock.explainCode(
                 rawCode, { name: title || '', type: 'rule' },
-                { email: session.email, sessionToken: session.sessionToken }
+                { email: session.email, sessionToken: session.sessionToken, propertyKey: propKey }
               );
               explainBox.innerHTML = window.TagScannerBedrock.renderBedrockCodeExplanation(brResult.explanation);
+              if (brResult.cached && brResult.cached_by) {
+                var rCachedAt = brResult.cached_at ? new Date(brResult.cached_at).toLocaleString() : '';
+                var rByStr    = brResult.cached_by.name || brResult.cached_by.email || 'unknown';
+                var rNotice   = document.createElement('div');
+                rNotice.style.cssText = 'display:flex;align-items:flex-start;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid #3b82f6;border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#1e40af';
+                rNotice.innerHTML = '<i class="fas fa-info-circle" style="font-size:13px;margin-top:1px;flex-shrink:0"></i><div><strong style="display:block;margin-bottom:2px">Cached Explanation</strong><span style="color:#374151">Generated on ' + rCachedAt + ' by ' + rByStr + '. Same code — no new AI call needed.</span></div>';
+                explainBox.insertBefore(rNotice, explainBox.firstChild);
+              }
               explainBox.style.display = 'block';
               return;
             } catch(bedrockErr) {

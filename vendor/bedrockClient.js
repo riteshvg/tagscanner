@@ -292,17 +292,21 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
     // Proxy mode — use hardcoded URL, no client-side credentials
     if (TS_PROXY_URL && !TS_PROXY_URL.includes('YOUR_LAMBDA')) {
       const data = await callProxy(TS_PROXY_URL, {
-        type: 'explain',
+        type:        'explain',
         sessionToken: config.sessionToken || null,
-        email: config.email || '',
-        code: code,
-        metadata: metadata || {},
+        email:        config.email        || '',
+        code:         code,
+        metadata:     metadata            || {},
+        propertyKey:  config.propertyKey  || null,
       });
       return {
-        explanation: data.explanation,
-        inputTokens: data.tokens?.input || 0,
+        explanation:  data.explanation,
+        inputTokens:  data.tokens?.input  || 0,
         outputTokens: data.tokens?.output || 0,
-        queryId: data.queryId || null,
+        queryId:      data.queryId        || null,
+        cached:       data.cached         || false,
+        cached_at:    data.cached_at      || null,
+        cached_by:    data.cached_by      || null,
       };
     }
     // Direct Bedrock mode
@@ -508,11 +512,20 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
         email: config.email || '',
         payload: healthPayload,
         userContext: userContext || {},
+        fingerprint: config.fingerprint || null,
       });
       if (!data.report) {
         throw new Error('Proxy response missing report. Got: ' + JSON.stringify(data).slice(0, 300));
       }
-      return { report: data.report, tokens: data.tokens || {}, cost_usd: 0, queryId: data.queryId || null };
+      return {
+        report:     data.report,
+        tokens:     data.tokens || {},
+        cost_usd:   0,
+        queryId:    data.queryId || null,
+        cached:     data.cached     || false,
+        cached_at:  data.cached_at  || null,
+        cached_by:  data.cached_by  || null,
+      };
     }
     // Direct Bedrock mode
     const userMessage = JSON.stringify(

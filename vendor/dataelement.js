@@ -1322,6 +1322,10 @@ if (de_details_node) {
       if (explainBtn) {
         explainBtn.onclick = async function () {
           if (!explainBox) return;
+          if (window.TagScannerAuth && window.TagScannerAuth.requireExplainConsent) {
+            var consented = await window.TagScannerAuth.requireExplainConsent();
+            if (!consented) return;
+          }
           explainBtn.disabled = true;
           var originalHtml = explainBtn.innerHTML;
           explainBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Explaining...';
@@ -1361,11 +1365,21 @@ if (de_details_node) {
                 return;
               }
               try {
+                var dePropKey = (sessionStorage.getItem('launch_property_name') || '') + '#' +
+                                (sessionStorage.getItem('launch_property_environment') || 'Production');
                 var brResult = await window.TagScannerBedrock.explainCode(
                   rawCode, { name: title || '', type: 'dataElement' },
-                  { email: session.email, sessionToken: session.sessionToken }
+                  { email: session.email, sessionToken: session.sessionToken, propertyKey: dePropKey }
                 );
                 explainBox.innerHTML = window.TagScannerBedrock.renderBedrockCodeExplanation(brResult.explanation);
+                if (brResult.cached && brResult.cached_by) {
+                  var deCachedAt = brResult.cached_at ? new Date(brResult.cached_at).toLocaleString() : '';
+                  var deByStr    = brResult.cached_by.name || brResult.cached_by.email || 'unknown';
+                  var deNotice   = document.createElement('div');
+                  deNotice.style.cssText = 'display:flex;align-items:flex-start;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid #3b82f6;border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#1e40af';
+                  deNotice.innerHTML = '<i class="fas fa-info-circle" style="font-size:13px;margin-top:1px;flex-shrink:0"></i><div><strong style="display:block;margin-bottom:2px">Cached Explanation</strong><span style="color:#374151">Generated on ' + deCachedAt + ' by ' + deByStr + '. Same code — no new AI call needed.</span></div>';
+                  explainBox.insertBefore(deNotice, explainBox.firstChild);
+                }
                 explainBox.style.display = 'block';
                 return;
               } catch(bedrockErr) {
@@ -1878,14 +1892,38 @@ if (download_button[0]) {
       return;
     }
     function toCsvCell(val) {
-      return '"' + String(val).replace(/"/g, '""') + '"';
+      return '"' + String(val == null ? '' : val).replace(/"/g, '""') + '"';
     }
-    var headers = ['ID #', 'Data Element Name', 'Type', 'Used in Rules', 'Used in Extensions', 'Used in Data Elements', 'Custom Code'];
+    var deRaw = {};
+    try {
+      var rawStr = sessionStorage.getItem('_satellite._container.dataElements');
+      if (rawStr) deRaw = JSON.parse(rawStr) || {};
+    } catch (e) {}
+    var headers = ['#', 'Data Element Name', 'Type', 'Extension', 'Module Path', 'Storage Duration', 'Default Value', 'Clean Text', 'Force Lowercase', 'Settings JSON', 'Custom Code', 'Used in Rules', 'Used in Extensions', 'Used in Data Elements'];
     var csvLines = [headers.map(toCsvCell).join(',')].concat(
       rows.map(function (r, i) {
+        var raw = deRaw[r.name] || {};
+        var s = raw.settings || {};
+        var mp = raw.modulePath || '';
+        var extName = mp ? mp.split('/')[0] : (r.extensionLabel || '');
+        var storageDuration = s.storeDuration || s.storageDuration || s.storage_duration || '';
+        var defaultValue = (s.defaultValue !== undefined) ? s.defaultValue : '';
+        var cleanText = (s.cleanText !== undefined) ? (s.cleanText ? 'true' : 'false') : '';
+        var forceLower = (s.forceLowerCase !== undefined) ? (s.forceLowerCase ? 'true' : 'false') : '';
+        var settingsJson = '';
+        try {
+          var scopy = Object.assign({}, s);
+          if (typeof scopy.source === 'function') scopy.source = '[function]';
+          if (typeof scopy.source === 'string' && scopy.source.length > 500) scopy.source = scopy.source.slice(0, 500) + '\u2026[truncated]';
+          var sj = JSON.stringify(scopy);
+          settingsJson = sj.length > 2000 ? sj.slice(0, 2000) + '\u2026[truncated]' : sj;
+        } catch (e) {}
         var info = r.customCodeInfo || { kind: 'none', text: '' };
         var codeExport = info.kind === 'url' ? 'Hosted URL: ' + info.text : (info.text || '');
-        return [i + 1, r.name, r.typeLabel, r.rulesCount, r.extensionsCount, r.dataElementsCount, codeExport].map(toCsvCell).join(',');
+        var ruleNames = (r.ruleNames || []).join('; ');
+        var extNames = (r.extensionNames || []).join('; ');
+        var deNames = (r.dataElementNames || []).join('; ');
+        return [i + 1, r.name, r.typeLabel, extName, mp, storageDuration, defaultValue, cleanText, forceLower, settingsJson, codeExport, ruleNames, extNames, deNames].map(toCsvCell).join(',');
       })
     );
     var csvContent = '\uFEFF' + csvLines.join('\r\n');

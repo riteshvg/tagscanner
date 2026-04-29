@@ -9,14 +9,16 @@
  *   dynamodb:PutItem / GetItem / UpdateItem / Query / Scan on arn:aws:dynamodb:*:*:table/tagscanner_*
  *
  * DynamoDB tables to create (all in same region as Lambda):
- *   tagscanner_users      — PK: userId (String)
- *   tagscanner_sessions   — PK: sessionToken (String)  [enable TTL on "expiresAt"]
- *   tagscanner_queries    — PK: userId (String), SK: queryId (String)
- *   tagscanner_ratelimits — PK: pk (String)            [enable TTL on "ttl"]
- *   tagscanner_config     — PK: pk (String)            [enable TTL on "ttl"]
+ *   tagscanner_users       — PK: userId (String)
+ *   tagscanner_sessions    — PK: sessionToken (String)  [enable TTL on "expiresAt"]
+ *   tagscanner_queries     — PK: userId (String), SK: queryId (String)
+ *   tagscanner_ratelimits  — PK: pk (String)            [enable TTL on "ttl"]
+ *   tagscanner_config      — PK: pk (String)            [enable TTL on "ttl"]
  *     Items:
  *       { pk: "global", ai_enabled: true, disabled_reason: "", cost_limit_usd: 5.00 }
  *       { pk: "cost#YYYY-MM-DD", cost_usd: 0.00, ttl: <epoch> }
+ *   tagscanner_scan_cache    — PK: cache_key (String)     [enable TTL on "ttl"]
+ *   tagscanner_explain_cache — PK: code_hash (String)    [enable TTL on "ttl"]
  *
  * Environment variables:
  *   BEDROCK_MODEL_ID  (default: us.anthropic.claude-3-5-haiku-20241022-v1:0)
@@ -24,8 +26,9 @@
  *   USERS_TABLE       (default: tagscanner_users)
  *   SESSIONS_TABLE    (default: tagscanner_sessions)
  *   QUERIES_TABLE     (default: tagscanner_queries)
- *   RATE_TABLE             (default: tagscanner_ratelimits)  — PK: pk (String), enable TTL on "ttl"
- *   CONFIG_TABLE           (default: tagscanner_config)      — PK: pk (String), enable TTL on "ttl"
+ *   RATE_TABLE             (default: tagscanner_ratelimits)   — PK: pk (String), enable TTL on "ttl"
+ *   CONFIG_TABLE           (default: tagscanner_config)       — PK: pk (String), enable TTL on "ttl"
+ *   SCAN_CACHE_TABLE       (default: tagscanner_scan_cache)   — PK: cache_key (String), enable TTL on "ttl"
  *   DAILY_REQUEST_CAP      (default: 20)    — max AI requests per user per day
  *   DEFAULT_COST_LIMIT_USD (default: 5.00)  — daily cost cap used before admin sets one via dashboard
  *   ADMIN_EMAIL            (required for /users endpoint — set to your email, lowercase)
@@ -37,6 +40,7 @@
 const { BedrockRuntimeClient, InvokeModelCommand } = require('@aws-sdk/client-bedrock-runtime');
 const { DynamoDBClient }                           = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+const nodeCrypto = require('node:crypto');
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +65,9 @@ const ddb       = DynamoDBDocumentClient.from(ddbClient);
 
 const RATE_TABLE        = (process.env.RATE_TABLE        || 'tagscanner_ratelimits').trim();
 const CONFIG_TABLE      = (process.env.CONFIG_TABLE      || 'tagscanner_config').trim();
+const SCAN_CACHE_TABLE    = (process.env.SCAN_CACHE_TABLE    || 'tagscanner_scan_cache').trim();
+const EXPLAIN_CACHE_TABLE = (process.env.EXPLAIN_CACHE_TABLE || 'tagscanner_explain_cache').trim();
+const QUERIES_PROPERTY_INDEX = 'propertyKey-createdAt-index';
 const DAILY_CAP         = parseInt(process.env.DAILY_REQUEST_CAP  || '20', 10);
 const DEFAULT_COST_LIMIT = parseFloat(process.env.DEFAULT_COST_LIMIT_USD || '5.00');
 
@@ -304,7 +311,7 @@ async function getSession(sessionToken) {
   }
 }
 
-async function logQuery(userId, email, type, requestSummary, tokens, resultJson) {
+async function logQuery(userId, email, userName, type, requestSummary, tokens, resultJson, propertyKey) {
   const queryId = new Date().toISOString() + '#' + randomId(8);
   try {
     await ddb.send(new PutCommand({
@@ -314,13 +321,15 @@ async function logQuery(userId, email, type, requestSummary, tokens, resultJson)
         queryId,
         type,
         email,
+        userName:      userName    || '',
+        propertyKey:   propertyKey || '',
         requestSummary,
-        tokens:      tokens     || {},
-        resultJson:  resultJson || null,
-        hasResult:   resultJson ? true : false,
-        feedback:    null,
-        feedbackText: null,
-        createdAt:   new Date().toISOString()
+        tokens:        tokens      || {},
+        resultJson:    resultJson  || null,
+        hasResult:     resultJson  ? true : false,
+        feedback:      null,
+        feedbackText:  null,
+        createdAt:     new Date().toISOString()
       }
     }));
     return queryId;
@@ -330,18 +339,90 @@ async function logQuery(userId, email, type, requestSummary, tokens, resultJson)
   }
 }
 
+// ── Scan cache helpers ────────────────────────────────────────────────────────
+
+async function getCachedScan(cacheKey) {
+  try {
+    const result = await ddb.send(new GetCommand({ TableName: SCAN_CACHE_TABLE, Key: { cache_key: cacheKey } }));
+    return result.Item || null;
+  } catch (err) {
+    console.error('getCachedScan error:', err.message);
+    return null;
+  }
+}
+
+async function putCachedScan(cacheKey, report, tokens, email, name, propertyName, environment) {
+  const ttl = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // 30-day cleanup TTL
+  try {
+    await ddb.send(new PutCommand({
+      TableName: SCAN_CACHE_TABLE,
+      Item: {
+        cache_key:       cacheKey,
+        report:          report,
+        tokens:          tokens,
+        cached_at:       new Date().toISOString(),
+        cached_by_email: email,
+        cached_by_name:  name || email,
+        property_name:   propertyName,
+        environment:     environment,
+        ttl:             ttl
+      }
+    }));
+  } catch (err) {
+    console.error('putCachedScan error:', err.message);
+  }
+}
+
+// ── Explain cache helpers ─────────────────────────────────────────────────────
+
+async function getExplainCache(codeHash) {
+  try {
+    const result = await ddb.send(new GetCommand({ TableName: EXPLAIN_CACHE_TABLE, Key: { code_hash: codeHash } }));
+    return result.Item || null;
+  } catch (err) {
+    console.error('getExplainCache error:', err.message);
+    return null;
+  }
+}
+
+async function putExplainCache(codeHash, explanation, tokens, email, name, componentName, componentType, propertyKey) {
+  const ttl = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+  try {
+    await ddb.send(new PutCommand({
+      TableName: EXPLAIN_CACHE_TABLE,
+      Item: {
+        code_hash:       codeHash,
+        explanation:     explanation,
+        tokens:          tokens,
+        cached_at:       new Date().toISOString(),
+        cached_by_email: email,
+        cached_by_name:  name || email,
+        component_name:  componentName || '',
+        component_type:  componentType || '',
+        property_key:    propertyKey || '',
+        ttl:             ttl
+      }
+    }));
+  } catch (err) {
+    console.error('putExplainCache error:', err.message);
+  }
+}
+
 // ── Detail handler ────────────────────────────────────────────────────────────
 
 async function handleDetail(body) {
-  const { sessionToken, queryId } = body;
+  const { sessionToken, queryId, ownerId } = body;
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session. Please sign in again.' });
   if (!queryId)  return resp(400, { error: 'Missing queryId.' });
 
+  // ownerId lets property-scoped history views fetch another user's query result
+  const lookupUserId = ownerId || session.userId;
+
   try {
     const result = await ddb.send(new GetCommand({
       TableName: QUERIES_TABLE,
-      Key: { userId: session.userId, queryId }
+      Key: { userId: lookupUserId, queryId }
     }));
     if (!result.Item) return resp(404, { error: 'Query not found.' });
     return resp(200, { item: result.Item });
@@ -418,25 +499,40 @@ async function handleAuth(body, sourceIp) {
 // ── History handler ───────────────────────────────────────────────────────────
 
 async function handleHistory(body) {
-  const { sessionToken, limit, lastKey } = body;
+  const { sessionToken, limit, lastKey, propertyKey } = body;
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session. Please sign in again.' });
 
   try {
-    const params = {
-      TableName: QUERIES_TABLE,
-      KeyConditionExpression: 'userId = :uid',
-      ExpressionAttributeValues: { ':uid': session.userId },
-      ScanIndexForward: false,
-      Limit: Math.min(limit || 25, 50)
-    };
+    let params;
+    if (propertyKey) {
+      // Property-scoped: query GSI — all users' activity for this property
+      params = {
+        TableName:                 QUERIES_TABLE,
+        IndexName:                 QUERIES_PROPERTY_INDEX,
+        KeyConditionExpression:    'propertyKey = :pk',
+        ExpressionAttributeValues: { ':pk': propertyKey },
+        ScanIndexForward:          false,
+        Limit:                     Math.min(limit || 25, 50)
+      };
+    } else {
+      // Fallback: user-scoped
+      params = {
+        TableName:                 QUERIES_TABLE,
+        KeyConditionExpression:    'userId = :uid',
+        ExpressionAttributeValues: { ':uid': session.userId },
+        ScanIndexForward:          false,
+        Limit:                     Math.min(limit || 25, 50)
+      };
+    }
     if (lastKey) params.ExclusiveStartKey = lastKey;
 
     const result = await ddb.send(new QueryCommand(params));
     return resp(200, {
-      items:   result.Items || [],
-      lastKey: result.LastEvaluatedKey || null,
-      user:    { email: session.email, name: session.name, picture: session.picture }
+      items:       result.Items || [],
+      lastKey:     result.LastEvaluatedKey || null,
+      propertyKey: propertyKey || null,
+      user:        { email: session.email, name: session.name, picture: session.picture }
     });
   } catch (err) {
     console.error('history error:', err.message);
@@ -644,6 +740,42 @@ exports.handler = async (event) => {
     }
     const identity = { userId: session.userId, email: session.email };
 
+    // Cache checks — happen BEFORE rate limiting so cache hits are always free
+    if (type === 'explain' && body.code) {
+      const codeHash   = nodeCrypto.createHash('sha256').update((body.code || '').trim()).digest('hex').slice(0, 16);
+      const cachedItem = await getExplainCache(codeHash);
+      if (cachedItem) {
+        console.log(JSON.stringify({ ts: new Date().toISOString(), userId: identity.userId, type: 'explain_cache_hit', codeHash }));
+        return resp(200, {
+          explanation: cachedItem.explanation,
+          tokens:      { input: 0, output: 0 },
+          queryId:     null,
+          cached:      true,
+          cached_at:   cachedItem.cached_at,
+          cached_by:   { email: cachedItem.cached_by_email, name: cachedItem.cached_by_name }
+        });
+      }
+    }
+
+    if (type === 'scan' && body.fingerprint && body.payload) {
+      const cp          = body.payload;
+      const cpName      = (cp.property && cp.property.name)        || 'Unknown';
+      const cpEnv       = (cp.property && cp.property.environment) || 'Production';
+      const cacheKey    = cpName + '#' + cpEnv + '#' + body.fingerprint;
+      const cachedItem  = await getCachedScan(cacheKey);
+      if (cachedItem) {
+        console.log(JSON.stringify({ ts: new Date().toISOString(), userId: identity.userId, type: 'scan_cache_hit', cacheKey }));
+        return resp(200, {
+          report:    cachedItem.report,
+          tokens:    { input: 0, output: 0 },
+          queryId:   null,
+          cached:    true,
+          cached_at: cachedItem.cached_at,
+          cached_by: { email: cachedItem.cached_by_email, name: cachedItem.cached_by_name }
+        });
+      }
+    }
+
     // Rate limit by userId
     if (await isRateLimited(identity.userId)) {
       return resp(429, { error: 'Daily AI request limit reached (' + DAILY_CAP + '/day). Try again tomorrow.' });
@@ -663,21 +795,29 @@ exports.handler = async (event) => {
 
     // ── Scan ─────────────────────────────────────────────────────────────────
     if (type === 'scan') {
-      const { payload, userContext } = body;
+      const { payload, userContext, fingerprint } = body;
       if (!payload) return resp(400, { error: 'Missing payload for scan.' });
 
-      const userMsg = JSON.stringify({ user_context: userContext || {}, property_health: payload });
-      const result  = await invokeClaude(SCAN_SYSTEM_PROMPT, userMsg, MAX_TOKENS_SCAN);
-      const report  = parseJSON(result.text);
+      const userMsg      = JSON.stringify({ user_context: userContext || {}, property_health: payload });
+      const result       = await invokeClaude(SCAN_SYSTEM_PROMPT, userMsg, MAX_TOKENS_SCAN);
+      const report       = parseJSON(result.text);
+      const propertyName = (payload.property && payload.property.name)        || 'Unknown property';
+      const environment  = (payload.property && payload.property.environment) || 'Production';
+      const propertyKey  = propertyName + '#' + environment;
 
-      const propertyName = (payload && payload.property && payload.property.name) || 'Unknown property';
       const [queryId, newDayCost] = await Promise.all([
-        logQuery(identity.userId, identity.email, 'scan', 'Property scan: ' + propertyName,
-          { input: result.inputTokens, output: result.outputTokens }, report),
+        logQuery(identity.userId, identity.email, session.name, 'scan', 'Property scan: ' + propertyName,
+          { input: result.inputTokens, output: result.outputTokens }, report, propertyKey),
         trackCost(result.inputTokens, result.outputTokens)
       ]);
 
-      // Auto-disable if the new daily total now exceeds the limit
+      // Store in scan cache keyed by composition fingerprint
+      if (fingerprint) {
+        const cacheKey = propertyName + '#' + environment + '#' + fingerprint;
+        putCachedScan(cacheKey, report, { input: result.inputTokens, output: result.outputTokens },
+          identity.email, session.name, propertyName, environment).catch(() => {});
+      }
+
       if (newDayCost > aiConfig.cost_limit_usd) {
         autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached. AI disabled automatically.').catch(() => {});
       }
@@ -685,13 +825,14 @@ exports.handler = async (event) => {
       return resp(200, {
         report,
         tokens:  { input: result.inputTokens, output: result.outputTokens },
-        queryId: queryId || null
+        queryId: queryId || null,
+        cached:  false
       });
     }
 
     // ── Explain ───────────────────────────────────────────────────────────────
     if (type === 'explain') {
-      const { code, metadata } = body;
+      const { code, metadata, propertyKey } = body;
       if (!code) return resp(400, { error: 'Missing code for explain.' });
 
       const userMsg     = JSON.stringify({ code, metadata: metadata || {} });
@@ -699,12 +840,17 @@ exports.handler = async (event) => {
       const explanation = parseJSON(result.text);
 
       const componentName = (metadata && metadata.name) || 'unknown';
+      const codeHash      = nodeCrypto.createHash('sha256').update((code || '').trim()).digest('hex').slice(0, 16);
+
       const [queryId, newDayCost] = await Promise.all([
-        logQuery(identity.userId, identity.email, 'explain',
+        logQuery(identity.userId, identity.email, session.name, 'explain',
           'Explain ' + (metadata && metadata.type || '') + ': ' + componentName,
-          { input: result.inputTokens, output: result.outputTokens }, explanation),
+          { input: result.inputTokens, output: result.outputTokens }, explanation, propertyKey || ''),
         trackCost(result.inputTokens, result.outputTokens)
       ]);
+
+      putExplainCache(codeHash, explanation, { input: result.inputTokens, output: result.outputTokens },
+        identity.email, session.name, componentName, metadata && metadata.type, propertyKey).catch(() => {});
 
       if (newDayCost > aiConfig.cost_limit_usd) {
         autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached. AI disabled automatically.').catch(() => {});

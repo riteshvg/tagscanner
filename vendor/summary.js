@@ -1210,14 +1210,15 @@ function loadCachedAIReport() {
   } catch (e) { return null; }
 }
 
-function saveCachedAIReport(report, tokens, costUsd) {
+function saveCachedAIReport(report, tokens, costUsd, fingerprint) {
   try {
     localStorage.setItem(getAICacheKey(), JSON.stringify({
-      v:       AI_CACHE_VERSION,
-      ts:      Date.now(),
-      report:  report,
-      tokens:  tokens,
-      costUsd: costUsd
+      v:           AI_CACHE_VERSION,
+      ts:          Date.now(),
+      report:      report,
+      tokens:      tokens,
+      costUsd:     costUsd,
+      fingerprint: fingerprint || null
     }));
   } catch (e) {}
 }
@@ -1379,7 +1380,7 @@ async function runAIScan(user, config) {
       try { localStorage.setItem('tagscanner_last_query_id', result.queryId); } catch(e) {}
     }
     if (!result.cached) {
-      saveCachedAIReport(result.report, result.tokens, result.cost_usd);
+      saveCachedAIReport(result.report, result.tokens, result.cost_usd, effectiveConfig.fingerprint || null);
     }
     renderHealthReport(
       result.report, result.tokens, result.cost_usd,
@@ -1602,7 +1603,86 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
     footerRow.style.cssText = 'text-align:right;margin-top:14px;padding-top:10px;border-top:1px solid #f3f4f6;font-size:11.5px;color:#9ca3af;';
     footerRow.innerHTML = '<button id="btnRescan" style="font-size:11.5px;color:#27c5c1;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;">Re-analyze</button>';
     container.appendChild(footerRow);
-    document.getElementById('btnRescan').addEventListener('click', function() {
+
+    document.getElementById('btnRescan').addEventListener('click', async function () {
+      var cachedEntry = loadCachedAIReport();
+      var storedFingerprint = cachedEntry && cachedEntry.fingerprint;
+      var currentFingerprint;
+
+      if (storedFingerprint && window.TagScannerHealthPayload && window.TagScannerHealthPayload.computeFingerprint) {
+        try {
+          currentFingerprint = await window.TagScannerHealthPayload.computeFingerprint({
+            dataElements: _aiHealthData.dataElements,
+            rules:        _aiHealthData.rules,
+            extensions:   _aiHealthData.extensions
+          });
+        } catch (e) {}
+      }
+
+      var compositionUnchanged = currentFingerprint && storedFingerprint && currentFingerprint === storedFingerprint;
+      var compositionChanged   = currentFingerprint && storedFingerprint && currentFingerprint !== storedFingerprint;
+
+      if (compositionUnchanged) {
+        // Definitely unchanged — show warning with Cancel only
+        var existing = document.getElementById('rescan-unchanged-notice');
+        if (existing) { existing.remove(); return; }
+
+        var notice = document.createElement('div');
+        notice.id = 'rescan-unchanged-notice';
+        notice.style.cssText = 'margin-top:10px;padding:10px 12px;background:#fefce8;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:6px;font-size:12px;color:#92400e;text-align:left;';
+        notice.innerHTML =
+          '<strong><i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>Property unchanged</strong>' +
+          '<div style="margin-top:4px;">The data elements, rules, and extensions in this property have not changed since this report was generated. Re-analyzing will produce an identical result.</div>' +
+          '<div style="margin-top:8px;display:flex;gap:8px;">' +
+            '<button id="btnRescanCancel" style="padding:4px 12px;font-size:12px;background:none;border:1px solid #fde68a;border-radius:4px;cursor:pointer;color:#92400e;">Cancel</button>' +
+          '</div>';
+        footerRow.appendChild(notice);
+
+        document.getElementById('btnRescanCancel').addEventListener('click', function () {
+          notice.remove();
+        });
+        return;
+      }
+
+      if (compositionChanged) {
+        // Definitely changed — show centered modal confirmation
+        var existingOverlay = document.getElementById('rescan-changed-overlay');
+        if (existingOverlay) { existingOverlay.remove(); }
+
+        var overlay = document.createElement('div');
+        overlay.id = 'rescan-changed-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;';
+
+        var modal = document.createElement('div');
+        modal.style.cssText = 'background:#fff;border-radius:10px;padding:24px 28px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.18);font-size:13px;color:#1e293b;text-align:left;';
+        modal.innerHTML =
+          '<div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:#1d4ed8;margin-bottom:10px;">' +
+            '<i class="fas fa-sync-alt"></i>Property has changed' +
+          '</div>' +
+          '<div style="color:#374151;line-height:1.5;">The property composition has changed since this report was generated. Re-analyzing will reflect the latest state.</div>' +
+          '<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">' +
+            '<button id="btnRescanCancel" style="padding:6px 16px;font-size:12px;background:none;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;color:#64748b;">Cancel</button>' +
+            '<button id="btnRescanConfirm" style="padding:6px 16px;font-size:12px;background:#3b82f6;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:500;">Re-analyze</button>' +
+          '</div>';
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        document.getElementById('btnRescanConfirm').addEventListener('click', function () {
+          overlay.remove();
+          localStorage.removeItem(getAICacheKey());
+          showAIState('prompt');
+        });
+        document.getElementById('btnRescanCancel').addEventListener('click', function () {
+          overlay.remove();
+        });
+        overlay.addEventListener('click', function (e) {
+          if (e.target === overlay) { overlay.remove(); }
+        });
+        return;
+      }
+
+      // Can't compare fingerprints (no stored fingerprint or computation failed) — proceed directly
       localStorage.removeItem(getAICacheKey());
       showAIState('prompt');
     });

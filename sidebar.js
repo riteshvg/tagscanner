@@ -143,6 +143,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (e.key === 'tagscanner_session') {
       setAuthButtonState(isSignedIn());
       renderTopbarUser();
+      if (window._revealDashboardIfAdmin) window._revealDashboardIfAdmin();
     }
   });
 
@@ -167,6 +168,7 @@ document.addEventListener('DOMContentLoaded', function () {
           await window.TagScannerAuth.signInWithGoogle();
           setAuthButtonState(true);
           renderTopbarUser();
+          if (window._revealDashboardIfAdmin) window._revealDashboardIfAdmin();
         } catch (err) {
           authBtn.innerHTML = '<i class="px-1 fas fa-exclamation-circle"></i><span>Failed</span>';
           setTimeout(function () { setAuthButtonState(false); }, 2000);

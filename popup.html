@@ -394,9 +394,9 @@
             </a>
           </li>
 
-          <hr style="border-color:rgba(255,255,255,0.15);margin:8px 0" />
+          <hr id="dashboard-divider" style="border-color:rgba(255,255,255,0.15);margin:8px 0;display:none" />
 
-          <li class="mb-1">
+          <li class="mb-1" id="dashboard-menu-item" style="display:none">
             <a id="dashboard-menu-link" href="vendor/dashboard.html" target="iframe2">
               <button id="dashboard-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Activity Dashboard">
                 <i class="px-1 fas fa-tachometer-alt"></i>
@@ -622,6 +622,23 @@
   <script src="js/sb-admin-2.min.js"></script>
 
   <script src="vendor/auth.js"></script>
+  <script>
+    (function () {
+      var ADMIN_EMAIL = 'riteshvgupta@gmail.com';
+      function revealDashboardIfAdmin() {
+        var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
+        var isAdmin = session && session.email && session.email.toLowerCase() === ADMIN_EMAIL;
+        var show = isAdmin ? '' : 'none';
+        var el  = document.getElementById('dashboard-menu-item');
+        var hr  = document.getElementById('dashboard-divider');
+        if (el) el.style.display  = isAdmin ? '' : 'none';
+        if (hr) hr.style.display  = isAdmin ? '' : 'none';
+      }
+      // Check on load and expose for re-check after sign-in
+      revealDashboardIfAdmin();
+      window._revealDashboardIfAdmin = revealDashboardIfAdmin;
+    })();
+  </script>
   <script src="popup.js"></script>
   <script src="sidebar.js"></script>
   <!-- <script src="sform.js"></script> -->

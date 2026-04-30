@@ -137,6 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Set initial state
   setAuthButtonState(isSignedIn());
   renderTopbarUser();
+  if (window._revealDashboardIfAdmin) window._revealDashboardIfAdmin();
 
   // React to sign-in/out happening inside iframes (dashboard, etc.)
   window.addEventListener('storage', function (e) {

@@ -623,21 +623,22 @@
 
   <script src="vendor/auth.js"></script>
   <script>
-    (function () {
+    window._revealDashboardIfAdmin = function () {
       var ADMIN_EMAIL = 'riteshvgupta@gmail.com';
-      function revealDashboardIfAdmin() {
-        var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
-        var isAdmin = session && session.email && session.email.toLowerCase() === ADMIN_EMAIL;
-        var show = isAdmin ? '' : 'none';
-        var el  = document.getElementById('dashboard-menu-item');
-        var hr  = document.getElementById('dashboard-divider');
-        if (el) el.style.display  = isAdmin ? '' : 'none';
-        if (hr) hr.style.display  = isAdmin ? '' : 'none';
-      }
-      // Check on load and expose for re-check after sign-in
-      revealDashboardIfAdmin();
-      window._revealDashboardIfAdmin = revealDashboardIfAdmin;
-    })();
+      var isAdmin = false;
+      try {
+        var raw = localStorage.getItem('tagscanner_session');
+        if (raw) {
+          var s = JSON.parse(raw);
+          isAdmin = !!(s && s.email && s.email.toLowerCase() === ADMIN_EMAIL);
+        }
+      } catch (e) {}
+      var el = document.getElementById('dashboard-menu-item');
+      var hr = document.getElementById('dashboard-divider');
+      if (el) el.style.display = isAdmin ? '' : 'none';
+      if (hr) hr.style.display = isAdmin ? '' : 'none';
+    };
+    window._revealDashboardIfAdmin();
   </script>
   <script src="popup.js"></script>
   <script src="sidebar.js"></script>

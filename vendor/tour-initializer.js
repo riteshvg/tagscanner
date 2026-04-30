@@ -20,8 +20,6 @@
       pageName = 'dataElements';
     } else if (path.includes('extension.html')) {
       pageName = 'extensions';
-    } else if (path.includes('summary.html')) {
-      pageName = 'summary';
     } else if (path.includes('relationship-diagram.html')) {
       pageName = 'mapping';
     } else if (path.includes('flow.html')) {
@@ -174,43 +172,6 @@
           element: '.download-button',
           intro: 'Export the extensions data to CSV format for analysis in Excel or other tools.',
           position: 'left',
-        },
-      ],
-
-      // Summary page tour
-      summary: [
-        {
-          intro: 'Welcome to the Summary page! This page provides an overview of your Adobe Tags property and helps you identify optimization opportunities.',
-          position: 'center',
-        },
-        {
-          element: '.data-element-card',
-          intro: 'This card shows data element usage: counts of unused vs total, and a list of unused data elements you can consider removing to reduce property size.',
-          position: 'bottom',
-        },
-        {
-          element: '.rule-card',
-          intro: 'This card shows rules usage: counts of unused vs total, and a list of unused rules you can consider removing to optimize performance.',
-          position: 'bottom',
-        },
-        {
-          element: '.extension-card',
-          intro: 'This card shows extensions usage: counts of unused vs total, and a list of unused extensions you can consider removing.',
-          position: 'bottom',
-        },
-        {
-          element: '.property-details-card',
-          intro: 'This card shows your property details including name, environment, and total size. It helps you understand the overall impact of your implementation.',
-          position: 'bottom',
-        },
-        {
-          element: '#download-pdf',
-          intro: 'Generate a PDF report that you can share with your team or stakeholders. The report includes all the summary information in a print-friendly format.',
-          position: 'left',
-        },
-        {
-          intro: 'The summary helps you identify unused components that add weight to your property. Removing them can improve page load times and reduce costs.',
-          position: 'center',
         },
       ],
 

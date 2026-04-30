@@ -470,6 +470,81 @@
     });
   }
 
+  // ── Customer Feedback ────────────────────────────────────────────────────
+
+  var RATING_CSS = {
+    'Love it':          'rating-love',
+    "It's helpful":     'rating-helpful',
+    'Could be better':  'rating-meh',
+    'Not helpful':      'rating-bad'
+  };
+  var RATING_ICON = {
+    'Love it':          'fa-heart',
+    "It's helpful":     'fa-thumbs-up',
+    'Could be better':  'fa-meh',
+    'Not helpful':      'fa-thumbs-down'
+  };
+
+  async function fetchAndRenderFeedback(session) {
+    var wrap    = document.getElementById('feedbackTableWrap');
+    var countEl = document.getElementById('feedbackCount');
+    try {
+      var data  = await callLambda({ type: 'getFeedback', sessionToken: session.sessionToken });
+      var items = data.items || [];
+
+      if (countEl) countEl.textContent = items.length + ' entr' + (items.length === 1 ? 'y' : 'ies');
+
+      if (!items.length) {
+        wrap.innerHTML = '<div class="empty-state"><i class="fas fa-comment"></i>No feedback submitted yet.</div>';
+        return;
+      }
+
+      var rows = items.map(function (item) {
+        var cssClass  = RATING_CSS[item.rating]  || 'rating-unknown';
+        var iconClass = RATING_ICON[item.rating] || 'fa-star';
+        var ratingBadge = '<span class="rating-pill ' + cssClass + '">' +
+          '<i class="fas ' + iconClass + '"></i>' + esc(item.rating || '—') + '</span>';
+
+        var catBadge = '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;background:#eff4ff;color:#3730a3">' +
+          esc(item.category || 'General') + '</span>';
+
+        var when = item.submittedAt
+          ? new Date(item.submittedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+          : '—';
+
+        var nameHtml  = item.name  ? esc(item.name)  : '';
+        var emailHtml = item.email ? '<span style="font-size:10px;color:#9ca3af">' + esc(item.email) + '</span>' : '';
+        var userCell  = (nameHtml || emailHtml)
+          ? (nameHtml ? '<div style="font-size:12px;font-weight:500">' + nameHtml + '</div>' : '') + emailHtml
+          : '<span style="font-size:11px;color:#d1d5db">Anonymous</span>';
+
+        return '<tr>' +
+          '<td style="white-space:nowrap;font-size:11px;color:#6b7280">' + when + '</td>' +
+          '<td>' + userCell + '</td>' +
+          '<td>' + ratingBadge + '</td>' +
+          '<td>' + catBadge + '</td>' +
+          '<td class="feedback-msg-cell">' + esc(item.message || '') + '</td>' +
+          '</tr>';
+      }).join('');
+
+      wrap.innerHTML =
+        '<table class="users-table">' +
+          '<thead><tr>' +
+            '<th>Date</th>' +
+            '<th>User</th>' +
+            '<th>Rating</th>' +
+            '<th>Category</th>' +
+            '<th>Message</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>';
+    } catch (err) {
+      if (wrap) wrap.innerHTML =
+        '<div style="padding:16px;color:#ef4444;font-size:12px">' +
+        '<i class="fas fa-exclamation-circle" style="margin-right:6px"></i>' + esc(err.message) + '</div>';
+    }
+  }
+
   // ── AI Controls ──────────────────────────────────────────────────────────
 
   async function fetchAndRenderAIControl(session) {
@@ -623,6 +698,7 @@
       showState('dashboard');
       fetchAndRenderUsers(session);
       fetchAndRenderAIControl(session);
+      fetchAndRenderFeedback(session);
 
     } catch (err) {
       renderProfile(session, null);
@@ -631,6 +707,7 @@
       showState('dashboard');
       fetchAndRenderUsers(session);
       fetchAndRenderAIControl(session);
+      fetchAndRenderFeedback(session);
     }
   }
 

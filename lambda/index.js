@@ -19,6 +19,7 @@
  *       { pk: "cost#YYYY-MM-DD", cost_usd: 0.00, ttl: <epoch> }
  *   tagscanner_scan_cache    — PK: cache_key (String)     [enable TTL on "ttl"]
  *   tagscanner_explain_cache — PK: code_hash (String)    [enable TTL on "ttl"]
+ *   tagscanner_feedback      — PK: feedbackId (String)
  *
  * Environment variables:
  *   BEDROCK_MODEL_ID  (default: us.anthropic.claude-3-5-haiku-20241022-v1:0)
@@ -67,6 +68,7 @@ const RATE_TABLE        = (process.env.RATE_TABLE        || 'tagscanner_ratelimi
 const CONFIG_TABLE      = (process.env.CONFIG_TABLE      || 'tagscanner_config').trim();
 const SCAN_CACHE_TABLE    = (process.env.SCAN_CACHE_TABLE    || 'tagscanner_scan_cache').trim();
 const EXPLAIN_CACHE_TABLE = (process.env.EXPLAIN_CACHE_TABLE || 'tagscanner_explain_cache').trim();
+const FEEDBACK_TABLE      = (process.env.FEEDBACK_TABLE      || 'tagscanner_feedback').trim();
 const QUERIES_PROPERTY_INDEX = 'propertyKey-createdAt-index';
 const DAILY_CAP         = parseInt(process.env.DAILY_REQUEST_CAP  || '20', 10);
 const DEFAULT_COST_LIMIT = parseFloat(process.env.DEFAULT_COST_LIMIT_USD || '5.00');
@@ -566,6 +568,54 @@ async function handleFeedback(body) {
   }
 }
 
+// ── General feedback (no auth required) ──────────────────────────────────────
+
+async function handleGeneralFeedback(body, sourceIp) {
+  const { name, email, rating, category, message } = body;
+  if (!message || !String(message).trim()) return resp(400, { error: 'Message is required.' });
+
+  const feedbackId = new Date().toISOString() + '-' + nodeCrypto.randomBytes(4).toString('hex');
+  try {
+    await ddb.send(new PutCommand({
+      TableName: FEEDBACK_TABLE,
+      Item: {
+        feedbackId,
+        name:        String(name    || '').trim().slice(0, 200),
+        email:       String(email   || '').trim().toLowerCase().slice(0, 200),
+        rating:      String(rating  || '').slice(0, 50),
+        category:    String(category || 'General Feedback').slice(0, 100),
+        message:     String(message).trim().slice(0, 5000),
+        submittedAt: new Date().toISOString(),
+        sourceIp:    sourceIp || null
+      }
+    }));
+    return resp(200, { ok: true });
+  } catch (err) {
+    console.error('handleGeneralFeedback error:', err.message);
+    return resp(500, { error: 'Could not save feedback.' });
+  }
+}
+
+// ── Get all general feedback (admin only) ─────────────────────────────────────
+
+async function handleGetFeedback(body) {
+  const { sessionToken } = body;
+  const session = await getSession(sessionToken);
+  if (!session) return resp(401, { error: 'Invalid or expired session.' });
+  if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
+  if (session.email.toLowerCase() !== ADMIN_EMAIL) return resp(403, { error: 'Admin access required.' });
+
+  try {
+    const result = await ddb.send(new ScanCommand({ TableName: FEEDBACK_TABLE }));
+    const items  = (result.Items || []).sort((a, b) =>
+      (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+    return resp(200, { items });
+  } catch (err) {
+    console.error('handleGetFeedback error:', err.message);
+    return resp(500, { error: err.message || 'Could not fetch feedback.' });
+  }
+}
+
 // ── Users list (admin only) ───────────────────────────────────────────────────
 
 async function handleUsers(body) {
@@ -723,8 +773,14 @@ exports.handler = async (event) => {
     // ── Detail ──────────────────────────────────────────────────────────────
     if (type === 'detail') return handleDetail(body);
 
-    // ── Feedback ────────────────────────────────────────────────────────────
+    // ── Feedback (query-level rating) ───────────────────────────────────────
     if (type === 'feedback') return handleFeedback(body);
+
+    // ── General feedback form (no auth required) ─────────────────────────────
+    if (type === 'generalFeedback') return handleGeneralFeedback(body, sourceIp);
+
+    // ── Get general feedback (admin only) ────────────────────────────────────
+    if (type === 'getFeedback') return await handleGetFeedback(body);
 
     // ── Users (admin) ───────────────────────────────────────────────────────
     if (type === 'users') return await handleUsers(body);

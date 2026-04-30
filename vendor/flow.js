@@ -1,4 +1,87 @@
 (function () {
+
+  function generateFlowSkeleton() {
+    // Pill geometry
+    var PH = 26, RX = 13;
+
+    // Column x anchors
+    var DEX = 55,  DIV1 = 310;
+    var RUX = 325, DIV2 = 592;
+    var EXX = 610;
+
+    // DE pills  [y, width]
+    var de = [[65,165],[99,140],[133,175],[167,150],[201,160],[235,135]];
+    // Rule pills [y, width]
+    var ru = [[75,170],[135,155],[195,165],[245,145]];
+    // Ext pills  [y, width]
+    var ex = [[100,170],[178,155],[248,165]];
+
+    function cy(y) { return y + RX; }
+    function rx(x, w) { return x + w; }
+
+    // Links: [fromColRight, fromIdx, toColLeft, toIdx]
+    var deToRu = [[0,0],[0,1],[2,0],[2,2],[4,2],[5,3]];
+    var ruToEx  = [[0,0],[1,0],[2,1],[2,2],[3,2]];
+
+    var parts = [];
+
+    parts.push('<svg width="100%" viewBox="0 0 900 320" preserveAspectRatio="xMidYMid meet" style="display:block;overflow:visible">');
+
+    // Column dividers
+    parts.push('<line x1="' + DIV1 + '" y1="18" x2="' + DIV1 + '" y2="292" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 4"/>');
+    parts.push('<line x1="' + DIV2 + '" y1="18" x2="' + DIV2 + '" y2="292" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 4"/>');
+
+    // Column header labels
+    var labelStyle = 'font-size="11" font-weight="600" letter-spacing="1" font-family="system-ui,sans-serif"';
+    parts.push('<text x="' + DEX + '" y="38" ' + labelStyle + ' fill="#0d9488">DATA ELEMENTS</text>');
+    parts.push('<text x="' + RUX + '" y="38" ' + labelStyle + ' fill="#2563eb">RULES</text>');
+    parts.push('<text x="' + EXX + '" y="38" ' + labelStyle + ' fill="#64748b">EXTENSIONS</text>');
+
+    // Links DE → Rule
+    deToRu.forEach(function(pair, i) {
+      var x1 = rx(DEX, de[pair[0]][1]), y1 = cy(de[pair[0]][0]);
+      var x2 = RUX,                     y2 = cy(ru[pair[1]][0]);
+      var cpx = (x1 + x2) / 2;
+      parts.push('<path class="fsl" d="M' + x1 + ',' + y1 + ' C' + cpx + ',' + y1 + ' ' + cpx + ',' + y2 + ' ' + x2 + ',' + y2 + '"'
+        + ' fill="none" stroke="#cbd5e1" stroke-width="1.5" style="animation-delay:' + (i * 0.15) + 's"/>');
+    });
+
+    // Links Rule → Ext
+    ruToEx.forEach(function(pair, i) {
+      var x1 = rx(RUX, ru[pair[0]][1]), y1 = cy(ru[pair[0]][0]);
+      var x2 = EXX,                     y2 = cy(ex[pair[1]][0]);
+      var cpx = (x1 + x2) / 2;
+      parts.push('<path class="fsl" d="M' + x1 + ',' + y1 + ' C' + cpx + ',' + y1 + ' ' + cpx + ',' + y2 + ' ' + x2 + ',' + y2 + '"'
+        + ' fill="none" stroke="#cbd5e1" stroke-width="1.5" style="animation-delay:' + (i * 0.15 + 0.3) + 's"/>');
+    });
+
+    // DE pills (mint teal)
+    de.forEach(function(p, i) {
+      parts.push('<rect class="fsp" x="' + DEX + '" y="' + p[0] + '" width="' + p[1] + '" height="' + PH + '" rx="' + RX + '"'
+        + ' fill="#a7f3d0" style="animation-delay:' + (i * 0.1) + 's"/>');
+    });
+
+    // Rule pills (sky blue)
+    ru.forEach(function(p, i) {
+      parts.push('<rect class="fsp" x="' + RUX + '" y="' + p[0] + '" width="' + p[1] + '" height="' + PH + '" rx="' + RX + '"'
+        + ' fill="#bfdbfe" style="animation-delay:' + (i * 0.1 + 0.2) + 's"/>');
+    });
+
+    // Ext pills (slate gray)
+    ex.forEach(function(p, i) {
+      parts.push('<rect class="fsp" x="' + EXX + '" y="' + p[0] + '" width="' + p[1] + '" height="' + PH + '" rx="' + RX + '"'
+        + ' fill="#e2e8f0" style="animation-delay:' + (i * 0.1 + 0.4) + 's"/>');
+    });
+
+    // Hint text
+    parts.push('<text x="450" y="312" text-anchor="middle" font-size="12" fill="#94a3b8" font-family="system-ui,sans-serif">'
+      + 'Search for a component above to explore its connections'
+      + '</text>');
+
+    parts.push('</svg>');
+    return parts.join('');
+  }
+
   var NODE_HEIGHT = 28;
   var NODE_WIDTH = 16;
   var NODE_GAP = 8;
@@ -675,7 +758,7 @@
       var w = Math.max(container.clientWidth || 900, container.getBoundingClientRect().width || 900);
       var h = Math.max(400, (flowData.nodes.length ? Math.max(flowData.nodes.filter(function (n) { return n.column === 0; }).length, flowData.nodes.filter(function (n) { return n.column === 1; }).length, flowData.nodes.filter(function (n) { return n.column === 2; }).length) * (NODE_HEIGHT + NODE_GAP) + VERT_PADDING * 2 + 24 : 400));
       if (!flowData.nodes.length) {
-        container.innerHTML = '<div class="flow-empty">Type or select a data element, rule, or extension above to see its flow.</div>';
+        container.innerHTML = generateFlowSkeleton();
       } else {
         render(container, flowData, w, h, rels, extensions);
       }

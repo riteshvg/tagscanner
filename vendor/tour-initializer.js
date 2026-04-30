@@ -24,6 +24,10 @@
       pageName = 'summary';
     } else if (path.includes('relationship-diagram.html')) {
       pageName = 'mapping';
+    } else if (path.includes('flow.html')) {
+      pageName = 'flow';
+    } else if (path.includes('history.html')) {
+      pageName = 'history';
     }
 
     if (!pageName) {
@@ -206,6 +210,63 @@
         },
         {
           intro: 'The summary helps you identify unused components that add weight to your property. Removing them can improve page load times and reduce costs.',
+          position: 'center',
+        },
+      ],
+
+      // Flow page tour
+      flow: [
+        {
+          intro: 'Welcome to the Flow view! This page shows how Data Elements, Rules, and Extensions connect in your Adobe Tags property — all in one visual diagram.',
+          position: 'center',
+        },
+        {
+          element: '.flow-info-panel',
+          intro: 'This panel explains how to read the diagram. Components flow left to right: Data Elements feed into Rules, and Rules use Extensions.',
+          position: 'bottom',
+        },
+        {
+          element: '#flowSearch',
+          intro: 'Type a component name here to filter the diagram and see only that component\'s connections. Great for quickly tracing how a single data element or rule is wired up.',
+          position: 'bottom',
+        },
+        {
+          element: '.flow-chart-container',
+          intro: 'This is the flow diagram. Each pill represents a Data Element (teal), Rule (blue), or Extension (gray). Arrows show the connections between them.',
+          position: 'top',
+        },
+        {
+          intro: 'Click any node in the diagram to highlight its direct connections and dim everything else. Click the same node again, or press Escape, to clear the selection.',
+          position: 'center',
+        },
+        {
+          intro: 'For full details, CSV exports, and sorting — use the Rules, Data Elements, and Extensions tabs in the sidebar.',
+          position: 'center',
+        },
+      ],
+
+      // Scan History page tour
+      history: [
+        {
+          intro: 'Welcome to Property AI History! This page shows all AI scans and explain queries that have been run on this property, across all team members.',
+          position: 'center',
+        },
+        {
+          element: '.filter-bar',
+          intro: 'Use these filters to narrow the list. "All" shows every query, "Scans" shows full property health analyses, and "Explains" shows custom code explanations.',
+          position: 'bottom',
+        },
+        {
+          element: '.history-list',
+          intro: 'Each card represents one AI query. It shows the type, a summary of what was asked or analyzed, who ran it, and when.',
+          position: 'bottom',
+        },
+        {
+          intro: 'On each card you can rate the AI response with a thumbs up or down, and leave written feedback. Your input helps improve future results.',
+          position: 'center',
+        },
+        {
+          intro: 'If there are more queries to show, a "Load more" button appears at the bottom of the list so you can browse older history entries.',
           position: 'center',
         },
       ],

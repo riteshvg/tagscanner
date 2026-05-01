@@ -379,11 +379,6 @@
     document.getElementById('prevPage').disabled = currentPage <= 1;
     document.getElementById('nextPage').disabled = totalPages === 0 || currentPage >= totalPages;
 
-    var countEl = document.getElementById('extCountInfo');
-    if (countEl) {
-      if (visibleRows.length === 0) countEl.textContent = 'No extensions match.';
-      else countEl.textContent = 'Showing ' + (start + 1) + '\u2013' + end + ' of ' + builtExtensionCount + ' extension' + (builtExtensionCount !== 1 ? 's' : '');
-    }
   }
 
   function showPage(page) {

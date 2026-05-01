@@ -109,9 +109,33 @@ a {
   min-width: 60px;
   transition: all 0.3s ease;
   overflow-x: hidden;
+  overflow-y: hidden;
   background-color: #252525;
   border-right: 1px solid #dee2e6;
   padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Copyright pinned to bottom of sidebar */
+.sidebar-copyright {
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Hide copyright text when sidebar is collapsed */
+#sidebar-click:not(.active) .sidebar-copyright {
+  opacity: 0;
+  visibility: hidden;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
 }
 
 #sidebar-click:not(.active) {

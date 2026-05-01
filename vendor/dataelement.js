@@ -1573,6 +1573,18 @@ if (de_details_node) {
     document.getElementById('prevPage').disabled = currentPage === 1;
     document.getElementById('nextPage').disabled = currentPage >= totalPages;
     sessionStorage.setItem('dataElementsCurrentPage', currentPage);
+
+    var countEl = document.getElementById('deCountInfo');
+    if (countEl) {
+      var visibleCount = visibleMain.length;
+      var start = (currentPage - 1) * rowsPerPage;
+      var end = Math.min(start + rowsPerPage, visibleCount);
+      if (visibleCount === 0) {
+        countEl.textContent = 'No data elements match.';
+      } else {
+        countEl.textContent = 'Showing ' + (start + 1) + '–' + end + ' of ' + visibleCount + ' data element' + (visibleCount !== 1 ? 's' : '');
+      }
+    }
   }
 
   function showPage(page) {

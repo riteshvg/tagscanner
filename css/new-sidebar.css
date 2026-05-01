@@ -291,6 +291,14 @@ a {
   text-decoration: none;
 }
 
+/* Active/selected menu item */
+#sidebar-click .btn-toggle.nav-active {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.18);
+  border-left: 3px solid #4e73df;
+  padding-left: calc(1rem - 3px);
+}
+
 .btn.btn-toggle:hover,
 .btn.btn-toggle:focus {
   color: #007bff;

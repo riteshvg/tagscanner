@@ -148,6 +148,16 @@ a {
   overflow: hidden;
 }
 
+/* Hide group labels when collapsed — also remove their height so no gap remains */
+#sidebar-click:not(.active) .sidebar-group-label {
+  opacity: 0;
+  visibility: hidden;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
 /* Show text elements when sidebar is expanded */
 #sidebar-click.active .sidebar-brand-text,
 #sidebar-click.active .btn-toggle span,

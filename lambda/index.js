@@ -570,9 +570,33 @@ async function handleFeedback(body) {
 
 // ── General feedback (no auth required) ──────────────────────────────────────
 
+async function isFeedbackRateLimited(sourceIp) {
+  if (!sourceIp) return false;
+  const pk  = 'fb#' + sourceIp + '#' + new Date().toISOString().slice(0, 10);
+  const ttl = Math.floor(Date.now() / 1000) + 25 * 60 * 60;
+  try {
+    const result = await ddb.send(new UpdateCommand({
+      TableName:                 RATE_TABLE,
+      Key:                       { pk },
+      UpdateExpression:          'SET #c = if_not_exists(#c, :zero) + :one, #ttl = if_not_exists(#ttl, :ttl)',
+      ExpressionAttributeNames:  { '#c': 'count', '#ttl': 'ttl' },
+      ExpressionAttributeValues: { ':zero': 0, ':one': 1, ':ttl': ttl },
+      ReturnValues:              'ALL_NEW'
+    }));
+    return (result.Attributes.count || 0) > 5;
+  } catch (err) {
+    console.error('isFeedbackRateLimited error:', err.message);
+    return false;
+  }
+}
+
 async function handleGeneralFeedback(body, sourceIp) {
   const { name, email, rating, category, message } = body;
   if (!message || !String(message).trim()) return resp(400, { error: 'Message is required.' });
+
+  if (await isFeedbackRateLimited(sourceIp)) {
+    return resp(429, { error: 'Too many submissions. Please try again tomorrow.' });
+  }
 
   const feedbackId = new Date().toISOString() + '-' + nodeCrypto.randomBytes(4).toString('hex');
   try {

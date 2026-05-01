@@ -155,6 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try { localStorage.removeItem('tagscanner_session'); } catch (e) {}
         try { localStorage.removeItem('tagscanner_user'); } catch (e) {}
         renderTopbarUser();
+        if (window._revealDashboardIfAdmin) window._revealDashboardIfAdmin();
         var iframe = document.getElementById('component-iframe');
         if (iframe) iframe.src = 'display.html';
         authBtn.innerHTML = '<i class="px-1 fas fa-check"></i><span>Signed out</span>';

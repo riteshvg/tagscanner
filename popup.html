@@ -622,24 +622,7 @@
   <script src="js/sb-admin-2.min.js"></script>
 
   <script src="vendor/auth.js"></script>
-  <script>
-    window._revealDashboardIfAdmin = function () {
-      var ADMIN_EMAIL = 'riteshvgupta@gmail.com';
-      var isAdmin = false;
-      try {
-        var raw = localStorage.getItem('tagscanner_session');
-        if (raw) {
-          var s = JSON.parse(raw);
-          isAdmin = !!(s && s.email && s.email.toLowerCase() === ADMIN_EMAIL);
-        }
-      } catch (e) {}
-      var el = document.getElementById('dashboard-menu-item');
-      var hr = document.getElementById('dashboard-divider');
-      if (el) el.style.display = isAdmin ? '' : 'none';
-      if (hr) hr.style.display = isAdmin ? '' : 'none';
-    };
-    window._revealDashboardIfAdmin();
-  </script>
+  <script src="js/admin-reveal.js"></script>
   <script src="popup.js"></script>
   <script src="sidebar.js"></script>
   <!-- <script src="sform.js"></script> -->

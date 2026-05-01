@@ -79,7 +79,7 @@
       flex-direction: column;
       overflow: hidden;
       min-height: 0;
-      padding: 0.75rem 1.5rem;
+      padding: 0.75rem 1rem 0.75rem 1rem;
     }
 
     .topbar-summary-strip { white-space: nowrap; }
@@ -93,11 +93,6 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
-      max-width: 100%;
-      margin-left: -1.5rem;
-      margin-right: -1.5rem;
-      width: calc(100% + 3rem);
-      box-sizing: border-box;
     }
     #components-overview .col-xl-12 {
       flex: 1;
@@ -106,15 +101,15 @@
       min-height: 0;
       padding: 0;
     }
-    #components-overview .row { margin: 0; }
+    #components-overview .row { margin: 0; flex: 1; min-height: 0; }
     #components-overview .card {
       flex: 1;
       display: flex;
       flex-direction: column;
       min-height: 0;
       margin: 0 !important;
-      border-radius: 0;
-      box-shadow: none !important;
+      border-radius: 8px;
+      overflow: hidden;
     }
 
     /* The iframe wrapper fills remaining card space and scrolls */

@@ -9,8 +9,6 @@ window._revealDashboardIfAdmin = function () {
     }
   } catch (e) {}
   var el = document.getElementById('dashboard-menu-item');
-  var hr = document.getElementById('dashboard-divider');
   if (el) el.style.display = isAdmin ? '' : 'none';
-  if (hr) hr.style.display = isAdmin ? '' : 'none';
 };
 window._revealDashboardIfAdmin();

@@ -49,11 +49,20 @@
   font-weight: 700;
   /* margin-left: 10px; Adding left margin to the icon */
 }
-#home-menu-link,
-#extension-menu-link,
-#rule-menu-link,
-#dataelements-menu-link {
+#sidebar-click a {
   text-decoration: none;
+}
+
+/* ── Sidebar group labels ─────────────────────────────── */
+.sidebar-group-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 14px 6px 4px;
+  margin-bottom: 2px;
+  list-style: none;
 }
 /* Sidebar brand description */
 .sidebar-brand-description {

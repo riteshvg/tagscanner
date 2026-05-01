@@ -316,6 +316,8 @@
             id="sidebar-toggle-label">Collapse</span>
         </button>
         <ul class="list-unstyled ps-0">
+
+          <!-- Home -->
           <li class="mb-1">
             <a id="home-menu-link" href="display.html" target="iframe2">
               <button id="home-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Home">
@@ -324,6 +326,10 @@
               </button>
             </a>
           </li>
+
+          <!-- ── Components ───────────────────────────────────── -->
+          <li class="sidebar-group-label">Components</li>
+
           <li class="mb-1">
             <a id="extension-menu-link" href="vendor/extension.html" target="iframe2">
               <button id="ext-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Extensions">
@@ -349,6 +355,9 @@
             </a>
           </li>
 
+          <!-- ── Tools ────────────────────────────────────────── -->
+          <li class="sidebar-group-label">Tools</li>
+
           <li class="mb-1">
             <a id="flow-menu-link" href="vendor/flow.html" target="iframe2">
               <button id="flow-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Flow">
@@ -357,21 +366,27 @@
               </button>
             </a>
           </li>
-
           <li class="mb-1">
             <a id="codesearch-menu-link" href="vendor/global-search.html" target="iframe2">
-              <button id="codesearch-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Code Search">
-                <i class="px-1 fas fa-search-dollar"></i>
-                <span>Code Search</span>
+              <button id="codesearch-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Search">
+                <i class="px-1 fas fa-search"></i>
+                <span>Search</span>
               </button>
             </a>
           </li>
-
           <li class="mb-1">
             <a id="summary-menu-link" href="vendor/summary.html" target="iframe2">
               <button id="summary-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Summary">
                 <i class="px-1 fas fa-chart-pie"></i>
                 <span>Summary</span>
+              </button>
+            </a>
+          </li>
+          <li class="mb-1">
+            <a id="history-menu-link" href="vendor/history.html" target="iframe2">
+              <button id="history-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Scan History">
+                <i class="px-1 fas fa-history"></i>
+                <span>Scan History</span>
               </button>
             </a>
           </li>
@@ -385,6 +400,9 @@
             </a>
           </li>
 
+          <!-- ── Miscellaneous ─────────────────────────────────── -->
+          <li class="sidebar-group-label">Miscellaneous</li>
+
           <li class="mb-1">
             <a id="feedback-menu-link" href="vendor/feedback.html" target="iframe2">
               <button id="feedback-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Feedback">
@@ -393,17 +411,6 @@
               </button>
             </a>
           </li>
-
-          <li class="mb-1">
-            <a id="history-menu-link" href="vendor/history.html" target="iframe2">
-              <button id="history-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Scan History">
-                <i class="px-1 fas fa-history"></i>
-                <span>Scan History</span>
-              </button>
-            </a>
-          </li>
-
-          <hr id="dashboard-divider" style="border-color:rgba(255,255,255,0.15);margin:8px 0;display:none" />
 
           <li class="mb-1" id="dashboard-menu-item" style="display:none">
             <a id="dashboard-menu-link" href="vendor/dashboard.html" target="iframe2">
@@ -414,14 +421,13 @@
             </a>
           </li>
 
-          <hr id="signout-divider" style="border-color:rgba(255,255,255,0.15);margin:8px 0" />
-
           <li class="mb-1">
             <button id="signout-button-sidebar" class="btn btn-toggle align-items-center rounded" type="button" title="Sign In" style="width:100%;color:#86efac">
               <i class="px-1 fas fa-sign-in-alt"></i>
               <span>Sign In</span>
             </button>
           </li>
+
         </ul>
       </div>
       <!-- End of Sidebar -->

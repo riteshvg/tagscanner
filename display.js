@@ -205,23 +205,43 @@ function exportFullXlsx() {
     return;
   }
 
-  var rulesData = buildRulesSheet(rules);
-  var deData    = buildDataElementsSheet(de);
-  var extData   = buildExtensionsSheet(ext);
+  try {
+    var rulesData = buildRulesSheet(rules);
+    var deData    = buildDataElementsSheet(de);
+    var extData   = buildExtensionsSheet(ext);
 
-  var wb = XLSX.utils.book_new();
+    var wb = XLSX.utils.book_new();
 
-  var ws1 = XLSX.utils.aoa_to_sheet(rulesData);
-  autoWidth(ws1, rulesData);
-  XLSX.utils.book_append_sheet(wb, ws1, 'Rules');
+    var ws1 = XLSX.utils.aoa_to_sheet(rulesData);
+    autoWidth(ws1, rulesData);
+    XLSX.utils.book_append_sheet(wb, ws1, 'Rules');
 
-  var ws2 = XLSX.utils.aoa_to_sheet(deData);
-  autoWidth(ws2, deData);
-  XLSX.utils.book_append_sheet(wb, ws2, 'Data Elements');
+    var ws2 = XLSX.utils.aoa_to_sheet(deData);
+    autoWidth(ws2, deData);
+    XLSX.utils.book_append_sheet(wb, ws2, 'Data Elements');
 
-  var ws3 = XLSX.utils.aoa_to_sheet(extData);
-  autoWidth(ws3, extData);
-  XLSX.utils.book_append_sheet(wb, ws3, 'Extensions');
+    var ws3 = XLSX.utils.aoa_to_sheet(extData);
+    autoWidth(ws3, extData);
+    XLSX.utils.book_append_sheet(wb, ws3, 'Extensions');
 
-  XLSX.writeFile(wb, 'tagscanner_export.xlsx');
+    // Use XLSX.write + manual blob download — more reliable in extension iframes
+    // than XLSX.writeFile which may use an internal path that doesn't fire from nested frames
+    var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    var blob = new Blob([wbout], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'tagscanner_export.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (e) {
+    console.error('TagScanner export error:', e);
+    alert('Export failed: ' + e.message);
+  }
 }

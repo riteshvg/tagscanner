@@ -24,60 +24,119 @@
 
   <!-- Quick Hack to expand view and remove scrollbars - just shrinking window size-->
   <style>
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      margin: 0;
+    }
+
     body {
       transform: scale(1);
       transform-origin: 0 0;
-      margin: 0;
-      min-height: 100vh;
-      min-width: 100vw;
     }
 
-    .window-card-body {
-      display: block;
-      height: 800px;
+    /* Full-height flex column — brand bar + content-container share the viewport */
+    .parent-container {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
     }
 
-    /* Increase overall container size */
-    .parent-container {
-      min-height: 100vh;
-      min-width: 100vw;
+    /* Brand bar takes its natural height, doesn't grow */
+    #wrapper { flex-shrink: 0; }
+
+    /* Content container fills remaining space after brand bar */
+    .content-container {
+      flex: 1;
+      height: auto !important;   /* override 100vh from new-sidebar.css */
+      min-height: 0;
+      overflow: hidden;
     }
 
-    /* Ensure content wrapper takes full available space */
+    /* Right-hand content column */
     #content-wrapper {
-      min-height: calc(100vh - 100px);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+      min-width: 0;
     }
 
-    /* Make the main content area larger */
+    #content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* Reduce outer padding so the workspace gets maximum room */
     .container-fluid {
-      padding: 2rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+      padding: 0.75rem 1.5rem;
     }
 
-    .topbar-summary-strip {
-      white-space: nowrap;
-    }
+    .topbar-summary-strip { white-space: nowrap; }
 
-    /* Components overview: expand horizontal width, keep aligned with content */
+    /* Remove footer — it adds dead space */
+    .sticky-footer { display: none !important; }
+
+    /* Components overview stretches to fill remaining container height */
     #components-overview {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
       max-width: 100%;
-      margin-left: -2rem;
-      margin-right: -2rem;
-      width: calc(100% + 4rem);
+      margin-left: -1.5rem;
+      margin-right: -1.5rem;
+      width: calc(100% + 3rem);
       box-sizing: border-box;
     }
-    #components-overview .row {
-      margin-left: 0;
-      margin-right: 0;
+    #components-overview .col-xl-12 {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 0;
     }
+    #components-overview .row { margin: 0; }
     #components-overview .card {
-      max-width: none;
-      margin-left: 0;
-      margin-right: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      margin: 0 !important;
+      border-radius: 0;
+      box-shadow: none !important;
     }
-    #components-overview .window-card-body {
-      width: 100%;
-      box-sizing: border-box;
+
+    /* The iframe wrapper fills remaining card space and scrolls */
+    .window-card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .window-card-body > div {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #component-iframe {
+      flex: 1;
+      min-height: 0;
+      border: none;
+      overflow: auto;
     }
   </style>
   <!-- Custom Style for the loader -->
@@ -598,7 +657,7 @@
                   <div class="window-card-body">
                     <div>
                       <iframe id="component-iframe" class="embed-responsive-item" name="iframe2"
-                        width="100%" height="800"></iframe>
+                        width="100%" height="100%"></iframe>
                     </div>
                   </div>
                 </div>

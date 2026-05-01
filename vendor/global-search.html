@@ -1,334 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, shrink-to-fit=no"
-    />
-    <title>Global Search - TagScanner</title>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <title>Code Search — TagScanner</title>
+  <link href="fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
+  <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+  <link href="../css/fonts.css" rel="stylesheet" />
+  <style>
+    body { background: #f8f9fc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; }
 
-    <!-- Custom fonts for this template-->
-    <link
-      href="fontawesome-free/css/all.min.css"
-      rel="stylesheet"
-      type="text/css"
-    />
-    <link href="../css/fonts.css" rel="stylesheet" />
+    /* ── Header ─────────────────────────────────────────────── */
+    .cs-header {
+      background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
+      padding: 16px 20px;
+    }
+    .cs-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 5px; }
+    .cs-title   { font-size: 18px; font-weight: 800; color: #fff; margin: 0; }
+    .cs-title span { color: #61dafb; }
+    .cs-sub     { font-size: 12px; color: #9ca3af; margin-top: 4px; }
 
-    <!-- Custom styles for this template-->
-    <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+    /* ── Search bar ─────────────────────────────────────────── */
+    .cs-body { padding: 16px 20px; }
+    .cs-search-wrap {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 12px;
+    }
+    .cs-search-input {
+      flex: 1; padding: 9px 14px 9px 36px;
+      border: 1.5px solid #d1d5db; border-radius: 8px;
+      font-size: 13.5px; color: #111827; background: #fff;
+      font-family: inherit;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: 12px center;
+    }
+    .cs-search-input:focus { outline: none; border-color: #4e73df; box-shadow: 0 0 0 2px rgba(78,115,223,0.12); }
 
-    <style>
-      /* Global search styles */
-      .search-container {
-        position: relative;
-        margin-bottom: 20px;
-      }
+    /* ── Filter pills ────────────────────────────────────────── */
+    .cs-filters { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+    .cs-filter-pill {
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 12px; border: 1.5px solid #e5e7eb; border-radius: 20px;
+      font-size: 11.5px; font-weight: 600; color: #6b7280; cursor: pointer;
+      background: #fff; transition: all 0.15s; user-select: none;
+    }
+    .cs-filter-pill.active { border-color: #4e73df; background: #eff4ff; color: #1d4ed8; }
+    .cs-filter-pill input { display: none; }
+    .cs-result-count { margin-left: auto; font-size: 11.5px; color: #9ca3af; font-weight: 500; }
 
-      .search-input {
-        padding-right: 40px;
-        border-radius: 20px;
-      }
+    /* ── Empty / loading states ─────────────────────────────── */
+    .cs-state {
+      text-align: center; padding: 48px 20px; color: #9ca3af;
+    }
+    .cs-state i { font-size: 28px; margin-bottom: 10px; display: block; }
+    .cs-state p { font-size: 13px; margin: 0; }
 
-      .search-icon {
-        position: absolute;
-        right: 15px;
-        top: 10px;
-        color: #4e73df;
-      }
+    /* ── Result card ────────────────────────────────────────── */
+    .cs-card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+      margin-bottom: 10px; overflow: hidden;
+    }
+    .cs-card-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; border-bottom: 1px solid #f3f4f6;
+    }
+    .cs-card-icon { font-size: 12px; color: #6b7280; }
+    .cs-card-name { font-size: 13px; font-weight: 700; color: #111827; flex: 1; }
+    .cs-type-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 10px;
+    }
+    .badge-rule   { background: #ede9fe; color: #6d28d9; }
+    .badge-de     { background: #dcfce7; color: #15803d; }
+    .badge-ext    { background: #fef3c7; color: #b45309; }
 
-      .filter-section {
-        background-color: #f8f9fc;
-        border: 1px solid #e3e6f0;
-        border-radius: 6px;
-        padding: 15px;
-        margin-bottom: 20px;
-      }
+    /* ── Code match block ───────────────────────────────────── */
+    .cs-match {
+      padding: 8px 14px; border-bottom: 1px solid #f3f4f6;
+    }
+    .cs-match:last-child { border-bottom: none; }
+    .cs-match-label {
+      font-size: 10.5px; font-weight: 600; color: #6b7280; margin-bottom: 5px;
+      text-transform: uppercase; letter-spacing: 0.4px;
+    }
+    .cs-code {
+      background: #0f172a; border-radius: 6px; overflow: auto;
+      font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+      font-size: 11.5px; line-height: 1.6; max-height: 160px;
+    }
+    .cs-code table { border-collapse: collapse; width: 100%; }
+    .cs-code td { padding: 0; vertical-align: top; }
+    .cs-code .ln {
+      color: #4b5563; padding: 0 10px; text-align: right;
+      user-select: none; border-right: 1px solid #1e293b;
+      min-width: 32px; white-space: nowrap;
+    }
+    .cs-code .lc { color: #cbd5e1; padding: 0 10px; white-space: pre; }
+    .cs-code tr.hit .ln { color: #93c5fd; background: #1e3a5f; border-right-color: #2d4a7a; }
+    .cs-code tr.hit .lc { background: #1e3a5f; }
+    .cs-code .hl { background: #854d0e; color: #fef08a; border-radius: 2px; padding: 0 1px; }
+    .cs-more-matches {
+      font-size: 11px; color: #6b7280; padding: 6px 14px 8px;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
 
-      .result-count {
-        margin-bottom: 15px;
-        font-weight: 600;
-        color: #4e73df;
-      }
+  <div class="cs-header">
+    <div class="cs-eyebrow">TagScanner</div>
+    <h1 class="cs-title">Code <span>Search</span></h1>
+    <p class="cs-sub">Search across all custom code in rules and data elements.</p>
+  </div>
 
-      .result-item {
-        border-left: 4px solid #4e73df;
-        background-color: #f8f9fc;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-radius: 6px;
-        transition: all 0.2s ease;
-      }
-
-      .result-item:hover {
-        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
-        transform: translateY(-2px);
-      }
-
-      .result-type {
-        font-size: 0.7rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        color: #6c757d;
-        margin-bottom: 5px;
-      }
-
-      .result-title {
-        font-size: 1.1rem;
-        font-weight: 600;
-        margin-bottom: 5px;
-      }
-
-      .result-details {
-        font-size: 0.9rem;
-        color: #5a5c69;
-      }
-
-      .highlight {
-        background-color: #fff59d;
-        padding: 0px 2px;
-        border-radius: 2px;
-      }
-
-      .no-results {
-        text-align: center;
-        padding: 30px;
-        color: #6c757d;
-      }
-
-      .search-shortcut {
-        display: inline-block;
-        background-color: #f1f1f1;
-        color: #5a5c69;
-        border-radius: 3px;
-        padding: 2px 6px;
-        font-size: 12px;
-        margin-left: 10px;
-      }
-
-      .history-dropdown {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        width: 100%;
-        z-index: 100;
-        background-color: white;
-        border: 1px solid #d1d3e2;
-        border-radius: 0 0 6px 6px;
-        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
-        display: none;
-      }
-
-      .history-item {
-        padding: 10px 15px;
-        cursor: pointer;
-        border-bottom: 1px solid #f1f1f1;
-      }
-
-      .history-item:hover {
-        background-color: #f8f9fc;
-      }
-
-      .history-item:last-child {
-        border-bottom: none;
-      }
-
-      .clear-history {
-        text-align: center;
-        padding: 8px;
-        font-size: 12px;
-        background-color: #f8f9fc;
-        color: #6c757d;
-        cursor: pointer;
-      }
-
-      .clear-history:hover {
-        background-color: #eaecf4;
-        color: #e74a3b;
-      }
-
-      .loader {
-        border: 3px solid #f3f3f3;
-        border-radius: 50%;
-        border-top: 3px solid #4e73df;
-        width: 20px;
-        height: 20px;
-        animation: spin 1s linear infinite;
-        display: inline-block;
-        margin-right: 10px;
-        vertical-align: middle;
-      }
-
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-
-      /* Responsive adjustments */
-      @media (max-width: 768px) {
-        .filter-section .form-group {
-          margin-bottom: 10px;
-        }
-      }
-    </style>
-  </head>
-
-  <body id="page-top">
-    <!-- Page Wrapper -->
-    <div id="wrapper">
-      <!-- Content Wrapper -->
-      <div id="content-wrapper" class="d-flex flex-column">
-        <!-- Main Content -->
-        <div id="content">
-          <!-- Topbar -->
-          <nav
-            class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow"
-          >
-            <div class="navbar-brand">
-              <i class="fas fa-search mr-2"></i> Global Search
-            </div>
-            <button
-              id="back-button"
-              class="btn btn-sm btn-outline-secondary ml-auto"
-            >
-              <i class="fas fa-arrow-left"></i> Back to Summary
-            </button>
-          </nav>
-
-          <!-- Begin Page Content -->
-          <div class="container-fluid">
-            <!-- Global Search Section -->
-            <div class="card shadow mb-4">
-              <div
-                class="card-header py-3 d-flex flex-row align-items-center justify-content-between"
-              >
-                <h6 class="m-0 font-weight-bold text-primary">
-                  Search Across All Components
-                </h6>
-                <div>
-                  <span class="search-shortcut">Press / to search</span>
-                </div>
-              </div>
-              <div class="card-body">
-                <!-- Search Input -->
-                <div class="search-container">
-                  <input
-                    type="text"
-                    id="global-search-input"
-                    class="form-control search-input"
-                    placeholder="Search for rules, data elements, extensions, or any component..."
-                  />
-                  <i class="fas fa-search search-icon"></i>
-
-                  <!-- Search History Dropdown -->
-                  <div class="history-dropdown" id="search-history">
-                    <!-- History items will be added here dynamically -->
-                    <div class="clear-history" id="clear-history">
-                      Clear Search History
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Filters Section -->
-                <div class="filter-section">
-                  <div class="row">
-                    <div class="col-md-3">
-                      <div class="form-group">
-                        <label for="component-type">Component Type</label>
-                        <select class="form-control" id="component-type">
-                          <option value="all">All Types</option>
-                          <option value="rule">Rules</option>
-                          <option value="dataElement">Data Elements</option>
-                          <option value="extension">Extensions</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="col-md-3">
-                      <div class="form-group">
-                        <label for="sort-by">Sort By</label>
-                        <select class="form-control" id="sort-by">
-                          <option value="relevance">Relevance</option>
-                          <option value="nameAsc">Name (A-Z)</option>
-                          <option value="nameDesc">Name (Z-A)</option>
-                          <option value="newest">Newest</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="col-md-3">
-                      <div class="form-group">
-                        <label for="search-in">Search In</label>
-                        <select class="form-control" id="search-in">
-                          <option value="all">All Fields</option>
-                          <option value="name">Names Only</option>
-                          <option value="settings">Settings Only</option>
-                          <option value="code">Custom Code Only</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="col-md-3">
-                      <div class="form-group">
-                        <label>&nbsp;</label>
-                        <button
-                          id="search-button"
-                          class="btn btn-primary form-control"
-                        >
-                          <i class="fas fa-search mr-1"></i> Search
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Results Section -->
-                <div id="search-results-container">
-                  <div class="result-count" id="result-count">
-                    0 results found
-                  </div>
-                  <div id="results-list">
-                    <!-- Search results will be added here dynamically -->
-                    <div class="no-results">
-                      <i class="fas fa-search fa-3x mb-3 text-gray-300"></i>
-                      <p>
-                        Search for components across your Adobe Tags property
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- /.container-fluid -->
-        </div>
-        <!-- End of Main Content -->
-
-        <!-- Footer -->
-        <footer class="sticky-footer bg-white">
-          <div class="container my-auto">
-            <div class="copyright text-center my-auto">
-              <span>TagScanner</span>
-            </div>
-          </div>
-        </footer>
-        <!-- End of Footer -->
-      </div>
-      <!-- End of Content Wrapper -->
+  <div class="cs-body">
+    <div class="cs-search-wrap">
+      <input id="csInput" class="cs-search-input" type="text"
+             placeholder="Search custom code… (e.g. s.pageName, digitalData, adobeDataLayer)" />
     </div>
-    <!-- End of Page Wrapper -->
 
-    <!-- Bootstrap core JavaScript-->
-    <script src="jquery/jquery.min.js"></script>
-    <script src="bootstrap/js/bootstrap.bundle.min.js"></script>
+    <div class="cs-filters">
+      <label class="cs-filter-pill active" id="pill-all">
+        <input type="radio" name="csType" value="all" checked /> All
+      </label>
+      <label class="cs-filter-pill" id="pill-rule">
+        <input type="radio" name="csType" value="rule" />
+        <i class="fas fa-wrench"></i> Rules
+      </label>
+      <label class="cs-filter-pill" id="pill-de">
+        <input type="radio" name="csType" value="de" />
+        <i class="fas fa-database"></i> Data Elements
+      </label>
+      <span class="cs-result-count" id="csCount"></span>
+    </div>
 
-    <!-- Core plugin JavaScript-->
-    <script src="jquery-easing/jquery.easing.min.js"></script>
+    <div id="csResults">
+      <div class="cs-state">
+        <i class="fas fa-code"></i>
+        <p>Type to search custom code across all rules and data elements.</p>
+      </div>
+    </div>
+  </div>
 
-    <!-- Custom scripts -->
-    <script src="global-search.js"></script>
-  </body>
+  <script src="global-search.js"></script>
+</body>
 </html>

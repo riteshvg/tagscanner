@@ -27,7 +27,7 @@
     });
   });
 
-  // Restore last active item on popup open
-  var saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) setActive(saved);
+  // Always start with Home highlighted — the iframe defaults to display.html on every open.
+  // Restoring a previous nav item would make the sidebar out of sync with the content.
+  setActive('home-button-sidebar');
 })();

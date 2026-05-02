@@ -2230,7 +2230,7 @@ if (rule_details_node) {
           console.log('Found custom code in action:', customCode.substring(0, 100) + '...');
           customCodeActions.push({
             code: customCode,
-            actionName: action.name || action.id || 'Unknown Action'
+            actionName: action.name || action.id || deriveBadgeLabel(action)
           });
         }
       }
@@ -3174,8 +3174,11 @@ function showCodeModal(title, code) {
           var res = await fetch(fetchUrl, { method: 'GET', mode: 'cors', headers: { 'Accept': 'text/plain,text/javascript,*/*' } });
           if (res.ok) {
             var text = await res.text();
+            // Strip leading license/source-map comment lines referencing the CDN URL
+            text = text.replace(/^\/\/[^\n]*assets\.adobedtm\.com[^\n]*\n?/gm, '').trim();
             // Try to pull the inner code from _satellite.__registerScript("RC...", "…escaped…")
-            var m = text.match(/_satellite\.__registerScript\([^,]+,\s*(["'`])([\s\S]*?)\1\s*\)/);
+            // Allow optional trailing comma before closing paren: __registerScript(url, 'code',)
+            var m = text.match(/_satellite\.__registerScript\([^,]+,\s*(["'`])([\s\S]*?)\1\s*,?\s*\)/);
             if (m && m[2]) {
               extracted = m[2]
                 .replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\'/g, "'")

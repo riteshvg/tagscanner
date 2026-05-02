@@ -226,42 +226,65 @@
       var wrap = document.createElement('div');
       wrap.className = 'ext-expanded-content';
 
-      var scrollWrap = document.createElement('div');
-      scrollWrap.className = 'ext-expanded-table-scroll';
-
-      var tbl = document.createElement('table');
-      tbl.className = 'ext-expanded-table';
-      tbl.innerHTML = '<thead><tr><th>Rules</th><th>Events</th><th>Data Elements</th><th>Conditions</th></tr></thead><tbody></tbody>';
-      var tbody = tbl.querySelector('tbody');
-
       var ruleNames = Object.keys(v).filter(function (k) { return k !== 'dataelement'; });
-      ruleNames.forEach(function (ruleName) {
-        var r = v[ruleName];
-        var eventNames = Array.isArray(r.events) && r.events.length ? r.events.join(', ') : '—';
-        var row = document.createElement('tr');
-        row.innerHTML =
-          '<td>' + (ruleName || '—') + '</td>' +
-          '<td>' + eventNames + '</td>' +
-          '<td>—</td>' +
-          '<td>' + (r.conditions ? 'Yes' : '—') + '</td>';
-        tbody.appendChild(row);
-      });
-
       var deList = v.dataelement && Array.isArray(v.dataelement) ? v.dataelement : [];
-      deList.forEach(function (item) {
-        var row = document.createElement('tr');
-        row.innerHTML = '<td>—</td><td>—</td><td>' + (item.name || item.path || '—') + '</td><td>—</td>';
-        tbody.appendChild(row);
-      });
 
-      if (tbody.querySelectorAll('tr').length === 0) {
-        var empty = document.createElement('tr');
-        empty.innerHTML = '<td colspan="4">Not used in any rule or data element.</td>';
-        tbody.appendChild(empty);
+      if (ruleNames.length === 0 && deList.length === 0) {
+        var empty = document.createElement('p');
+        empty.style.cssText = 'margin:0;color:#6b7280;font-size:13px;';
+        empty.textContent = 'Not used in any rule or data element.';
+        wrap.appendChild(empty);
+        return wrap;
       }
 
-      scrollWrap.appendChild(tbl);
-      wrap.appendChild(scrollWrap);
+      // ── Rules section ──────────────────────────────────────────────────────
+      if (ruleNames.length > 0) {
+        var ruleLabel = document.createElement('div');
+        ruleLabel.className = 'ext-expanded-section-label';
+        ruleLabel.innerHTML = '<i class="fas fa-wrench"></i> Rules (' + ruleNames.length + ')';
+        wrap.appendChild(ruleLabel);
+
+        var scrollWrap = document.createElement('div');
+        scrollWrap.className = 'ext-expanded-table-scroll';
+
+        var tbl = document.createElement('table');
+        tbl.className = 'ext-expanded-table';
+        tbl.innerHTML = '<thead><tr><th>Rule Name</th><th>Events</th><th>Has Conditions</th></tr></thead><tbody></tbody>';
+        var tbody = tbl.querySelector('tbody');
+
+        ruleNames.forEach(function (ruleName) {
+          var r = v[ruleName];
+          var eventNames = Array.isArray(r.events) && r.events.length ? r.events.join(', ') : '—';
+          var row = document.createElement('tr');
+          row.innerHTML =
+            '<td>' + (ruleName || '—') + '</td>' +
+            '<td>' + eventNames + '</td>' +
+            '<td>' + (r.conditions ? 'Yes' : '—') + '</td>';
+          tbody.appendChild(row);
+        });
+
+        scrollWrap.appendChild(tbl);
+        wrap.appendChild(scrollWrap);
+      }
+
+      // ── Data Elements section ───────────────────────────────────────────────
+      if (deList.length > 0) {
+        var deLabel = document.createElement('div');
+        deLabel.className = 'ext-expanded-section-label';
+        deLabel.innerHTML = '<i class="fas fa-database"></i> Data Elements (' + deList.length + ')';
+        wrap.appendChild(deLabel);
+
+        var deChips = document.createElement('div');
+        deChips.className = 'ext-de-list';
+        deList.forEach(function (item) {
+          var chip = document.createElement('span');
+          chip.className = 'ext-de-chip';
+          chip.textContent = item.name || item.path || '—';
+          deChips.appendChild(chip);
+        });
+        wrap.appendChild(deChips);
+      }
+
       return wrap;
     }
 

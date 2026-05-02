@@ -3151,34 +3151,69 @@ function showCodeModal(title, code) {
     modalTitle.textContent = title;
     var rawCode = code != null ? String(code) : '';
 
-    // Detect external library URL (AppMeasurement / Analytics CDN reference)
-    var isExternalLib = /^https?:\/\/assets\.adobedtm\.com\S+\.js(\s*)$/.test(rawCode.trim()) ||
-                        (/^https?:\/\//.test(rawCode.trim()) && rawCode.trim().indexOf('\n') === -1 && rawCode.trim().endsWith('.js'));
-    if (isExternalLib) {
-      var libUrl = rawCode.trim();
-      var isAppMeasurement = libUrl.includes('assets.adobedtm.com');
-      codeContent.innerHTML =
-        '<div style="background:#fff8f0;border:1px solid #fcd5a0;border-radius:8px;padding:14px 16px;font-family:inherit;">' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-            '<i class="fas fa-link" style="color:#e07b00;font-size:14px;"></i>' +
-            '<span style="font-weight:700;font-size:13px;color:#7a3e00;">External Library Reference' + (isAppMeasurement ? ' — AppMeasurement' : '') + '</span>' +
-          '</div>' +
-          (isAppMeasurement
-            ? '<p style="font-size:12px;color:#5a3e00;margin:0 0 10px;">This action loads the <strong>Adobe Analytics AppMeasurement</strong> library from Adobe\'s CDN at runtime instead of using inline custom code. No inline code is present to view or explain.</p>'
-            : '<p style="font-size:12px;color:#5a3e00;margin:0 0 10px;">This action references an external JavaScript library hosted on a CDN. No inline code is present.</p>') +
-          '<div style="background:#fff3e0;border-radius:5px;padding:8px 10px;word-break:break-all;">' +
-            '<a href="' + libUrl + '" target="_blank" rel="noopener noreferrer" style="font-size:11.5px;color:#1a73e8;font-family:monospace;">' + libUrl + '</a>' +
-          '</div>' +
-        '</div>';
+    // Detect a single-line URL reference (AppMeasurement / hosted custom code on Adobe CDN)
+    var trimmedCode = rawCode.trim();
+    var isSingleUrl = /^https?:\/\/\S+\.js$/.test(trimmedCode);
+    if (isSingleUrl) {
+      var fetchUrl = trimmedCode;
+      // Show loading state immediately, open modal
+      codeContent.textContent = 'Fetching source code from CDN…';
       modal.style.display = 'block';
-      // Hide Explain button — no inline code to explain
-      var explainBtn = document.getElementById('ruleCodeModalExplainBtn');
-      if (explainBtn) explainBtn.style.display = 'none';
-      if (copyBtn) copyBtn._currentCode = libUrl;
+      if (copyBtn) copyBtn._currentCode = fetchUrl;
+
+      (async function () {
+        var extracted = null;
+        try {
+          var res = await fetch(fetchUrl, { method: 'GET', mode: 'cors', headers: { 'Accept': 'text/plain,text/javascript,*/*' } });
+          if (res.ok) {
+            var text = await res.text();
+            // Try to pull the inner code from _satellite.__registerScript("RC...", "…escaped…")
+            var m = text.match(/_satellite\.__registerScript\([^,]+,\s*(["'`])([\s\S]*?)\1\s*\)/);
+            if (m && m[2]) {
+              extracted = m[2]
+                .replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\'/g, "'")
+                .replace(/\\\\/g, '\\').replace(/\\t/g, '\t').replace(/\\r/g, '\r')
+                .replace(/;\s*$/, '').trim();
+            } else {
+              // No wrapper — show raw content (could be a plain script)
+              extracted = text.trim();
+            }
+          }
+        } catch (e) { /* network error */ }
+
+        if (!extracted) {
+          // Could not fetch — fall back to info card showing the URL
+          codeContent.innerHTML =
+            '<div style="background:#fff8f0;border:1px solid #fcd5a0;border-radius:8px;padding:14px 16px;">' +
+              '<div style="font-weight:700;font-size:13px;color:#7a3e00;margin-bottom:8px;"><i class="fas fa-link" style="margin-right:6px;color:#e07b00;"></i>Hosted source file (could not fetch)</div>' +
+              '<div style="word-break:break-all;"><a href="' + fetchUrl + '" target="_blank" rel="noopener noreferrer" style="font-size:11.5px;color:#1a73e8;font-family:monospace;">' + fetchUrl + '</a></div>' +
+            '</div>';
+          var eb = document.getElementById('ruleCodeModalExplainBtn');
+          if (eb) eb.style.display = 'none';
+          return;
+        }
+
+        // We have real code — show it and let Prettier + Explain work normally
+        var eb = document.getElementById('ruleCodeModalExplainBtn');
+        if (eb) eb.style.display = '';
+        if (copyBtn) copyBtn._currentCode = extracted;
+        codeContent.textContent = extracted;
+        if (typeof prettier !== 'undefined' && typeof prettierPlugins !== 'undefined') {
+          try {
+            var formatted = await prettier.format(extracted, {
+              parser: 'babel',
+              plugins: [prettierPlugins.babel, prettierPlugins.estree],
+              printWidth: 80, tabWidth: 2, singleQuote: true, semi: true
+            });
+            codeContent.textContent = formatted.trim();
+            if (copyBtn) copyBtn._currentCode = formatted.trim();
+          } catch (e) { /* keep unformatted */ }
+        }
+      })();
       return;
     }
 
-    // Restore Explain button for regular code
+    // Restore Explain button for regular inline code
     var explainBtnRestore = document.getElementById('ruleCodeModalExplainBtn');
     if (explainBtnRestore) explainBtnRestore.style.display = '';
 

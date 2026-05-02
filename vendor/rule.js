@@ -176,6 +176,39 @@ if (rule_details_node) {
     return wrapper;
   }
 
+  // Derive a human-readable label for any action object
+  function deriveBadgeLabel(action) {
+    if (!action) return 'Action';
+    var path = action.modulePath || '';
+    if (path) {
+      if (path.includes('adobe-alloy')) {
+        if (path.includes('sendEvent'))       return 'WebSDK Send Event';
+        if (path.includes('sendBeacon'))      return 'WebSDK Send Beacon';
+        if (path.includes('setConsent'))      return 'WebSDK Set Consent';
+        if (path.includes('setVariables'))    return 'WebSDK Set Variables';
+        if (path.includes('updateVariables')) return 'WebSDK Update Variables';
+        if (path.includes('getData'))         return 'WebSDK Get Data';
+        if (path.includes('setCustomerIds'))  return 'WebSDK Set Customer IDs';
+        if (path.includes('setDebug'))        return 'WebSDK Set Debug';
+        if (path.includes('setIdentityMap'))  return 'WebSDK Set Identity Map';
+        if (path.includes('setTimestamp'))    return 'WebSDK Set Timestamp';
+        if (path.includes('setUserId'))       return 'WebSDK Set User ID';
+      }
+      if (path.includes('adobe-analytics')) {
+        if (path.includes('setVariables'))    return 'AA Set Variables';
+        if (path.includes('updateVariables')) return 'AA Update Variables';
+        if (path.includes('sendBeacon'))      return 'AA Send Beacon';
+      }
+      // Derive label from path: take the last non-index segment, convert camelCase
+      var parts = path.replace(/\.js$/, '').split('/');
+      var seg = parts[parts.length - 1];
+      if (seg === 'index' && parts.length > 1) seg = parts[parts.length - 2];
+      if (seg === 'customCode' || seg === 'custom-code') return 'Custom Code';
+      return seg.replace(/-/g, ' ').replace(/([A-Z])/g, ' $1').replace(/\s+/g, ' ').trim() || 'Action';
+    }
+    return action.name || action.type || 'Action';
+  }
+
   // Helper function to render actions with badges and custom code
   function renderActionsColumn(rule, customCodeActions) {
     const wrapper = document.createElement('div');
@@ -192,33 +225,7 @@ if (rule_details_node) {
     // Extract action names for badges
     const actionTypes = [];
     rule.actions.forEach((action) => {
-      let actionName = 'Unknown Action';
-      
-      if (action.modulePath) {
-        const pathParts = action.modulePath.split('/');
-        const fileName = pathParts[pathParts.length - 1];
-        let displayName = fileName.replace('.js', '');
-        
-        // Use the same logic as existing code to determine display name
-        if (action.modulePath.includes('adobe-analytics/src/lib/actions/setVariables.js')) {
-          displayName = 'SetVariable';
-        } else if (action.modulePath.includes('adobe-analytics/src/lib/actions/updateVariables.js')) {
-          displayName = 'UpdateVariable';
-        } else if (action.modulePath.includes('adobe-alloy/')) {
-          if (action.modulePath.includes('sendEvent')) displayName = 'WebSDK Send Event';
-          else if (action.modulePath.includes('sendBeacon')) displayName = 'WebSDK Send Beacon';
-          else if (action.modulePath.includes('setConsent')) displayName = 'WebSDK Set Consent';
-          else if (action.modulePath.includes('setVariables')) displayName = 'WebSDK SetVariable';
-          else if (action.modulePath.includes('updateVariables')) displayName = 'WebSDK Update Variable';
-        }
-        
-        actionName = displayName;
-      } else if (action.name) {
-        actionName = action.name;
-      } else if (action.type) {
-        actionName = action.type;
-      }
-      
+      var actionName = deriveBadgeLabel(action);
       actionTypes.push(actionName);
       wrapper.appendChild(createBadge(actionName, 'action'));
     });
@@ -474,7 +481,7 @@ if (rule_details_node) {
           if (action.actionType) actionDescription = action.actionType;
           else if (action.actionName) actionDescription = action.actionName;
           else if (action.track) actionDescription = `track ${action.track}`;
-          else actionDescription = 'Unknown Action';
+          else actionDescription = deriveBadgeLabel(action);
         }
 
         return actionDescription;

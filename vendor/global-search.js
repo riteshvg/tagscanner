@@ -4,6 +4,7 @@
   var data = { rules: [], dataElements: {}, extensions: {} };
   var debounceTimer = null;
   var activeType = 'all';
+  var renderMap = {}; // type|id → result object, rebuilt on each render
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -310,15 +311,19 @@
       return;
     }
 
+    renderMap = {};
     resultsEl.innerHTML = results.map(function (r) {
       var icon  = TYPE_ICON[r.type]  || 'fa-question-circle';
       var badge = TYPE_BADGE[r.type] || '';
       var label = TYPE_LABEL[r.type] || r.type;
 
+      var rkey = r.type + '|' + (r.type === 'ext' ? r.rawId : r.type === 'de' ? r.rawName : r.name);
+      renderMap[rkey] = r;
+
       var header =
         '<div class="cs-card-header">' +
           '<i class="fas ' + icon + ' cs-card-icon"></i>' +
-          '<span class="cs-card-name">' + hlText(esc(r.name), term) + '</span>' +
+          '<span class="cs-card-name" title="Click to view full details">' + hlText(esc(r.name), term) + '</span>' +
           '<span class="cs-type-badge ' + badge + '">' + label + '</span>' +
         '</div>';
 
@@ -334,7 +339,7 @@
         ? '<div class="cs-more-matches">+ ' + (r.matches.length - MAX_BLOCKS) + ' more match' +
           (r.matches.length - MAX_BLOCKS === 1 ? '' : 'es') + '</div>' : '';
 
-      return '<div class="cs-card">' + header + composition + blocks + extra + '</div>';
+      return '<div class="cs-card" data-rkey="' + esc(rkey) + '">' + header + composition + blocks + extra + '</div>';
     }).join('');
   }
 
@@ -352,6 +357,7 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     loadData();
+    wireCardClicks();
 
     var input     = document.getElementById('csInput');
     var resultsEl = document.getElementById('csResults');
@@ -391,5 +397,227 @@
       data.dataElements = deRaw    ? JSON.parse(deRaw)    : {};
       data.extensions   = extRaw   ? JSON.parse(extRaw)   : {};
     } catch (e) { data.rules = []; data.dataElements = {}; data.extensions = {}; }
+  }
+
+  // ── Detail modal ─────────────────────────────────────────────────────────────
+
+  function initModal() {
+    if (document.getElementById('gsModal')) return document.getElementById('gsModal');
+    var overlay = document.createElement('div');
+    overlay.id = 'gsModal';
+    overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;';
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#fff;border-radius:10px;max-width:860px;width:93%;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.35);';
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:#4e73df;border-radius:10px 10px 0 0;flex-shrink:0;gap:10px;';
+    var tag = document.createElement('span');
+    tag.id = 'gsModalTag';
+    tag.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;background:rgba(255,255,255,0.22);color:white;padding:2px 9px;border-radius:10px;white-space:nowrap;';
+    var titleEl = document.createElement('span');
+    titleEl.id = 'gsModalTitle';
+    titleEl.style.cssText = 'color:white;font-size:15px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    var closeBtn = document.createElement('button');
+    closeBtn.style.cssText = 'background:none;border:none;color:white;font-size:26px;cursor:pointer;line-height:1;padding:0;opacity:0.8;flex-shrink:0;';
+    closeBtn.textContent = '×';
+    closeBtn.onclick = function () { overlay.style.display = 'none'; };
+    hdr.appendChild(tag); hdr.appendChild(titleEl); hdr.appendChild(closeBtn);
+    var body = document.createElement('div');
+    body.id = 'gsModalBody';
+    body.style.cssText = 'overflow-y:auto;padding:20px 24px;flex:1;';
+    box.appendChild(hdr); box.appendChild(body);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.style.display = 'none'; });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') overlay.style.display = 'none'; });
+    return overlay;
+  }
+
+  function openModal(typeTag, name, buildFn) {
+    var overlay = initModal();
+    document.getElementById('gsModalTag').textContent = typeTag;
+    document.getElementById('gsModalTitle').textContent = name;
+    var body = document.getElementById('gsModalBody');
+    body.innerHTML = '';
+    buildFn(body);
+    overlay.style.display = 'flex';
+  }
+
+  function gsSec(label, iconClass, accent) {
+    var sec = document.createElement('div');
+    sec.style.cssText = 'margin-bottom:20px;';
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:' + accent + ';margin-bottom:8px;display:flex;align-items:center;gap:6px;padding-bottom:5px;border-bottom:2px solid ' + accent + '33;';
+    var ico = document.createElement('i'); ico.className = 'fas ' + iconClass;
+    hdr.appendChild(ico); hdr.appendChild(document.createTextNode(' ' + label));
+    sec.appendChild(hdr);
+    return sec;
+  }
+
+  function gsRow(label, value) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;font-size:13px;';
+    var lbl = document.createElement('span');
+    lbl.style.cssText = 'font-weight:600;color:#6b7280;min-width:130px;flex-shrink:0;';
+    lbl.textContent = label;
+    var val = document.createElement('span');
+    val.style.cssText = 'color:#2d3748;';
+    val.textContent = value || '—';
+    row.appendChild(lbl); row.appendChild(val);
+    return row;
+  }
+
+  function gsChips(items) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:4px 0;';
+    items.forEach(function (text) {
+      var c = document.createElement('span');
+      c.style.cssText = 'font-size:11.5px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:12px;padding:2px 10px;';
+      c.textContent = text;
+      wrap.appendChild(c);
+    });
+    return wrap;
+  }
+
+  function gsEmpty(msg) {
+    var p = document.createElement('p');
+    p.style.cssText = 'color:#9ca3af;font-size:12px;font-style:italic;margin:4px 0 0;';
+    p.textContent = msg || 'None';
+    return p;
+  }
+
+  function gsPre(code) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'font-family:monospace;font-size:10.5px;background:#1e1e1e;color:#d4d4d4;padding:10px 12px;border-radius:6px;max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:0;';
+    pre.textContent = code;
+    return pre;
+  }
+
+  function showRuleModalGS(rule) {
+    openModal('Rule', rule.name || 'Unnamed Rule', function (body) {
+      // Events
+      var events = rule.events || [];
+      var evSec = gsSec('Events (' + events.length + ')', 'fa-bolt', '#10b981');
+      if (!events.length) { evSec.appendChild(gsEmpty('No events.')); }
+      else {
+        evSec.appendChild(gsChips(events.map(function (ev) {
+          var name = moduleName(ev.modulePath) || 'Event';
+          if (ev.settings && ev.settings.identifier) name = 'Direct Call: ' + ev.settings.identifier;
+          var ext = extensionFromPath(ev.modulePath);
+          return name + (ext ? ' (' + ext + ')' : '');
+        })));
+      }
+      body.appendChild(evSec);
+
+      // Conditions
+      var conds = rule.conditions || [];
+      var condSec = gsSec('Conditions (' + conds.length + ')', 'fa-filter', '#f59e0b');
+      if (!conds.length) { condSec.appendChild(gsEmpty('No conditions.')); }
+      else {
+        condSec.appendChild(gsChips(conds.map(function (c, i) {
+          return (i + 1) + '. ' + (moduleName(c.modulePath) || 'Condition');
+        })));
+      }
+      body.appendChild(condSec);
+
+      // Actions
+      var actions = rule.actions || [];
+      var actSec = gsSec('Actions (' + actions.length + ')', 'fa-play-circle', '#6366f1');
+      if (!actions.length) { actSec.appendChild(gsEmpty('No actions.')); }
+      else {
+        actSec.appendChild(gsChips(actions.map(function (a, i) {
+          return (i + 1) + '. ' + (moduleName(a.modulePath) || 'Action');
+        })));
+      }
+      body.appendChild(actSec);
+
+      actions.forEach(function (a, i) {
+        var src = a.settings && (a.settings.source || (a.settings.customSetup && a.settings.customSetup.source));
+        if (src) {
+          var codeSec = gsSec('Action ' + (i + 1) + ' — Custom Code', 'fa-code', '#374151');
+          codeSec.appendChild(gsPre(src.length > 2000 ? src.slice(0, 2000) + '\n…[truncated]' : src));
+          body.appendChild(codeSec);
+        }
+      });
+    });
+  }
+
+  function showDEModalGS(name, config) {
+    openModal('Data Element', name, function (body) {
+      var s = config.settings || {};
+      var detailSec = gsSec('Details', 'fa-info-circle', '#4e73df');
+      detailSec.appendChild(gsRow('Name', name));
+      detailSec.appendChild(gsRow('Type', moduleName(config.modulePath) || '—'));
+      detailSec.appendChild(gsRow('Extension', extensionFromPath(config.modulePath) || '—'));
+      if (s.storeDuration || s.storageDuration) detailSec.appendChild(gsRow('Storage Duration', s.storeDuration || s.storageDuration));
+      if (s.defaultValue !== undefined && s.defaultValue !== '') detailSec.appendChild(gsRow('Default Value', String(s.defaultValue)));
+      if (s.cleanText !== undefined) detailSec.appendChild(gsRow('Clean Text', s.cleanText ? 'Yes' : 'No'));
+      if (s.forceLowerCase !== undefined) detailSec.appendChild(gsRow('Force Lowercase', s.forceLowerCase ? 'Yes' : 'No'));
+      body.appendChild(detailSec);
+
+      if (s.source) {
+        var codeSec = gsSec('Custom Code', 'fa-code', '#374151');
+        codeSec.appendChild(gsPre(s.source.length > 2000 ? s.source.slice(0, 2000) + '\n…[truncated]' : s.source));
+        body.appendChild(codeSec);
+      }
+    });
+  }
+
+  function showExtModalGS(id, config) {
+    var displayName = config.displayName || id;
+    openModal('Extension', displayName, function (body) {
+      var detailSec = gsSec('Extension Details', 'fa-puzzle-piece', '#4e73df');
+      detailSec.appendChild(gsRow('Extension Key', id));
+      detailSec.appendChild(gsRow('Display Name', displayName));
+      if (config.version) detailSec.appendChild(gsRow('Version', config.version));
+      var hasSettings = config.settings && Object.keys(config.settings).length > 0;
+      detailSec.appendChild(gsRow('Has Custom Settings', hasSettings ? 'Yes' : 'No'));
+      body.appendChild(detailSec);
+
+      if (hasSettings) {
+        var settingsSec = gsSec('Settings', 'fa-sliders-h', '#7c3aed');
+        var pre = document.createElement('pre');
+        pre.style.cssText = 'font-family:monospace;font-size:10.5px;background:#1e1e1e;color:#d4d4d4;padding:10px 12px;border-radius:6px;max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:0;';
+        try { pre.textContent = JSON.stringify(config.settings, null, 2); } catch (e) { pre.textContent = String(config.settings); }
+        settingsSec.appendChild(pre);
+        body.appendChild(settingsSec);
+      }
+
+      // Usage data from extension.js's pre-built sessionStorage map
+      try {
+        var usageRaw = sessionStorage.getItem('_satellite._extension');
+        if (usageRaw) {
+          var usageMap = JSON.parse(usageRaw);
+          var v = usageMap[id] || {};
+          var ruleNames = Object.keys(v).filter(function (k) { return k !== 'dataelement'; });
+          var deList = v.dataelement && Array.isArray(v.dataelement) ? v.dataelement : [];
+
+          var rSec = gsSec('Used in Rules (' + ruleNames.length + ')', 'fa-wrench', '#7c3aed');
+          rSec.appendChild(ruleNames.length ? gsChips(ruleNames) : gsEmpty('Not used in any rule.'));
+          body.appendChild(rSec);
+
+          var deSec = gsSec('Data Elements (' + deList.length + ')', 'fa-database', '#059669');
+          deSec.appendChild(deList.length ? gsChips(deList.map(function (d) { return d.name || d.path || '—'; })) : gsEmpty('Not used in any data element.'));
+          body.appendChild(deSec);
+        }
+      } catch (e) {}
+    });
+  }
+
+  // ── Delegated click on result cards ──────────────────────────────────────────
+
+  function wireCardClicks() {
+    var resultsEl = document.getElementById('csResults');
+    if (!resultsEl) return;
+    resultsEl.addEventListener('click', function (e) {
+      var nameEl = e.target.closest('.cs-card-name');
+      if (!nameEl) return;
+      var card = e.target.closest('.cs-card[data-rkey]');
+      if (!card) return;
+      var entry = renderMap[card.getAttribute('data-rkey')];
+      if (!entry) return;
+      if (entry.type === 'rule') showRuleModalGS(entry.raw);
+      else if (entry.type === 'de') showDEModalGS(entry.rawName, entry.rawConfig);
+      else if (entry.type === 'ext') showExtModalGS(entry.rawId, entry.rawConfig);
+    });
   }
 })();

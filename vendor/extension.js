@@ -317,6 +317,7 @@
       tr._detailData = v;
       tr.setAttribute('data-ext-key', key);
       tr.setAttribute('data-display-name', (displayName || '').toLowerCase());
+      tr.setAttribute('data-search-text', ((displayName || '') + ' ' + key).toLowerCase());
 
       var tdId = document.createElement('td');
       tdId.className = 'ext-col-id';
@@ -339,7 +340,14 @@
         toggleExpand(expandIcon, index);
       };
       tdName.appendChild(expandIcon);
-      tdName.appendChild(document.createTextNode(displayName || key));
+      var nameSpan = document.createElement('span');
+      nameSpan.textContent = displayName || key;
+      nameSpan.title = 'Click to view full composition';
+      nameSpan.style.cursor = 'pointer';
+      nameSpan.addEventListener('click', (function (k, vv, extData) {
+        return function (e) { e.stopPropagation(); showExtModal(k, vv, extData); };
+      })(key, v, ext));
+      tdName.appendChild(nameSpan);
       if (isComponentDisabled(ext)) {
         var disabledBadge = document.createElement('span');
         disabledBadge.className = 'component-disabled-badge';
@@ -402,6 +410,17 @@
     document.getElementById('prevPage').disabled = currentPage <= 1;
     document.getElementById('nextPage').disabled = totalPages === 0 || currentPage >= totalPages;
 
+    var countEl = document.getElementById('extCountInfo');
+    if (countEl) {
+      var total = dataRows.length;
+      if (visibleRows.length === total) {
+        countEl.textContent = '';
+      } else if (visibleRows.length === 0) {
+        countEl.textContent = 'No extensions match.';
+      } else {
+        countEl.textContent = 'Showing ' + (start + 1) + '–' + Math.min(end, visibleRows.length) + ' of ' + visibleRows.length + ' extension' + (visibleRows.length !== 1 ? 's' : '');
+      }
+    }
   }
 
   function showPage(page) {
@@ -504,6 +523,162 @@
     URL.revokeObjectURL(a.href);
   }
 
+  // ── Extension detail modal ──────────────────────────────────────────────
+
+  function initExtModal() {
+    if (document.getElementById('extCompModal')) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'extCompModal';
+    overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;overflow-y:auto;padding:24px 16px;box-sizing:border-box;';
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#1e1e2e;border-radius:12px;max-width:740px;margin:0 auto;padding:28px 32px;position:relative;color:#cdd6f4;font-family:inherit;box-shadow:0 20px 60px rgba(0,0,0,.6);';
+    var closeBtn = document.createElement('button');
+    closeBtn.id = 'extCompModalClose';
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'position:absolute;top:16px;right:20px;background:none;border:none;color:#cdd6f4;font-size:20px;cursor:pointer;line-height:1;padding:0;';
+    closeBtn.addEventListener('click', function () { overlay.style.display = 'none'; });
+    var body = document.createElement('div');
+    body.id = 'extCompModalBody';
+    box.appendChild(closeBtn);
+    box.appendChild(body);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.style.display = 'none'; });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') overlay.style.display = 'none'; });
+  }
+
+  function openExtModal(titleText, buildFn) {
+    initExtModal();
+    var overlay = document.getElementById('extCompModal');
+    var body = document.getElementById('extCompModalBody');
+    if (!overlay || !body) return;
+    body.innerHTML = '';
+    var title = document.createElement('h2');
+    title.style.cssText = 'margin:0 0 20px;font-size:18px;color:#cba6f7;word-break:break-all;padding-right:32px;';
+    title.textContent = titleText;
+    body.appendChild(title);
+    buildFn(body);
+    overlay.style.display = 'block';
+  }
+
+  function extCdmSection(parent, label, iconClass) {
+    var sec = document.createElement('div');
+    sec.style.cssText = 'margin-bottom:20px;';
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'font-size:13px;font-weight:700;color:#89b4fa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:6px;';
+    var icon = document.createElement('i');
+    icon.className = 'fas ' + iconClass;
+    hdr.appendChild(icon);
+    hdr.appendChild(document.createTextNode(' ' + label));
+    sec.appendChild(hdr);
+    parent.appendChild(sec);
+    return sec;
+  }
+
+  function extCdmRow(parent, label, value) {
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:12px;margin-bottom:6px;font-size:13px;';
+    var lbl = document.createElement('span');
+    lbl.style.cssText = 'color:#6c7086;min-width:150px;flex-shrink:0;';
+    lbl.textContent = label;
+    var val = document.createElement('span');
+    val.style.cssText = 'color:#cdd6f4;word-break:break-all;';
+    val.textContent = value;
+    row.appendChild(lbl);
+    row.appendChild(val);
+    parent.appendChild(row);
+  }
+
+  function extCdmChips(parent, items) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
+    items.forEach(function (label) {
+      var chip = document.createElement('span');
+      chip.style.cssText = 'background:#313244;border:1px solid #45475a;border-radius:6px;padding:3px 10px;font-size:12px;color:#cdd6f4;white-space:nowrap;';
+      chip.textContent = label;
+      wrap.appendChild(chip);
+    });
+    parent.appendChild(wrap);
+  }
+
+  function extCdmEmpty(parent, msg) {
+    var p = document.createElement('p');
+    p.style.cssText = 'color:#6c7086;font-size:13px;margin:0;';
+    p.textContent = msg;
+    parent.appendChild(p);
+  }
+
+  function showExtModal(key, v, ext) {
+    var displayName = (ext && ext.displayName) ? ext.displayName : key;
+    openExtModal(displayName + ' — Extension Details', function (body) {
+
+      // ── Extension Details ────────────────────────────────────────────────
+      var detailSec = extCdmSection(body, 'Extension Details', 'fa-puzzle-piece');
+      extCdmRow(detailSec, 'Extension Key', key);
+      extCdmRow(detailSec, 'Display Name', displayName);
+      extCdmRow(detailSec, 'Size', getSizeKb(ext).toFixed(2) + ' KB');
+      var hasSettings = ext && ext.settings && Object.keys(ext.settings).length > 0;
+      extCdmRow(detailSec, 'Has Custom Settings', hasSettings ? 'Yes' : 'No');
+
+      // ── Settings ─────────────────────────────────────────────────────────
+      if (hasSettings) {
+        var settingsSec = extCdmSection(body, 'Settings', 'fa-sliders-h');
+        var pre = document.createElement('pre');
+        pre.style.cssText = 'background:#11111b;border-radius:6px;padding:12px;font-size:11px;overflow-x:auto;max-height:160px;color:#a6e3a1;margin:0;';
+        try { pre.textContent = JSON.stringify(ext.settings, null, 2); } catch (e) { pre.textContent = String(ext.settings); }
+        settingsSec.appendChild(pre);
+      }
+
+      // ── Rules ────────────────────────────────────────────────────────────
+      var ruleNames = Object.keys(v).filter(function (k) { return k !== 'dataelement'; });
+      var rulesSec = extCdmSection(body, 'Used in Rules (' + ruleNames.length + ')', 'fa-wrench');
+      if (ruleNames.length === 0) {
+        extCdmEmpty(rulesSec, 'Not used in any rule.');
+      } else {
+        var scrollWrap = document.createElement('div');
+        scrollWrap.style.cssText = 'overflow-x:auto;border-radius:6px;border:1px solid #313244;';
+        var tbl = document.createElement('table');
+        tbl.style.cssText = 'width:100%;border-collapse:collapse;font-size:12px;';
+        var thead = document.createElement('thead');
+        var hRow = document.createElement('tr');
+        ['Rule Name', 'Events', 'Has Actions', 'Has Conditions'].forEach(function (txt) {
+          var th = document.createElement('th');
+          th.style.cssText = 'text-align:left;padding:8px 12px;background:#181825;color:#89b4fa;font-weight:600;border-bottom:1px solid #313244;';
+          th.textContent = txt;
+          hRow.appendChild(th);
+        });
+        thead.appendChild(hRow);
+        tbl.appendChild(thead);
+        var tbody = document.createElement('tbody');
+        ruleNames.forEach(function (ruleName, ri) {
+          var r = v[ruleName];
+          var eventNames = Array.isArray(r.events) && r.events.length ? r.events.join(', ') : '—';
+          var tr = document.createElement('tr');
+          tr.style.cssText = ri % 2 === 0 ? 'background:#1e1e2e;' : 'background:#181825;';
+          [ruleName, eventNames, r.rule ? 'Yes' : '—', r.conditions ? 'Yes' : '—'].forEach(function (cellText) {
+            var td = document.createElement('td');
+            td.style.cssText = 'padding:7px 12px;color:#cdd6f4;border-bottom:1px solid #313244;word-break:break-word;';
+            td.textContent = cellText;
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        tbl.appendChild(tbody);
+        scrollWrap.appendChild(tbl);
+        rulesSec.appendChild(scrollWrap);
+      }
+
+      // ── Data Elements ─────────────────────────────────────────────────────
+      var deList = v.dataelement && Array.isArray(v.dataelement) ? v.dataelement : [];
+      var deSec = extCdmSection(body, 'Data Elements (' + deList.length + ')', 'fa-database');
+      if (deList.length === 0) {
+        extCdmEmpty(deSec, 'Not used in any data element.');
+      } else {
+        extCdmChips(deSec, deList.map(function (d) { return d.name || d.path || '—'; }));
+      }
+    });
+  }
+
   function init() {
     var extMain = document.getElementById('ext-main');
     var noData = document.getElementById('no-data-alert');
@@ -533,21 +708,25 @@
 
     showPage(1);
 
+    // Search — debounced, searches display name + extension key
+    function _debounceExt(fn, ms) {
+      var t; return function () { clearTimeout(t); var a = arguments, c = this; t = setTimeout(function () { fn.apply(c, a); }, ms); };
+    }
     var searchInput = document.getElementById('extensionSearchInput');
     if (searchInput) {
-      searchInput.addEventListener('input', function () {
+      var _extTbody = document.getElementById('extension_details') && document.getElementById('extension_details').querySelector('tbody');
+      searchInput.addEventListener('input', _debounceExt(function () {
         var term = (searchInput.value || '').trim().toLowerCase();
-        var tbody = document.getElementById('extension_details') && document.getElementById('extension_details').querySelector('tbody');
-        if (tbody) {
-          tbody.querySelectorAll('tr').forEach(function (tr) {
-            var name = tr.getAttribute('data-display-name') || '';
-            if (!term || name.indexOf(term) !== -1) tr.classList.remove('search-hidden');
+        if (_extTbody) {
+          _extTbody.querySelectorAll('tr').forEach(function (tr) {
+            var haystack = tr.getAttribute('data-search-text') || tr.getAttribute('data-display-name') || '';
+            if (!term || haystack.indexOf(term) !== -1) tr.classList.remove('search-hidden');
             else tr.classList.add('search-hidden');
           });
           currentPage = 1;
           showPage(1);
         }
-      });
+      }, 220));
     }
 
     var prevBtn = document.getElementById('prevPage');

@@ -74,10 +74,7 @@ var satellite = {};
         }
 
         if (event.data && event.data.type === 'INJECT_SCRIPT') {
-          const script = document.createElement('script');
-          script.textContent = event.data.payload;
           let data = event.data.payload;
-          console.log('@#333333333333333  ', event.data.payload);
           let match = data.match(
             /window\._satellite\.container\s*=\s*({[\s\S]*});/
           );
@@ -102,7 +99,6 @@ var satellite = {};
           } else {
             console.error('Container not found in script.');
           }
-          // document.body.appendChild(script);
         }
       });
 
@@ -116,19 +112,6 @@ var satellite = {};
       }
 
       //Naming headers for the table
-      const headers = [
-        'componentType',
-        'componentName',
-        'hasCustomCode',
-        'customCode',
-        'deModule',
-        'deSettings',
-        'ruleID',
-        'ruleModule',
-        'ruleSettings',
-        'eventOrder',
-      ];
-
       var dataElements = satellite.dataElements;
       var rules = satellite.rules;
       var extensions = satellite.extensions;
@@ -136,75 +119,228 @@ var satellite = {};
       propertyName = property.name;
       propertyId = property.id;
 
-      var deTest = parseDataElements(dataElements);
-      var extTest = parseExtensions(extensions);
-      var ruleTest = parseRules(rules);
-
-      var deDicts = toTable(headers, deTest);
-      var extDicts = toTable(headers, extTest);
-      var ruleDicts = toTable(headers, ruleTest);
-      const mergedDicts = [...deDicts, ...extDicts, ...ruleDicts];
-
-      //console.log(mergedDicts);
-
-      // To CSV
-      csv = [
-        [
-          'Component Type',
-          'Component Name',
-          'Has Custom Code',
-          'Custom Code',
-          'DE Module',
-          'DE Settings',
-          'RuleID',
-          'Rule Module',
-          'Rule Settings',
-          'Event Order',
-        ],
-        ...mergedDicts.map((row) =>
-          [
-            row.componentType,
-            row.componentName,
-            row.hasCustomCode,
-            row.customCode,
-            row.deModule, //TODO: Not showing up in csv? check qualifiers. Single quotes vs double?
-            row.deSettings,
-            row.ruleID,
-            row.ruleModule,
-            row.ruleSettings,
-            row.eventOrder,
-          ].map((item) =>
-            typeof item === 'string' ? `"${item.replace(/"/g, '""')}"` : item
-          )
-        ),
-      ]
-        .map((row) => row.join(','))
-        .join('\n');
-      //console.log(csv);
-
-      //Button to download CSV.
+      //Button to download XLSX (3 sheets: Rules, Data Elements, Extensions).
       document
         .getElementById('csv_link')
-        .addEventListener('click', downloadCSV);
-      function downloadCSV() {
-        var csvFile = new Blob([csv], { type: 'text/csv' });
-        var downloadLink = document.createElement('a');
-        downloadLink.download = propertyName + '_tagScanner.csv';
-        downloadLink.href = window.URL.createObjectURL(csvFile);
-        downloadLink.click();
+        .addEventListener('click', downloadXLSX);
+
+      function downloadXLSX() {
+        if (typeof XLSX === 'undefined') {
+          alert('Excel library not loaded. Please reload and try again.');
+          return;
+        }
+
+        function extFromPath(p) { return p ? p.split('/')[0] : ''; }
+        function typeFromPath(p) {
+          if (!p) return '';
+          var parts = p.split('/');
+          var fn = parts[parts.length - 1].replace(/\.js$/, '');
+          if ((fn === 'index' || fn === '') && parts.length > 2) fn = parts[parts.length - 2];
+          return fn.replace(/([A-Z])/g, ' $1').trim();
+        }
+        function codeSnippet(comp) {
+          var src = comp && comp.settings && (comp.settings.source || comp.settings.code);
+          if (!src || typeof src !== 'string') return '';
+          var s = src.trim();
+          return s.length > 500 ? s.slice(0, 500) + '…' : s;
+        }
+
+        var ruleList = Array.isArray(rules) ? rules
+          : (rules && typeof rules === 'object' ? Object.values(rules) : []);
+        var deObj = dataElements || {};
+        var extObj = extensions || {};
+
+        // ── Pre-compute extension usage counts from rules + data elements ────
+        var extUsage = {};
+        Object.keys(extObj).forEach(function (k) {
+          extUsage[k] = { events: 0, conditions: 0, actions: 0, dataElements: 0 };
+        });
+        function tally(arr, field) {
+          if (!arr) return;
+          arr.forEach(function (comp) {
+            var k = extFromPath(comp.modulePath);
+            if (k) {
+              if (!extUsage[k]) extUsage[k] = { events: 0, conditions: 0, actions: 0, dataElements: 0 };
+              extUsage[k][field]++;
+            }
+          });
+        }
+        ruleList.forEach(function (rule) {
+          tally(rule.events, 'events');
+          tally(rule.conditions, 'conditions');
+          tally(rule.actions, 'actions');
+        });
+        Object.keys(deObj).forEach(function (name) {
+          var k = extFromPath((deObj[name] || {}).modulePath);
+          if (k) {
+            if (!extUsage[k]) extUsage[k] = { events: 0, conditions: 0, actions: 0, dataElements: 0 };
+            extUsage[k].dataElements++;
+          }
+        });
+
+        // ── Sheet 1: Rules Summary — one row per rule ─────────────────────────
+        var summaryRows = [['#', 'Rule Name', '# Events', '# Conditions',
+                            '# Actions', 'Total Components', 'Extensions Used', 'Has Custom Code']];
+        ruleList.forEach(function (rule, idx) {
+          var rName = rule.name || rule.id || 'Unknown';
+          var evts = (rule.events || []).length;
+          var conds = (rule.conditions || []).length;
+          var acts = (rule.actions || []).length;
+          var hasCode = false;
+          var extSet = {};
+          function scanComps(arr) {
+            if (!arr) return;
+            arr.forEach(function (c) {
+              if (c.settings && (c.settings.source || c.settings.code)) hasCode = true;
+              var k = extFromPath(c.modulePath);
+              if (k) extSet[k] = true;
+            });
+          }
+          scanComps(rule.events); scanComps(rule.conditions); scanComps(rule.actions);
+          summaryRows.push([idx + 1, rName,
+            evts, conds, acts, evts + conds + acts,
+            Object.keys(extSet).join(', '), hasCode ? 'Yes' : 'No']);
+        });
+
+        // ── Sheet 2: Rule Components — one row per component, rule name merged ─
+        var compRows = [['Rule Name', 'Component Type', 'Component Name',
+                         'Extension', 'Order', 'Has Custom Code', 'Code Snippet']];
+        var compMerges = [];
+        ruleList.forEach(function (rule) {
+          var rName = rule.name || rule.id || 'Unknown';
+          var startRow = compRows.length; // 0-indexed
+          var order = 0;
+          function addComps(arr, typeName) {
+            if (!arr || !arr.length) return;
+            arr.forEach(function (comp) {
+              var hasCode = !!(comp.settings && (comp.settings.source || comp.settings.code));
+              var isFirst = compRows.length === startRow;
+              compRows.push([
+                isFirst ? rName : '',
+                typeName,
+                comp.name || typeFromPath(comp.modulePath),
+                extFromPath(comp.modulePath),
+                ++order,
+                hasCode ? 'Yes' : 'No',
+                codeSnippet(comp)
+              ]);
+            });
+          }
+          addComps(rule.events, 'Event');
+          addComps(rule.conditions, 'Condition');
+          addComps(rule.actions, 'Action');
+          if (compRows.length === startRow) {
+            compRows.push([rName, '(no components)', '', '', '', '', '']);
+          }
+          var endRow = compRows.length - 1;
+          if (endRow > startRow) {
+            // Merge Rule Name column across all component rows
+            compMerges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } });
+          }
+        });
+
+        // ── Sheet 3: Data Elements ────────────────────────────────────────────
+        var deRows = [['#', 'Name', 'Type', 'Extension', 'Storage Duration',
+                        'Default Value', 'Clean Text', 'Force Lowercase',
+                        'Has Custom Code', 'Code Snippet', 'Size (KB)']];
+        var di = 1;
+        Object.keys(deObj).forEach(function (name) {
+          var d = deObj[name] || {};
+          var hasCode = !!(d.settings && (d.settings.source || d.settings.code));
+          var sizeKb = d.size ? parseFloat((d.size / 1024).toFixed(2)) : '';
+          deRows.push([di++, name, typeFromPath(d.modulePath), extFromPath(d.modulePath),
+            d.storageDuration || '',
+            (d.settings && d.settings.defaultValue) || '',
+            d.cleanText ? 'Yes' : 'No',
+            d.forceLowerCase ? 'Yes' : 'No',
+            hasCode ? 'Yes' : 'No', codeSnippet(d), sizeKb]);
+        });
+
+        // ── Sheet 4: Extensions ───────────────────────────────────────────────
+        var extRows = [['#', 'Extension Key', 'Display Name',
+                        '# Events Used', '# Conditions Used', '# Actions Used', '# Data Elements',
+                        'Total Usage', 'Has Settings', 'Settings Summary', 'Size (KB)']];
+        var ei = 1;
+        Object.keys(extObj).sort().forEach(function (key) {
+          var e = extObj[key] || {};
+          var u = extUsage[key] || { events: 0, conditions: 0, actions: 0, dataElements: 0 };
+          var hasSettings = !!(e.settings && Object.keys(e.settings).length > 0);
+          var settingsSummary = '';
+          if (e.settings) {
+            try {
+              var j = JSON.stringify(e.settings);
+              settingsSummary = j.length > 300 ? j.slice(0, 300) + '…' : j;
+            } catch (_) {}
+          }
+          var sizeKb = e.size ? parseFloat((e.size / 1024).toFixed(2)) : '';
+          extRows.push([ei++, key, e.displayName || key,
+            u.events, u.conditions, u.actions, u.dataElements,
+            u.events + u.conditions + u.actions + u.dataElements,
+            hasSettings ? 'Yes' : 'No', settingsSummary, sizeKb]);
+        });
+
+        // ── Build workbook ─────────────────────────────────────────────────────
+        function autoWidth(ws, data) {
+          if (!data || !data.length) return;
+          var widths = [];
+          for (var c = 0; c < data[0].length; c++) {
+            var max = 10;
+            data.forEach(function (row) {
+              var len = row[c] == null ? 0 : String(row[c]).length;
+              if (len > max) max = len;
+            });
+            widths.push({ wch: Math.min(max + 2, 60) });
+          }
+          ws['!cols'] = widths;
+        }
+
+        var wb = XLSX.utils.book_new();
+
+        var wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+        autoWidth(wsSummary, summaryRows);
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'Rules Summary');
+
+        var wsComp = XLSX.utils.aoa_to_sheet(compRows);
+        if (compMerges.length) wsComp['!merges'] = compMerges;
+        autoWidth(wsComp, compRows);
+        XLSX.utils.book_append_sheet(wb, wsComp, 'Rule Components');
+
+        var wsDe = XLSX.utils.aoa_to_sheet(deRows);
+        autoWidth(wsDe, deRows);
+        XLSX.utils.book_append_sheet(wb, wsDe, 'Data Elements');
+
+        var wsExt = XLSX.utils.aoa_to_sheet(extRows);
+        autoWidth(wsExt, extRows);
+        XLSX.utils.book_append_sheet(wb, wsExt, 'Extensions');
+
+        var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        var blob = new Blob([wbout], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = propertyName + '_tagScanner.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
       }
 
       //Assigning Values in popup
       sessionStorage.setItem('launch_property_name', propertyName);
       sessionStorage.setItem('launch_property_environment', 'Production');
-      document.getElementById('property_name').innerHTML =
+      document.getElementById('property_name').textContent =
         'PROPERTY NAME: ' + propertyName;
 
       //Hard Setting Environment to Production - TODO: fix if ever needed. Currently will always be on prod if not owner of property.
-      var envLabel = 'Environment: Production';
-      document.getElementById('environment_name').innerHTML = envLabel;
-      if (document.getElementById('topbar-env')) {
-        document.getElementById('topbar-env').innerHTML = '<i class="fas fa-cloud mr-1"></i>Env: Production';
+      document.getElementById('environment_name').textContent = 'Environment: Production';
+      var topbarEnv = document.getElementById('topbar-env');
+      if (topbarEnv) {
+        topbarEnv.textContent = '';
+        var envIcon = document.createElement('i');
+        envIcon.className = 'fas fa-cloud mr-1';
+        topbarEnv.appendChild(envIcon);
+        topbarEnv.appendChild(document.createTextNode('Env: Production'));
       }
 
       //Extension details
@@ -212,16 +348,26 @@ var satellite = {};
       sessionStorage.setItem('_satellite._container.extension', extensionStr);
       extensionStr = extensionStr.split('hostedLibFilesBaseUrl');
       var extCount = extensionStr.length - 1;
-      document.getElementById('extensions').innerHTML = extCount;
+      document.getElementById('extensions').textContent = extCount;
       sessionStorage.setItem('extensions-length', extensionStr.length - 1);
-      if (document.getElementById('topbar-ext')) {
-        document.getElementById('topbar-ext').innerHTML = '<i class="fas fa-puzzle-piece mr-1"></i>Extensions: ' + extCount;
+      var topbarExt = document.getElementById('topbar-ext');
+      if (topbarExt) {
+        topbarExt.textContent = '';
+        var extIcon = document.createElement('i');
+        extIcon.className = 'fas fa-puzzle-piece mr-1';
+        topbarExt.appendChild(extIcon);
+        topbarExt.appendChild(document.createTextNode('Extensions: ' + extCount));
       }
 
       //Rule details
-      document.getElementById('rule_details').innerHTML = rules.length;
-      if (document.getElementById('topbar-rules')) {
-        document.getElementById('topbar-rules').innerHTML = '<i class="fas fa-wrench mr-1"></i>Rules: ' + rules.length;
+      document.getElementById('rule_details').textContent = rules.length;
+      var topbarRules = document.getElementById('topbar-rules');
+      if (topbarRules) {
+        topbarRules.textContent = '';
+        var rulesIcon = document.createElement('i');
+        rulesIcon.className = 'fas fa-wrench mr-1';
+        topbarRules.appendChild(rulesIcon);
+        topbarRules.appendChild(document.createTextNode('Rules: ' + rules.length));
       }
       sessionStorage.setItem('rule-length', rules.length);
       sessionStorage.setItem(
@@ -498,7 +644,7 @@ function toTable(headers, data) {
 if (window.location.href.indexOf('page_url=') > -1) {
   sessionStorage.setItem('launch_page_url', window.location.href);
 }
-sessionStorage.setItem('tagScanner_version', '2.4.0');
+sessionStorage.setItem('tagScanner_version', chrome.runtime.getManifest().version);
 // document.getElementById('feed_back_form').addEventListener('click', newwindow);
 // function newwindow() {
 //   window.open(

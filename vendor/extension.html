@@ -232,11 +232,14 @@
 
       <div class="search-container" style="margin-bottom: 20px">
         <div class="input-group">
-          <input type="text" id="extensionSearchInput" class="form-control" placeholder="Search by extension name..." />
+          <input type="text" id="extensionSearchInput" class="form-control" placeholder="Search by name or extension key..." />
           <div class="input-group-append">
             <span class="input-group-text"><i class="fas fa-search"></i></span>
           </div>
         </div>
+      </div>
+      <div style="text-align: right; margin-bottom: 6px; font-size: 13px; color: #5a5c69;">
+        <span id="extCountInfo"></span>
       </div>
       <div class="table-container">
         <table id="extension_details" style="width: 100%"></table>
@@ -257,7 +260,7 @@
       </div>
     </div>
 
-    <script src="jquery.js"></script>
+    <script src="jquery/jquery.min.js"></script>
     <script src="tablesorter.js"></script>
     <script src="initTableSorter.js"></script>
     <script src="extension.js"></script>

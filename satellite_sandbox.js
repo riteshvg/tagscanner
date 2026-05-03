@@ -8,7 +8,12 @@
   }
 
   fetch(script_URL)
-    .then(function (response) { return response.text(); })
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error('satellite_sandbox: HTTP ' + response.status);
+      }
+      return response.text();
+    })
     .then(function (jsCode) {
       window.parent.postMessage({ type: 'INJECT_SCRIPT', payload: jsCode }, '*');
     })

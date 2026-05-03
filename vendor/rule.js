@@ -271,6 +271,11 @@ if (rule_details_node) {
     var ruleNameSpan = document.createElement('span');
     ruleNameSpan.textContent = ruleName.replaceAll(',', '');
     ruleNameSpan.classList.add('rule-name-text');
+    ruleNameSpan.title = 'Click to view full composition';
+    ruleNameSpan.style.cursor = 'pointer';
+    ruleNameSpan.addEventListener('click', (function (r) {
+      return function (e) { e.stopPropagation(); showRuleModal(r); };
+    })(rule));
     tdName.appendChild(ruleNameExpandIcon);
     tdName.appendChild(ruleNameSpan);
     if (isComponentDisabled(rule)) {
@@ -302,11 +307,9 @@ if (rule_details_node) {
 
     // Rule Action(s)
     var tdActions = document.createElement('td');
-    console.log(`Rule ${i} actions:`, rule.actions);
     if (rule.actions && Array.isArray(rule.actions)) {
       // Extract action information with better debugging
       const actionInfo = rule.actions.map((action, actionIndex) => {
-        console.log(`Action ${actionIndex}:`, action);
         let actionDescription = '';
 
         // Check for action type
@@ -2321,6 +2324,18 @@ if (rule_details_node) {
     // Size (KB) – appended last
     tr.appendChild(tdSize);
 
+    // Build search index: rule name + every extension key used across components
+    var _searchExts = [];
+    function _collectExt(arr) {
+      if (!arr) return;
+      arr.forEach(function (c) {
+        var k = c.modulePath ? c.modulePath.split('/')[0] : '';
+        if (k && _searchExts.indexOf(k) === -1) _searchExts.push(k);
+      });
+    }
+    _collectExt(rule.events); _collectExt(rule.conditions); _collectExt(rule.actions);
+    tr.setAttribute('data-search-text', (ruleName + ' ' + _searchExts.join(' ')).toLowerCase());
+
     tbody.appendChild(tr);
   }
 
@@ -2418,24 +2433,22 @@ if (rule_details_node) {
   // Initialize with saved page or first page
   showPage(currentPage);
 
-  // Add search functionality
+  // Search — debounced, multi-field (rule name + extensions used)
+  function _debounce(fn, ms) {
+    var t; return function () { clearTimeout(t); var a = arguments, c = this; t = setTimeout(function () { fn.apply(c, a); }, ms); };
+  }
   const searchInput = document.getElementById('ruleSearchInput');
   if (searchInput) {
-    searchInput.addEventListener('input', function () {
-      const searchTerm = this.value.toLowerCase();
-      rows.forEach((row) => {
-        // Get the second cell (Rule Name) since first cell is now ID #
-        const ruleNameCell = row.querySelectorAll('td')[1];
-        if (ruleNameCell && ruleNameCell.textContent.toLowerCase().includes(searchTerm)) {
-          row.classList.remove('search-hidden');
-        } else {
-          row.classList.add('search-hidden');
-        }
+    searchInput.addEventListener('input', _debounce(function () {
+      const term = this.value.toLowerCase().trim();
+      rows.forEach(function (row) {
+        var haystack = row.getAttribute('data-search-text') || row.querySelectorAll('td')[1].textContent.toLowerCase();
+        if (!term || haystack.includes(term)) row.classList.remove('search-hidden');
+        else row.classList.add('search-hidden');
       });
-      // Reset to first page on search
       currentPage = 1;
       showPage(currentPage);
-    });
+    }, 220));
   }
 
   } catch (e) {
@@ -3158,6 +3171,21 @@ function showCodeModal(title, code) {
     modalTitle.textContent = title;
     var rawCode = code != null ? String(code) : '';
 
+    // Strip CDN license comment lines and backtick URL lines.
+    rawCode = rawCode
+      .replace(/^\/\/[^\n]*assets\.adobedtm\.com[^\n]*/gm, '')
+      .replace(/^`[^\n`]*assets\.adobedtm\.com[^\n`]*`\s*\.\s*/gm, '')
+      .trim();
+    // Only extract from __registerScript wrapper when the ENTIRE rawCode is that call
+    // (anchored ^ and $). Uses ((?:[^\\]|\\.)*?) to correctly skip over escaped quotes.
+    var wrapperMatch = rawCode.match(/^_satellite\.__registerScript\s*\([^,]+,\s*(["'`])((?:[^\\]|\\.)*?)\1\s*,?\s*\)\s*;?\s*$/);
+    if (wrapperMatch && wrapperMatch[2]) {
+      rawCode = wrapperMatch[2]
+        .replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\'/g, "'")
+        .replace(/\\\\/g, '\\').replace(/\\t/g, '\t').replace(/\\r/g, '\r')
+        .trim();
+    }
+
     // Detect a single-line URL reference (AppMeasurement / hosted custom code on Adobe CDN)
     var trimmedCode = rawCode.trim();
     var isSingleUrl = /^https?:\/\/\S+\.js$/.test(trimmedCode);
@@ -3544,6 +3572,199 @@ function settingsJsonForModal(settings) {
   }
 }
 
+// ── Component label helpers (module-scope, shared by expand rows and detail modal) ──
+function eventLabel(ev) {
+  if (ev.modulePath && ev.modulePath.indexOf('directCall') !== -1) {
+    return (ev.settings && ev.settings.identifier) ? 'Direct Call: ' + ev.settings.identifier : 'Direct Call';
+  }
+  if (ev.modulePath) {
+    var hostedEv = hostBundleLabelFromModulePath(ev.modulePath);
+    if (hostedEv) return hostedEv;
+    return ev.modulePath.split('/').pop().replace('.js', '');
+  }
+  return ev.name || ev.type || 'Event';
+}
+function conditionLabel(c) {
+  if (c.modulePath) {
+    var hostedC = hostBundleLabelFromModulePath(c.modulePath);
+    if (hostedC) return hostedC;
+    return c.modulePath.split('/').pop().replace('.js', '');
+  }
+  return c.name || c.type || 'Condition';
+}
+function actionLabel(a) {
+  if (!a.modulePath) return a.name || a.type || 'Action';
+  var path = a.modulePath;
+  var hostedA = hostBundleLabelFromModulePath(path);
+  if (hostedA) return hostedA;
+  var name = path.split('/').pop().replace('.js', '');
+  if (name === 'index') {
+    if (path.indexOf('adobe-alloy') !== -1) {
+      if (path.indexOf('sendEvent') !== -1) return 'WebSDK Send Event';
+      if (path.indexOf('sendBeacon') !== -1) return 'WebSDK Send Beacon';
+      if (path.indexOf('setConsent') !== -1) return 'WebSDK Set Consent';
+      if (path.indexOf('getData') !== -1) return 'WebSDK Get Data';
+      if (path.indexOf('setCustomerIds') !== -1) return 'WebSDK Set Customer IDs';
+      if (path.indexOf('setDebug') !== -1) return 'WebSDK Set Debug';
+      if (path.indexOf('setIdentityMap') !== -1) return 'WebSDK Set Identity Map';
+      if (path.indexOf('setVariables') !== -1) return 'WebSDK Set Variables';
+      if (path.indexOf('updateVariables') !== -1) return 'WebSDK Update Variable';
+    }
+    if (path.indexOf('adobe-analytics') !== -1) {
+      if (path.indexOf('setVariables') !== -1) return 'Set Variables';
+      if (path.indexOf('updateVariables') !== -1) return 'Update Variables';
+    }
+    if (path.indexOf('sendEvent') !== -1) return 'Send Event';
+    if (path.indexOf('sendBeacon') !== -1) return 'Send Beacon';
+    return 'Action';
+  }
+  if (path.indexOf('adobe-analytics') !== -1 && name === 'setVariables') return 'Set Variables';
+  if (path.indexOf('adobe-analytics') !== -1 && name === 'updateVariables') return 'Update Variables';
+  if (path.indexOf('adobe-alloy') !== -1) {
+    if (path.indexOf('sendEvent') !== -1) return 'WebSDK Send Event';
+    if (path.indexOf('sendBeacon') !== -1) return 'WebSDK Send Beacon';
+    if (path.indexOf('updateVariables') !== -1) return 'WebSDK Update Variable';
+    if (path.indexOf('setVariables') !== -1) return 'WebSDK Set Variables';
+  }
+  return name;
+}
+
+// ── Detail modal (shared across component types) ───────────────────────────
+function initCompModal() {
+  if (document.getElementById('comp-detail-modal')) return document.getElementById('comp-detail-modal');
+  var overlay = document.createElement('div');
+  overlay.id = 'comp-detail-modal';
+  overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;';
+  var box = document.createElement('div');
+  box.style.cssText = 'background:#fff;border-radius:10px;max-width:860px;width:93%;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,0.35);';
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:#4e73df;border-radius:10px 10px 0 0;flex-shrink:0;gap:10px;';
+  var tag = document.createElement('span');
+  tag.id = 'cdm-type-tag';
+  tag.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;background:rgba(255,255,255,0.22);color:white;padding:2px 9px;border-radius:10px;white-space:nowrap;';
+  var titleText = document.createElement('span');
+  titleText.id = 'cdm-title';
+  titleText.style.cssText = 'color:white;font-size:15px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'background:none;border:none;color:white;font-size:26px;cursor:pointer;line-height:1;padding:0;opacity:0.8;flex-shrink:0;';
+  closeBtn.textContent = '×';
+  closeBtn.onclick = function () { overlay.style.display = 'none'; };
+  hdr.appendChild(tag); hdr.appendChild(titleText); hdr.appendChild(closeBtn);
+  var body = document.createElement('div');
+  body.id = 'cdm-body';
+  body.style.cssText = 'overflow-y:auto;padding:20px 24px;flex:1;';
+  box.appendChild(hdr); box.appendChild(body);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.style.display = 'none'; });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') overlay.style.display = 'none'; });
+  return overlay;
+}
+function openCompModal(typeTag, name, buildFn) {
+  var overlay = initCompModal();
+  document.getElementById('cdm-type-tag').textContent = typeTag;
+  document.getElementById('cdm-title').textContent = name;
+  var body = document.getElementById('cdm-body');
+  body.innerHTML = '';
+  buildFn(body);
+  overlay.style.display = 'flex';
+}
+function cdmSection(label, iconClass, accent) {
+  var sec = document.createElement('div');
+  sec.style.cssText = 'margin-bottom:20px;';
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:' + accent + ';margin-bottom:8px;display:flex;align-items:center;gap:6px;padding-bottom:5px;border-bottom:2px solid ' + accent + '33;';
+  var ico = document.createElement('i'); ico.className = 'fas ' + iconClass;
+  hdr.appendChild(ico); hdr.appendChild(document.createTextNode(' ' + label));
+  sec.appendChild(hdr);
+  return sec;
+}
+function cdmCard(label, extKey, code, order, onViewCode) {
+  var card = document.createElement('div');
+  card.style.cssText = 'background:#f8f9fa;border:1px solid #e3e6f0;border-radius:6px;padding:10px 14px;margin-bottom:6px;';
+  var top = document.createElement('div');
+  top.style.cssText = 'display:flex;align-items:center;gap:8px;';
+  if (order !== undefined) {
+    var badge = document.createElement('span');
+    badge.style.cssText = 'background:#6c757d;color:#fff;border-radius:50%;width:19px;height:19px;line-height:19px;text-align:center;font-size:10px;font-weight:700;flex-shrink:0;display:inline-block;';
+    badge.textContent = order;
+    top.appendChild(badge);
+  }
+  var nameEl = document.createElement('span');
+  nameEl.style.cssText = 'font-weight:600;font-size:13px;color:#2d3748;flex:1;';
+  nameEl.textContent = label;
+  top.appendChild(nameEl);
+  if (onViewCode) {
+    var codeBtn = document.createElement('button');
+    codeBtn.style.cssText = 'font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid #4e73df;color:#4e73df;background:white;cursor:pointer;white-space:nowrap;';
+    codeBtn.textContent = 'View Code';
+    codeBtn.onclick = onViewCode;
+    top.appendChild(codeBtn);
+  }
+  card.appendChild(top);
+  if (extKey) {
+    var meta = document.createElement('div');
+    meta.style.cssText = 'font-size:11.5px;color:#6b7280;margin-top:3px;display:flex;align-items:center;gap:4px;';
+    var ico = document.createElement('i'); ico.className = 'fas fa-puzzle-piece';
+    meta.appendChild(ico); meta.appendChild(document.createTextNode(extKey));
+    card.appendChild(meta);
+  }
+  if (code) {
+    var pre = document.createElement('pre');
+    pre.style.cssText = 'font-family:monospace;font-size:10.5px;background:#1e1e1e;color:#d4d4d4;padding:8px 10px;border-radius:4px;margin:8px 0 0;max-height:110px;overflow:auto;white-space:pre-wrap;word-break:break-word;';
+    pre.textContent = code.length > 350 ? code.slice(0, 350) + '…' : code;
+    card.appendChild(pre);
+  }
+  return card;
+}
+function cdmChips(items) {
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:4px 0;';
+  items.forEach(function (item) {
+    var chip = document.createElement('span');
+    chip.style.cssText = 'font-size:11.5px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:12px;padding:2px 10px;';
+    chip.textContent = item;
+    wrap.appendChild(chip);
+  });
+  return wrap;
+}
+function cdmEmpty(msg) {
+  var p = document.createElement('p');
+  p.style.cssText = 'color:#9ca3af;font-size:12px;font-style:italic;margin:4px 0 0;';
+  p.textContent = msg || 'None';
+  return p;
+}
+
+function showRuleModal(rule) {
+  function extKey(comp) { return comp.modulePath ? comp.modulePath.split('/')[0] : ''; }
+  function codeOf(comp) {
+    var src = comp.settings && (comp.settings.source || comp.settings.code);
+    return (src && typeof src === 'string') ? src.trim() : '';
+  }
+  openCompModal('Rule', rule.name || 'Unknown', function (body) {
+    var sections = [
+      { label: 'Events', arr: rule.events || [], icon: 'fa-bolt', accent: '#e53e3e', labelFn: eventLabel },
+      { label: 'Conditions', arr: rule.conditions || [], icon: 'fa-filter', accent: '#d97706', labelFn: conditionLabel },
+      { label: 'Actions', arr: rule.actions || [], icon: 'fa-cogs', accent: '#3b82f6', labelFn: actionLabel }
+    ];
+    sections.forEach(function (s) {
+      var sec = cdmSection(s.label + ' (' + s.arr.length + ')', s.icon, s.accent);
+      if (s.arr.length === 0) { sec.appendChild(cdmEmpty()); }
+      s.arr.forEach(function (comp, i) {
+        var code = codeOf(comp);
+        sec.appendChild(cdmCard(
+          s.labelFn(comp),
+          extKey(comp),
+          code,
+          i + 1,
+          code ? function (c, lbl) { return function () { showCodeModal(lbl, c); }; }(code, s.labelFn(comp)) : null
+        ));
+      });
+      body.appendChild(sec);
+    });
+  });
+}
+
 // Toggle expand: show rule details in a row below (expandable row)
 function toggleExpand(icon, rowIndex) {
   const currentRow = icon.closest('tr');
@@ -3566,72 +3787,6 @@ function toggleExpand(icon, rowIndex) {
   try {
     var customCodeConds = currentRow._customCodeConditions || [];
     var customCodeActions = currentRow._customCodeActions || [];
-
-    function eventLabel(ev) {
-      if (ev.modulePath && ev.modulePath.indexOf('directCall') !== -1) {
-        return (ev.settings && ev.settings.identifier) ? 'Direct Call: ' + ev.settings.identifier : 'Direct Call';
-      }
-      if (ev.modulePath) {
-        var hostedEv = hostBundleLabelFromModulePath(ev.modulePath);
-        if (hostedEv) return hostedEv;
-        return ev.modulePath.split('/').pop().replace('.js', '');
-      }
-      return ev.name || ev.type || 'Event';
-    }
-    function conditionLabel(c) {
-      if (c.modulePath) {
-        var hostedC = hostBundleLabelFromModulePath(c.modulePath);
-        if (hostedC) return hostedC;
-        return c.modulePath.split('/').pop().replace('.js', '');
-      }
-      return c.name || c.type || 'Condition';
-    }
-    function actionLabel(a) {
-      if (a.modulePath) {
-        var path = a.modulePath;
-        var hostedA = hostBundleLabelFromModulePath(path);
-        if (hostedA) return hostedA;
-        var name = path.split('/').pop().replace('.js', '');
-        // When path ends with index.js, "name" is "index" – derive label from full path
-        if (name === 'index') {
-          if (path.indexOf('adobe-alloy') !== -1) {
-            if (path.indexOf('sendEvent') !== -1) return 'WebSDK Send Event';
-            if (path.indexOf('sendBeacon') !== -1) return 'WebSDK Send Beacon';
-            if (path.indexOf('setConsent') !== -1) return 'WebSDK Set Consent';
-            if (path.indexOf('getData') !== -1) return 'WebSDK Get Data';
-            if (path.indexOf('setCustomerIds') !== -1) return 'WebSDK Set Customer IDs';
-            if (path.indexOf('setDebug') !== -1) return 'WebSDK Set Debug';
-            if (path.indexOf('setIdentityMap') !== -1) return 'WebSDK Set Identity Map';
-            if (path.indexOf('setTimestamp') !== -1) return 'WebSDK Set Timestamp';
-            if (path.indexOf('setUserId') !== -1) return 'WebSDK Set User ID';
-            if (path.indexOf('setViewport') !== -1) return 'WebSDK Set Viewport';
-            if (path.indexOf('setWorkflow') !== -1) return 'WebSDK Set Workflow';
-            if (path.indexOf('setWorkflowState') !== -1) return 'WebSDK Set Workflow State';
-            if (path.indexOf('setVariables') !== -1) return 'WebSDK Set Variables';
-            if (path.indexOf('updateVariables') !== -1) return 'WebSDK Update Variable';
-          }
-          if (path.indexOf('adobe-analytics') !== -1) {
-            if (path.indexOf('setVariables') !== -1) return 'Set Variables';
-            if (path.indexOf('updateVariables') !== -1) return 'Update Variables';
-          }
-          if (path.indexOf('sendEvent') !== -1) return 'Send Event';
-          if (path.indexOf('sendBeacon') !== -1) return 'Send Beacon';
-          if (path.indexOf('setConsent') !== -1) return 'Set Consent';
-          if (path.indexOf('getData') !== -1) return 'Get Data';
-          return 'Action';
-        }
-        if (path.indexOf('adobe-analytics') !== -1 && name === 'setVariables') return 'Set Variables';
-        if (path.indexOf('adobe-analytics') !== -1 && name === 'updateVariables') return 'Update Variables';
-        if (path.indexOf('adobe-alloy') !== -1) {
-          if (path.indexOf('sendEvent') !== -1) return 'WebSDK Send Event';
-          if (path.indexOf('sendBeacon') !== -1) return 'WebSDK Send Beacon';
-          if (path.indexOf('updateVariables') !== -1) return 'WebSDK Update Variable';
-          if (path.indexOf('setVariables') !== -1) return 'WebSDK Set Variables';
-        }
-        return name;
-      }
-      return a.name || a.type || 'Action';
-    }
 
     // Simplified one-line event summary (no raw container dump)
     function getEventSummary(ev) {

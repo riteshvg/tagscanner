@@ -85,15 +85,26 @@
     .empty-state i { font-size:32px; margin-bottom:12px; display:block; }
 
     .sign-in-prompt {
-      text-align:center; padding:40px 20px;
-      background:#fff; border:1px solid #e3e6f0; border-radius:8px;
+      text-align:center; padding:44px 24px;
+      background:#fff; border:1px solid #e3e6f0; border-radius:10px;
     }
-    .sign-in-prompt i { font-size:32px; color:#4285f4; margin-bottom:12px; display:block; }
-    .go-to-summary {
-      display:inline-block; margin-top:12px; padding:8px 18px;
-      background:#4e73df; color:#fff; border-radius:6px; font-size:13px;
-      text-decoration:none; cursor:pointer; border:none;
+    .sign-in-icon-wrap {
+      width:52px; height:52px; border-radius:14px;
+      background:#f0f4ff; border:1px solid #c7d2fe;
+      display:flex; align-items:center; justify-content:center;
+      margin:0 auto 14px;
     }
+    .sign-in-icon-wrap i { font-size:22px; color:#4285f4; }
+    .sign-in-btn {
+      display:inline-flex; align-items:center; gap:9px;
+      margin-top:16px; padding:10px 22px;
+      background:#4285f4; color:#fff; border-radius:7px;
+      font-size:13px; font-weight:600; cursor:pointer; border:none;
+      transition:background 0.15s; box-shadow:0 1px 4px rgba(66,133,244,0.3);
+    }
+    .sign-in-btn:hover:not(:disabled) { background:#3574e0; }
+    .sign-in-btn:disabled { opacity:0.6; cursor:not-allowed; }
+    .sign-in-error { margin-top:10px; font-size:12px; color:#ef4444; display:none; }
 
     #loading { text-align:center; padding:30px; color:#9ca3af; font-size:13px; }
 
@@ -128,10 +139,15 @@
     No queries yet. Run a scan or explain code to see history here.
   </div>
   <div id="signInPrompt" class="sign-in-prompt" style="display:none">
-    <i class="fab fa-google"></i>
-    <div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:6px">Sign in required</div>
-    <div style="font-size:13px;color:#6b7280">Please sign in via the Summary page to view this property's AI history.</div>
-    <button id="btnGoToSummary" class="go-to-summary">Go to Summary</button>
+    <div class="sign-in-icon-wrap"><i class="fab fa-google"></i></div>
+    <div style="font-size:15px;font-weight:700;color:#111827;margin-bottom:6px">Sign in to view history</div>
+    <div style="font-size:13px;color:#6b7280;max-width:300px;margin:0 auto;line-height:1.6">
+      Your property's AI scan and explain history is stored securely against your Google account.
+    </div>
+    <button id="btnSignIn" class="sign-in-btn">
+      <i class="fab fa-google"></i> Sign in with Google
+    </button>
+    <div id="signInError" class="sign-in-error"></div>
   </div>
 
   <button id="loadMoreBtn" class="load-more-btn" style="display:none">Load more</button>

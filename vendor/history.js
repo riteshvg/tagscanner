@@ -581,9 +581,28 @@
     loadHistory(true);
   });
 
-  document.getElementById('btnGoToSummary').addEventListener('click', function () {
-    window.location.href = 'summary.html';
-  });
+  var btnSignIn = document.getElementById('btnSignIn');
+  if (btnSignIn) {
+    btnSignIn.addEventListener('click', async function () {
+      if (!window.TagScannerAuth) return;
+      var errEl = document.getElementById('signInError');
+      btnSignIn.disabled = true;
+      btnSignIn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in…';
+      if (errEl) errEl.style.display = 'none';
+      try {
+        await window.TagScannerAuth.signInWithGoogle();
+        document.getElementById('signInPrompt').style.display = 'none';
+        loadHistory(false);
+      } catch (err) {
+        btnSignIn.disabled = false;
+        btnSignIn.innerHTML = '<i class="fab fa-google"></i> Sign in with Google';
+        if (errEl) {
+          errEl.textContent = err.message || 'Sign-in failed. Please try again.';
+          errEl.style.display = '';
+        }
+      }
+    });
+  }
 
   loadHistory(false);
 })();

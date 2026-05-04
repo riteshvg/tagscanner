@@ -64,7 +64,7 @@ async function explainViaOllama(code, metadata, cfg) {
   var data = await response.json();
   var text = data && typeof data.response === 'string' ? data.response.trim() : '';
   if (!text) throw new Error('Ollama returned empty explanation');
-  return text;
+  return { text: text, model: cfg.ollamaModel };
 }
 
 async function explainViaBackend(code, metadata, cfg) {
@@ -79,10 +79,10 @@ async function explainViaBackend(code, metadata, cfg) {
   if (!response.ok) throw new Error('Backend HTTP ' + response.status);
   var data = await response.json();
   if (data && typeof data.explanation === 'string' && data.explanation.trim()) {
-    return data.explanation.trim();
+    return { text: data.explanation.trim(), model: 'Custom backend' };
   }
   if (data && typeof data.message === 'string' && data.message.trim()) {
-    return data.message.trim();
+    return { text: data.message.trim(), model: 'Custom backend' };
   }
   throw new Error('Backend returned no usable explanation');
 }
@@ -129,8 +129,8 @@ async function explainCustomCodeWithAI(code, metadata) {
   if (!code || typeof code !== 'string' || !code.trim()) {
     return 'No custom code available to explain.';
   }
-  var aiText = await getAIExplanationOrNull(code, metadata);
-  if (aiText) return aiText;
+  var aiResult = await getAIExplanationOrNull(code, metadata);
+  if (aiResult) return aiResult.text;
   return 'AI explanation is unavailable. To use local open-source models, run Ollama and set `aiExplain_ollamaModel` (e.g., llama3.1:8b or deepseek-r1) in localStorage.';
 }
 

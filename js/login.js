@@ -20,7 +20,7 @@ function loginformSubmit(){
     var url = sessionStorage.getItem('launch_page_url');  //TODO: Just move these to remove login logic? Add to Greeting in popup.js
     url = url.split('?');
     if(url[1]){
-        url[0] = url[1].replace('page_url=')
+        url[0] = url[1].replace('page_url=', '')
     }
     var value = validateForm(email,password,url[0]);
     if(value == true){

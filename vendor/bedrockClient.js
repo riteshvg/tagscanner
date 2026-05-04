@@ -307,6 +307,7 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
         cached:       data.cached         || false,
         cached_at:    data.cached_at      || null,
         cached_by:    data.cached_by      || null,
+        model:        data.model          || 'Claude 3.5 Haiku',
       };
     }
     // Direct Bedrock mode
@@ -340,6 +341,7 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
       explanation,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
+      model: config.modelId,
     };
   }
 
@@ -350,41 +352,42 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
     const parts = [];
+    const sec = (content) => '<div style="margin-top:16px;padding-top:14px;border-top:1px solid #eef0f5">' + content + '</div>';
+    const heading = (icon, label) =>
+      '<div class="de-analysis-heading" style="margin-bottom:8px"><i class="fas fa-' + icon + '"></i>' + label + '</div>';
 
-    // Purpose
+    // ── Purpose ───────────────────────────────────────────────────────────────
     if (json.purpose) {
       parts.push('<p class="de-analysis-prose">' + esc(json.purpose) + '</p>');
     }
     if (json.tags_context) {
       parts.push(
-        '<p class="de-analysis-prose" style="color:#6b7280;font-style:italic;margin-top:-4px">' +
-          esc(json.tags_context) +
-          '</p>',
+        '<p class="de-analysis-prose" style="color:#6b7280;font-style:italic;margin-top:4px">' +
+          esc(json.tags_context) + '</p>',
       );
     }
 
-    // How it works
+    // ── How it works ─────────────────────────────────────────────────────────
     if (json.how_it_works && json.how_it_works.length) {
       const steps = json.how_it_works
         .map(
           (s, i) =>
-            '<li style="margin-bottom:5px;font-size:13px;color:#374151">' +
-            '<span style="color:#4e73df;font-weight:700;margin-right:7px">' +
-            (i + 1) +
-            '.</span>' +
-            esc(s) +
+            '<li style="margin-bottom:7px;font-size:13px;color:#374151;display:flex;align-items:flex-start;gap:9px">' +
+            '<span style="color:#4e73df;font-weight:700;font-size:12px;min-width:18px;flex-shrink:0;padding-top:1px">' +
+            (i + 1) + '.</span>' +
+            '<span style="line-height:1.55">' + esc(s) + '</span>' +
             '</li>',
         )
         .join('');
       parts.push(
-        '<div class="de-debug-hint" style="margin-bottom:6px"><strong>How it works</strong></div>' +
-          '<ol style="margin:0 0 16px 0;padding-left:0;list-style:none">' +
-          steps +
-          '</ol>',
+        sec(
+          heading('list-ol', 'How it works') +
+          '<ol style="margin:0;padding-left:0;list-style:none">' + steps + '</ol>',
+        ),
       );
     }
 
-    // Data sources + return value (flow diagram)
+    // ── Data flow ─────────────────────────────────────────────────────────────
     const sources = json.data_sources || [];
     const kindColors = {
       adobeDataLayer: '#27c5c1',
@@ -419,26 +422,24 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
         '<div class="de-flow-item" style="border-left-color:#4e73df">' +
         '<div class="de-flow-item-header">' +
         '<span class="de-flow-label" style="margin-bottom:0;font-size:11px;font-weight:700;color:#4e73df;background:#e8f0fe;padding:1px 6px;border-radius:3px;text-transform:uppercase">' +
-        esc(json.return_type || 'unknown') +
-        '</span>' +
+        esc(json.return_type || 'unknown') + '</span>' +
         '</div>' +
         '<div class="de-flow-desc">' + esc(json.return_description || '') + '</div>' +
         '</div>';
 
       parts.push(
-        '<div class="de-analysis-flow">' +
-          '<div class="de-flow-col"><div class="de-flow-label">Reads from</div>' +
-          srcItems +
-          '</div>' +
-          '<div class="de-flow-arrow">&rarr;</div>' +
-          '<div class="de-flow-col"><div class="de-flow-label">Returns</div>' +
-          retItem +
-          '</div>' +
+        sec(
+          heading('exchange-alt', 'Data flow') +
+          '<div class="de-analysis-flow">' +
+            '<div class="de-flow-col"><div class="de-flow-label">Reads from</div>' + srcItems + '</div>' +
+            '<div class="de-flow-arrow">&rarr;</div>' +
+            '<div class="de-flow-col"><div class="de-flow-label">Returns</div>' + retItem + '</div>' +
           '</div>',
+        ),
       );
     }
 
-    // Debug commands
+    // ── Debug commands ────────────────────────────────────────────────────────
     const cmds = json.debug_commands || [];
     if (cmds.length) {
       const cmdItems = cmds
@@ -446,56 +447,51 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
           (cmd) =>
             '<li class="de-debug-cmd">' +
             '<div class="de-debug-code-wrap">' +
-            '<code class="de-debug-code">' +
-            esc(cmd) +
-            '</code>' +
+            '<code class="de-debug-code">' + esc(cmd) + '</code>' +
             '<button class="de-debug-copy" onclick="(function(){navigator.clipboard.writeText(' +
-            JSON.stringify(cmd) +
-            ')})()">' +
-            'Copy' +
-            '</button>' +
+            JSON.stringify(cmd) + ')})()">' +
+            'Copy</button>' +
             '</div>' +
             '</li>',
         )
         .join('');
       parts.push(
-        '<div class="de-debug-hint">Run in DevTools console:</div>' +
-          '<ul class="de-debug-list">' +
-          cmdItems +
-          '</ul>',
+        sec(
+          heading('terminal', 'Run in DevTools console') +
+          '<div style="font-size:11.5px;color:#6b7280;margin-bottom:10px;line-height:1.55;background:#f0f7ff;border-left:3px solid #93c5fd;border-radius:0 4px 4px 0;padding:6px 10px">' +
+          '<i class="fas fa-info-circle" style="color:#60a5fa;margin-right:5px"></i>' +
+          'Run these on the <strong>target website</strong> — open DevTools there (not inside this extension). Navigate to the page being tracked, then paste into the Console tab.' +
+          '</div>' +
+          '<ul class="de-debug-list">' + cmdItems + '</ul>',
+        ),
       );
     }
 
-    // Risks
+    // ── Risks ─────────────────────────────────────────────────────────────────
     const risks = json.risks || [];
     if (risks.length) {
       const sevColors = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' };
+      const sevBg    = { high: '#fef2f2', medium: '#fffbeb', low: '#f0fdf4' };
       const sevLabels = { high: 'High', medium: 'Medium', low: 'Low' };
       const riskItems = risks
         .map((r) => {
           const color = sevColors[r.severity] || '#6b7280';
+          const bg    = sevBg[r.severity]    || '#f9fafb';
           return (
-            '<div class="de-risk-item" style="border-left-color:' +
-            color +
-            '">' +
+            '<div class="de-risk-item" style="border-left-color:' + color + ';background:' + bg + '">' +
             '<div class="de-risk-text">' +
-            '<span style="font-size:10px;font-weight:700;text-transform:uppercase;color:' +
-            color +
-            ';margin-right:6px">' +
-            esc(sevLabels[r.severity] || r.severity) +
-            '</span>' +
+            '<span style="font-size:10px;font-weight:700;text-transform:uppercase;color:' + color + ';margin-right:6px">' +
+            esc(sevLabels[r.severity] || r.severity) + '</span>' +
             esc(r.issue || '') +
             '</div>' +
             (r.fix
-              ? '<div class="de-risk-fix"><i class="fas fa-wrench" style="margin-right:4px"></i>' +
-                esc(r.fix) +
-                '</div>'
+              ? '<div class="de-risk-fix"><i class="fas fa-wrench" style="margin-right:4px"></i>' + esc(r.fix) + '</div>'
               : '') +
             '</div>'
           );
         })
         .join('');
-      parts.push('<div style="margin-top:12px">' + riskItems + '</div>');
+      parts.push(sec(heading('exclamation-triangle', 'Potential risks') + riskItems));
     }
 
     return parts.join('');

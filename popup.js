@@ -46,6 +46,8 @@ var satellite = {};
       if (scriptURL) {
         chrome.storage.local.set({ launch_script_url: scriptURL });
       }
+      // Store the tab ID so the Env Override panel can reload it after switching envs
+      chrome.storage.local.set({ launch_tab_id: tab.id });
       // const script_URL = urlParams.get("scriptURL");
 
       //Passing unminified url to sandbox
@@ -331,19 +333,31 @@ var satellite = {};
 
       //Assigning Values in popup
       sessionStorage.setItem('launch_property_name', propertyName);
-      sessionStorage.setItem('launch_property_environment', 'Production');
+
+      // Derive environment from script URL suffix — staging/development override shows correctly
+      var envName = 'Production';
+      if (scriptURL && scriptURL.includes('-staging.min.js'))     envName = 'Staging';
+      else if (scriptURL && scriptURL.includes('-development.min.js')) envName = 'Development';
+      sessionStorage.setItem('launch_property_environment', envName);
+
       document.getElementById('property_name').textContent =
         'PROPERTY NAME: ' + propertyName;
+      document.getElementById('environment_name').textContent = 'Environment: ' + envName;
 
-      //Hard Setting Environment to Production - TODO: fix if ever needed. Currently will always be on prod if not owner of property.
-      document.getElementById('environment_name').textContent = 'Environment: Production';
       var topbarEnv = document.getElementById('topbar-env');
       if (topbarEnv) {
         topbarEnv.textContent = '';
         var envIcon = document.createElement('i');
-        envIcon.className = 'fas fa-cloud mr-1';
+        envIcon.className = (envName === 'Production') ? 'fas fa-cloud mr-1' : 'fas fa-flask mr-1';
         topbarEnv.appendChild(envIcon);
-        topbarEnv.appendChild(document.createTextNode('Env: Production'));
+        var envText = document.createTextNode('Env: ' + envName);
+        topbarEnv.appendChild(envText);
+        if (envName !== 'Production') {
+          var envBadge = document.createElement('span');
+          envBadge.style.cssText = 'margin-left:6px;background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.3px';
+          envBadge.textContent = envName.toUpperCase();
+          topbarEnv.appendChild(envBadge);
+        }
       }
 
       //Extension details

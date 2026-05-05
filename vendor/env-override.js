@@ -13,6 +13,7 @@
   var enableBtn        = document.getElementById('enableBtn');
   var activeBanner     = document.getElementById('activeBanner');
   var activeBannerUrl  = document.getElementById('activeBannerUrl');
+  var reloadStatus     = document.getElementById('reloadStatus');
 
   // ── URL derivation ─────────────────────────────────────────────────────
 
@@ -83,6 +84,44 @@
     renderState();
   });
 
+  // ── Reload sequence ────────────────────────────────────────────────────
+  // 1. Reload the website tab so it picks up the overridden script
+  // 2. Wait for it to load (countdown), then reload the extension popup
+  // The popup's own 3-second scan delay means Tags will be initialised by the time
+  // popup.js queries the content script.
+
+  function reloadSequence() {
+    enableBtn.disabled = true;
+    reloadStatus.style.display = 'flex';
+
+    chrome.storage.local.get('launch_tab_id', function (data) {
+      var tabId = data.launch_tab_id;
+
+      if (!tabId) {
+        reloadStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i>&nbsp; Reloading TagScanner…';
+        setTimeout(function () { window.top.location.reload(); }, 800);
+        return;
+      }
+
+      reloadStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i>&nbsp; Reloading website…';
+      chrome.tabs.reload(tabId);
+
+      var secs = 5;
+      reloadStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i>&nbsp; Waiting for page to load… (' + secs + 's)';
+
+      var ticker = setInterval(function () {
+        secs--;
+        if (secs <= 0) {
+          clearInterval(ticker);
+          reloadStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i>&nbsp; Reloading TagScanner…';
+          setTimeout(function () { window.top.location.reload(); }, 600);
+        } else {
+          reloadStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i>&nbsp; Waiting for page to load… (' + secs + 's)';
+        }
+      }, 1000);
+    });
+  }
+
   // ── Events ─────────────────────────────────────────────────────────────
 
   envSelect.addEventListener('change', updateUrlFields);
@@ -91,10 +130,10 @@
     enableBtn.disabled = true;
 
     if (currentOverride && currentOverride.enabled) {
-      // Disable
+      // Disable — clear rule then reload so the extension re-scans the real prod script
       chrome.runtime.sendMessage({ type: 'CLEAR_ENV_OVERRIDE' }, function () {
         currentOverride = null;
-        renderState();
+        reloadSequence();
       });
       return;
     }
@@ -123,12 +162,18 @@
       prodUrl:     prodUrl,
       overrideUrl: overrideUrl
     }, function (resp) {
+      if (chrome.runtime.lastError) {
+        alert('Override error: ' + chrome.runtime.lastError.message);
+        enableBtn.disabled = false;
+        return;
+      }
       if (resp && resp.success) {
         currentOverride = { enabled: true, prodUrl: prodUrl, overrideUrl: overrideUrl };
+        reloadSequence();
       } else {
-        alert('Failed to set override: ' + ((resp && resp.error) || 'unknown error'));
+        alert('Failed to set override: ' + ((resp && resp.error) || 'no response from service worker'));
+        enableBtn.disabled = false;
       }
-      renderState();
     });
   });
 })();

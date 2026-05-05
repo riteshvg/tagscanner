@@ -62,6 +62,13 @@
     .btn-toggle.state-disable:hover { background:#fecaca; }
     .btn-toggle:disabled { opacity:0.5; cursor:not-allowed; }
 
+    .btn-change {
+      padding:9px 16px; font-size:13px; font-weight:600; border-radius:6px; cursor:pointer;
+      transition:all 0.15s; display:flex; align-items:center; gap:6px;
+      background:#fff; color:#6b7280; border:1px solid #d1d3e2;
+    }
+    .btn-change:hover { border-color:#4e73df; color:#4e73df; background:#eff4ff; }
+
     .status-banner {
       display:flex; align-items:flex-start; gap:10px; padding:12px 14px;
       background:#d1fae5; border:1px solid #6ee7b7; border-radius:7px;
@@ -131,6 +138,9 @@
     <div class="action-row">
       <button id="enableBtn" class="btn-toggle state-enable">
         <i class="fas fa-toggle-off"></i> Enable Override
+      </button>
+      <button id="changeBtn" class="btn-change" style="display:none">
+        <i class="fas fa-pen"></i> Change
       </button>
     </div>
 

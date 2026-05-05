@@ -10,6 +10,7 @@
   var envSelect    = document.getElementById('envSelect');
   var overrideUrl  = document.getElementById('overrideUrl');
   var enableBtn    = document.getElementById('enableBtn');
+  var changeBtn    = document.getElementById('changeBtn');
   var activeBanner = document.getElementById('activeBanner');
   var activeBannerUrl = document.getElementById('activeBannerUrl');
   var reloadStatus = document.getElementById('reloadStatus');
@@ -21,18 +22,16 @@
       activeBanner.style.display = '';
       activeBannerUrl.textContent = '→ ' + (currentOverride.overrideUrl || '');
       // Restore the selected env label and URL in the form
-      if (currentOverride.envName) {
-        envSelect.value = currentOverride.envName;
-      }
-      if (currentOverride.overrideUrl) {
-        overrideUrl.value = currentOverride.overrideUrl;
-      }
+      if (currentOverride.envName) envSelect.value = currentOverride.envName;
+      if (currentOverride.overrideUrl) overrideUrl.value = currentOverride.overrideUrl;
       enableBtn.innerHTML = '<i class="fas fa-toggle-on"></i> Disable Override';
       enableBtn.className = 'btn-toggle state-disable';
+      changeBtn.style.display = '';
     } else {
       activeBanner.style.display = 'none';
       enableBtn.innerHTML = '<i class="fas fa-toggle-off"></i> Enable Override';
       enableBtn.className = 'btn-toggle state-enable';
+      changeBtn.style.display = 'none';
     }
     enableBtn.disabled = false;
     reloadStatus.style.display = 'none';
@@ -100,6 +99,21 @@
   }
 
   // ── Events ─────────────────────────────────────────────────────────────
+
+  // Change: reset the form so the user can enter a new environment URL.
+  // The existing rule stays active until they click Enable with the new URL,
+  // at which point SET_ENV_OVERRIDE replaces it atomically.
+  changeBtn.addEventListener('click', function () {
+    currentOverride = null; // local reset only — storage + rule untouched
+    overrideUrl.value = '';
+    envSelect.selectedIndex = 0;
+    activeBanner.style.display = 'none';
+    changeBtn.style.display = 'none';
+    enableBtn.innerHTML = '<i class="fas fa-toggle-off"></i> Enable Override';
+    enableBtn.className = 'btn-toggle state-enable';
+    enableBtn.disabled = false;
+    overrideUrl.focus();
+  });
 
   enableBtn.addEventListener('click', function () {
     enableBtn.disabled = true;

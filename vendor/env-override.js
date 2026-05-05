@@ -30,7 +30,8 @@
       enableBtn.className = 'btn-toggle state-enable';
       changeBtn.style.display = 'none';
     }
-    enableBtn.disabled = false;
+    // Enable button only when there is a URL in the input (or override is already active)
+    enableBtn.disabled = !(currentOverride && currentOverride.enabled) && !overrideUrl.value.trim();
     reloadStatus.style.display = 'none';
   }
 
@@ -96,6 +97,12 @@
   }
 
   // ── Events ─────────────────────────────────────────────────────────────
+
+  overrideUrl.addEventListener('input', function () {
+    if (!(currentOverride && currentOverride.enabled)) {
+      enableBtn.disabled = !overrideUrl.value.trim();
+    }
+  });
 
   // Change: reset the form so the user can enter a new environment URL.
   // The existing rule stays active until they click Enable with the new URL,

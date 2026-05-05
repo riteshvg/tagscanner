@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TagScanner — Environment Override</title>
+  <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet" />
+  <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
+  <style>
+    body { background:#f8f9fc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin:0; padding:20px; }
+
+    .page-header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid #e3e6f0;
+    }
+    .page-header h1 { font-size:16px; font-weight:700; color:#1a1a2e; margin:0; }
+
+    .card-panel {
+      background:#fff; border:1px solid #e3e6f0; border-radius:8px; padding:20px;
+      margin-bottom:14px;
+    }
+    .card-panel-label {
+      font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
+      color:#6b7280; margin-bottom:8px;
+    }
+
+    .script-url-box {
+      background:#f3f4f6; border:1px solid #e3e6f0; border-radius:5px;
+      padding:8px 10px; font-size:11px; color:#374151; word-break:break-all;
+      font-family:monospace; line-height:1.5;
+    }
+    .script-url-box.empty { color:#9ca3af; font-family:inherit; font-style:italic; }
+
+    .env-row {
+      display:flex; align-items:center; gap:10px; margin-top:14px;
+    }
+    .env-row label { font-size:12px; font-weight:600; color:#374151; flex-shrink:0; }
+    .env-select {
+      flex:1; padding:6px 10px; font-size:12px; border:1px solid #d1d3e2;
+      border-radius:5px; background:#fff; color:#374151; cursor:pointer; outline:none;
+    }
+    .env-select:focus { border-color:#4e73df; }
+
+    .override-url-label {
+      font-size:12px; font-weight:600; color:#374151; margin-top:14px; margin-bottom:6px;
+    }
+    .override-url-input {
+      width:100%; padding:8px 10px; font-size:11px; border:1px solid #d1d3e2;
+      border-radius:5px; background:#fff; color:#374151; font-family:monospace;
+      box-sizing:border-box; outline:none; line-height:1.4;
+    }
+    .override-url-input:focus { border-color:#4e73df; }
+    .override-url-input.hidden { display:none; }
+
+    .override-url-preview {
+      background:#f0fdf4; border:1px solid #bbf7d0; border-radius:5px;
+      padding:8px 10px; font-size:11px; color:#065f46; word-break:break-all;
+      font-family:monospace; line-height:1.5;
+    }
+    .override-url-preview.hidden { display:none; }
+
+    .action-row {
+      display:flex; align-items:center; gap:10px; margin-top:18px;
+    }
+
+    .btn-enable {
+      padding:9px 22px; font-size:13px; font-weight:600; border:none;
+      border-radius:6px; cursor:pointer; transition:all 0.15s; display:flex;
+      align-items:center; gap:7px;
+    }
+    .btn-enable.state-enable {
+      background:#4e73df; color:#fff;
+    }
+    .btn-enable.state-enable:hover { background:#3a5fc5; }
+    .btn-enable.state-disable {
+      background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;
+    }
+    .btn-enable.state-disable:hover { background:#fecaca; }
+    .btn-enable:disabled { opacity:0.5; cursor:not-allowed; }
+
+    .status-banner {
+      display:flex; align-items:flex-start; gap:10px; padding:12px 14px;
+      background:#d1fae5; border:1px solid #6ee7b7; border-radius:7px;
+      font-size:12px; color:#065f46; margin-bottom:14px;
+    }
+    .status-banner i { margin-top:1px; flex-shrink:0; }
+    .status-banner.inactive { background:#fff3cd; border-color:#fbbf24; color:#92400e; }
+
+    .info-note {
+      display:flex; align-items:flex-start; gap:8px; padding:10px 12px;
+      background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px;
+      font-size:11px; color:#1e40af; margin-top:10px; line-height:1.5;
+    }
+    .info-note i { margin-top:1px; flex-shrink:0; font-size:11px; }
+
+    .override-detail {
+      margin-top:6px; font-size:11px; word-break:break-all; color:#374151;
+      font-family:monospace; background:#ecfdf5; padding:6px 8px; border-radius:4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-header">
+    <h1><i class="fas fa-exchange-alt" style="color:#4e73df;margin-right:8px"></i>Environment Override</h1>
+  </div>
+
+  <div id="activeBanner" class="status-banner" style="display:none">
+    <i class="fas fa-check-circle"></i>
+    <div>
+      <strong>Override is active.</strong> Refresh the target page to load the overridden script.
+      <div id="activeBannerUrl" class="override-detail"></div>
+    </div>
+  </div>
+
+  <div class="card-panel">
+    <div class="card-panel-label"><i class="fas fa-code" style="margin-right:5px"></i>Detected Production Script</div>
+    <div id="prodUrlDisplay" class="script-url-box empty">Scanning…</div>
+  </div>
+
+  <div class="card-panel">
+    <div class="card-panel-label"><i class="fas fa-layer-group" style="margin-right:5px"></i>Override Settings</div>
+
+    <div class="env-row">
+      <label for="envSelect">Target environment:</label>
+      <select id="envSelect" class="env-select">
+        <option value="staging">Staging</option>
+        <option value="development">Development</option>
+        <option value="custom">Custom URL…</option>
+      </select>
+    </div>
+
+    <div class="override-url-label">Override URL:</div>
+    <div id="overrideUrlPreview" class="override-url-preview"></div>
+    <input id="overrideUrlCustom" type="text" class="override-url-input hidden" placeholder="https://assets.adobedtm.com/launch-EN…-staging.min.js" />
+
+    <div class="action-row">
+      <button id="enableBtn" class="btn-enable state-enable">
+        <i class="fas fa-toggle-off"></i> Enable Override
+      </button>
+    </div>
+
+    <div class="info-note">
+      <i class="fas fa-info-circle"></i>
+      <span>The override intercepts the Tags library request at the network level — no code changes are made to the page.
+      After enabling, <strong>refresh the target page</strong> in your browser tab. The override stays active until you disable it here.</span>
+    </div>
+  </div>
+
+  <script src="env-override.js"></script>
+</body>
+</html>

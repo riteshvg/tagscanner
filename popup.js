@@ -43,6 +43,9 @@ var satellite = {};
       satellite = response.satellite;
       scriptURL = response.scriptURL;
       console.log('in line 37 ' + scriptURL);
+      if (scriptURL) {
+        chrome.storage.local.set({ launch_script_url: scriptURL });
+      }
       // const script_URL = urlParams.get("scriptURL");
 
       //Passing unminified url to sandbox

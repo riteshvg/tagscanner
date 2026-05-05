@@ -4,7 +4,7 @@
   "version": "2.4.2",
   "homepage_url": "https://github.com/riteshg-adobe/tagscanner",
   "manifest_version": 3,
-  "permissions": ["activeTab", "storage", "scripting", "identity"],
+  "permissions": ["activeTab", "storage", "scripting", "identity", "declarativeNetRequest"],
   "icons": {
     "16": "images/tagscanner_16x16.png",
     "32": "images/tagscanner_32x32.png",

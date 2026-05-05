@@ -59,6 +59,21 @@
     .btn-download:hover { border-color: #4e73df; color: #4e73df; background: #eff4ff; }
     .btn-download:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    .btn-view-explain {
+      background: none; border: 1px solid #e3e6f0; border-radius: 5px;
+      color: #9ca3af; cursor: pointer; font-size: 11px; padding: 3px 7px;
+      flex-shrink: 0; transition: all 0.15s; line-height: 1;
+    }
+    .btn-view-explain:hover { border-color: #10b981; color: #065f46; background: #d1fae5; }
+    .btn-view-explain.active { border-color: #10b981; color: #065f46; background: #d1fae5; }
+    .btn-view-explain:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .history-explain-panel {
+      margin-top: 12px; padding: 14px; border-radius: 6px;
+      background: #f8f9fc; border: 1px solid #e3e6f0;
+      font-size: 13px;
+    }
+
     .feedback-bar { display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:8px; border-top:1px solid #f3f4f6; }
     .feedback-label { font-size:11px; color:#9ca3af; }
     .feedback-btn {
@@ -154,6 +169,7 @@
 
   <script src="jspdf.umd.min.js"></script>
   <script src="jspdf.plugin.autotable.min.js"></script>
+  <script src="bedrockClient.js"></script>
   <script src="auth.js"></script>
   <script src="history.js"></script>
   <script src="tour-initializer.js"></script>

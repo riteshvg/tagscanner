@@ -21,7 +21,7 @@
     }
     .card-panel-label {
       font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;
-      color:#6b7280; margin-bottom:8px;
+      color:#6b7280; margin-bottom:8px; display:flex; align-items:center; gap:5px;
     }
 
     .script-url-box {
@@ -31,52 +31,36 @@
     }
     .script-url-box.empty { color:#9ca3af; font-family:inherit; font-style:italic; }
 
-    .env-row {
-      display:flex; align-items:center; gap:10px; margin-top:14px;
-    }
-    .env-row label { font-size:12px; font-weight:600; color:#374151; flex-shrink:0; }
+    .form-row { margin-top:14px; }
+    .form-label { font-size:12px; font-weight:600; color:#374151; margin-bottom:5px; display:block; }
+
     .env-select {
-      flex:1; padding:6px 10px; font-size:12px; border:1px solid #d1d3e2;
+      width:100%; padding:7px 10px; font-size:12px; border:1px solid #d1d3e2;
       border-radius:5px; background:#fff; color:#374151; cursor:pointer; outline:none;
+      box-sizing:border-box;
     }
     .env-select:focus { border-color:#4e73df; }
 
-    .override-url-label {
-      font-size:12px; font-weight:600; color:#374151; margin-top:14px; margin-bottom:6px;
-    }
-    .override-url-input {
+    .url-input {
       width:100%; padding:8px 10px; font-size:11px; border:1px solid #d1d3e2;
       border-radius:5px; background:#fff; color:#374151; font-family:monospace;
       box-sizing:border-box; outline:none; line-height:1.4;
     }
-    .override-url-input:focus { border-color:#4e73df; }
-    .override-url-input.hidden { display:none; }
+    .url-input:focus { border-color:#4e73df; }
+    .url-input::placeholder { color:#9ca3af; font-family:inherit; }
 
-    .override-url-preview {
-      background:#f0fdf4; border:1px solid #bbf7d0; border-radius:5px;
-      padding:8px 10px; font-size:11px; color:#065f46; word-break:break-all;
-      font-family:monospace; line-height:1.5;
-    }
-    .override-url-preview.hidden { display:none; }
+    .action-row { display:flex; align-items:center; gap:10px; margin-top:18px; }
 
-    .action-row {
-      display:flex; align-items:center; gap:10px; margin-top:18px;
-    }
-
-    .btn-enable {
+    .btn-toggle {
       padding:9px 22px; font-size:13px; font-weight:600; border:none;
-      border-radius:6px; cursor:pointer; transition:all 0.15s; display:flex;
-      align-items:center; gap:7px;
+      border-radius:6px; cursor:pointer; transition:all 0.15s;
+      display:flex; align-items:center; gap:7px;
     }
-    .btn-enable.state-enable {
-      background:#4e73df; color:#fff;
-    }
-    .btn-enable.state-enable:hover { background:#3a5fc5; }
-    .btn-enable.state-disable {
-      background:#fee2e2; color:#991b1b; border:1px solid #fca5a5;
-    }
-    .btn-enable.state-disable:hover { background:#fecaca; }
-    .btn-enable:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn-toggle.state-enable { background:#4e73df; color:#fff; }
+    .btn-toggle.state-enable:hover { background:#3a5fc5; }
+    .btn-toggle.state-disable { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+    .btn-toggle.state-disable:hover { background:#fecaca; }
+    .btn-toggle:disabled { opacity:0.5; cursor:not-allowed; }
 
     .status-banner {
       display:flex; align-items:flex-start; gap:10px; padding:12px 14px;
@@ -84,19 +68,24 @@
       font-size:12px; color:#065f46; margin-bottom:14px;
     }
     .status-banner i { margin-top:1px; flex-shrink:0; }
-    .status-banner.inactive { background:#fff3cd; border-color:#fbbf24; color:#92400e; }
+
+    .override-detail {
+      margin-top:5px; font-size:11px; word-break:break-all; color:#374151;
+      font-family:monospace; background:#ecfdf5; padding:5px 8px; border-radius:4px;
+    }
+
+    #reloadStatus {
+      display:none; margin-top:12px; padding:10px 12px;
+      background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px;
+      font-size:12px; color:#0369a1; align-items:center; gap:8px;
+    }
 
     .info-note {
       display:flex; align-items:flex-start; gap:8px; padding:10px 12px;
       background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px;
-      font-size:11px; color:#1e40af; margin-top:10px; line-height:1.5;
+      font-size:11px; color:#1e40af; margin-top:12px; line-height:1.5;
     }
-    .info-note i { margin-top:1px; flex-shrink:0; font-size:11px; }
-
-    .override-detail {
-      margin-top:6px; font-size:11px; word-break:break-all; color:#374151;
-      font-family:monospace; background:#ecfdf5; padding:6px 8px; border-radius:4px;
-    }
+    .info-note i { margin-top:1px; flex-shrink:0; }
   </style>
 </head>
 <body>
@@ -107,44 +96,52 @@
   <div id="activeBanner" class="status-banner" style="display:none">
     <i class="fas fa-check-circle"></i>
     <div>
-      <strong>Override is active.</strong> Refresh the target page to load the overridden script.
+      <strong>Override active.</strong> Refresh the target page to load the overridden script.
       <div id="activeBannerUrl" class="override-detail"></div>
     </div>
   </div>
 
   <div class="card-panel">
-    <div class="card-panel-label"><i class="fas fa-code" style="margin-right:5px"></i>Detected Production Script</div>
+    <div class="card-panel-label"><i class="fas fa-code"></i> Current Production Script</div>
     <div id="prodUrlDisplay" class="script-url-box empty">Scanning…</div>
   </div>
 
   <div class="card-panel">
-    <div class="card-panel-label"><i class="fas fa-layer-group" style="margin-right:5px"></i>Override Settings</div>
+    <div class="card-panel-label"><i class="fas fa-layer-group"></i> Override Settings</div>
 
-    <div class="env-row">
-      <label for="envSelect">Target environment:</label>
+    <div class="form-row">
+      <label class="form-label" for="envSelect">Environment label (shown in header):</label>
       <select id="envSelect" class="env-select">
-        <option value="staging">Staging</option>
-        <option value="development">Development</option>
-        <option value="custom">Custom URL…</option>
+        <option value="Staging">Staging</option>
+        <option value="Development">Development</option>
+        <option value="UAT">UAT</option>
+        <option value="QA">QA</option>
+        <option value="Override">Custom</option>
       </select>
     </div>
 
-    <div class="override-url-label">Override URL:</div>
-    <div id="overrideUrlPreview" class="override-url-preview"></div>
-    <input id="overrideUrlCustom" type="text" class="override-url-input hidden" placeholder="https://assets.adobedtm.com/launch-EN…-staging.min.js" />
+    <div class="form-row">
+      <label class="form-label" for="overrideUrl">
+        Paste the <code style="background:#f3f4f6;padding:1px 5px;border-radius:3px">assets.adobedtm.com</code> script URL for that environment:
+      </label>
+      <input id="overrideUrl" type="text" class="url-input"
+        placeholder="https://assets.adobedtm.com/…/launch-….min.js" />
+    </div>
 
     <div class="action-row">
-      <button id="enableBtn" class="btn-enable state-enable">
+      <button id="enableBtn" class="btn-toggle state-enable">
         <i class="fas fa-toggle-off"></i> Enable Override
       </button>
     </div>
 
-    <div id="reloadStatus" style="display:none;margin-top:12px;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;font-size:12px;color:#0369a1;display:none;align-items:center;gap:8px"></div>
+    <div id="reloadStatus"></div>
 
     <div class="info-note">
       <i class="fas fa-info-circle"></i>
-      <span>The override intercepts the Tags library request at the network level — no code changes are made to the page.
-      After enabling, <strong>refresh the target page</strong> in your browser tab. The override stays active until you disable it here.</span>
+      <span>The override intercepts the Tags library request at the network level. After enabling,
+      the target page and TagScanner will reload automatically so the new
+      <code style="background:#dbeafe;padding:1px 4px;border-radius:3px">_satellite._container</code>
+      is picked up immediately.</span>
     </div>
   </div>
 

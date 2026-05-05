@@ -4,6 +4,13 @@ var propertyName;
 var propertyId;
 var satellite = {};
 
+// Allow the Env Override iframe to trigger a full popup reload via postMessage
+window.addEventListener('message', function (event) {
+  if (event.data && event.data.type === 'TAGSCANNER_RELOAD') {
+    window.location.reload();
+  }
+});
+
 (async () => {
   const [tab] = await chrome.tabs.query({
     active: true,
@@ -334,10 +341,16 @@ var satellite = {};
       //Assigning Values in popup
       sessionStorage.setItem('launch_property_name', propertyName);
 
-      // Derive environment from script URL suffix — staging/development override shows correctly
+      // Env name: prefer stored override selection, fall back to URL suffix, then Production
       var envName = 'Production';
-      if (scriptURL && scriptURL.includes('-staging.min.js'))     envName = 'Staging';
-      else if (scriptURL && scriptURL.includes('-development.min.js')) envName = 'Development';
+      var overrideStorage = await new Promise(function (res) { chrome.storage.local.get('envOverride', res); });
+      if (overrideStorage.envOverride && overrideStorage.envOverride.enabled && overrideStorage.envOverride.envName) {
+        envName = overrideStorage.envOverride.envName;
+      } else if (scriptURL && scriptURL.includes('-staging.min.js')) {
+        envName = 'Staging';
+      } else if (scriptURL && scriptURL.includes('-development.min.js')) {
+        envName = 'Development';
+      }
       sessionStorage.setItem('launch_property_environment', envName);
 
       document.getElementById('property_name').textContent =
@@ -350,8 +363,7 @@ var satellite = {};
         var envIcon = document.createElement('i');
         envIcon.className = (envName === 'Production') ? 'fas fa-cloud mr-1' : 'fas fa-flask mr-1';
         topbarEnv.appendChild(envIcon);
-        var envText = document.createTextNode('Env: ' + envName);
-        topbarEnv.appendChild(envText);
+        topbarEnv.appendChild(document.createTextNode('Env: ' + envName));
         if (envName !== 'Production') {
           var envBadge = document.createElement('span');
           envBadge.style.cssText = 'margin-left:6px;background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.3px';

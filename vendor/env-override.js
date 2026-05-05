@@ -6,14 +6,13 @@
   var prodUrl         = '';
   var currentOverride = null;
 
-  var prodUrlEl    = document.getElementById('prodUrlDisplay');
-  var envSelect    = document.getElementById('envSelect');
-  var overrideUrl  = document.getElementById('overrideUrl');
-  var enableBtn    = document.getElementById('enableBtn');
-  var changeBtn    = document.getElementById('changeBtn');
-  var activeBanner = document.getElementById('activeBanner');
+  var prodUrlEl   = document.getElementById('prodUrlDisplay');
+  var overrideUrl = document.getElementById('overrideUrl');
+  var enableBtn       = document.getElementById('enableBtn');
+  var changeBtn       = document.getElementById('changeBtn');
+  var activeBanner    = document.getElementById('activeBanner');
   var activeBannerUrl = document.getElementById('activeBannerUrl');
-  var reloadStatus = document.getElementById('reloadStatus');
+  var reloadStatus    = document.getElementById('reloadStatus');
 
   // ── UI state ───────────────────────────────────────────────────────────
 
@@ -21,8 +20,6 @@
     if (currentOverride && currentOverride.enabled) {
       activeBanner.style.display = '';
       activeBannerUrl.textContent = '→ ' + (currentOverride.overrideUrl || '');
-      // Restore the selected env label and URL in the form
-      if (currentOverride.envName) envSelect.value = currentOverride.envName;
       if (currentOverride.overrideUrl) overrideUrl.value = currentOverride.overrideUrl;
       enableBtn.innerHTML = '<i class="fas fa-toggle-on"></i> Disable Override';
       enableBtn.className = 'btn-toggle state-disable';
@@ -106,7 +103,6 @@
   changeBtn.addEventListener('click', function () {
     currentOverride = null; // local reset only — storage + rule untouched
     overrideUrl.value = '';
-    envSelect.selectedIndex = 0;
     activeBanner.style.display = 'none';
     changeBtn.style.display = 'none';
     enableBtn.innerHTML = '<i class="fas fa-toggle-off"></i> Enable Override';
@@ -152,8 +148,6 @@
       return;
     }
 
-    var envName = envSelect.value;
-
     chrome.runtime.sendMessage({
       type:        'SET_ENV_OVERRIDE',
       prodUrl:     prodUrl,
@@ -165,11 +159,10 @@
         return;
       }
       if (resp && resp.success) {
-        // Store envName in the override record so popup.js can use it for the header
         chrome.storage.local.set({
-          envOverride: { enabled: true, envName: envName, prodUrl: prodUrl, overrideUrl: targetUrl }
+          envOverride: { enabled: true, prodUrl: prodUrl, overrideUrl: targetUrl }
         });
-        currentOverride = { enabled: true, envName: envName, prodUrl: prodUrl, overrideUrl: targetUrl };
+        currentOverride = { enabled: true, prodUrl: prodUrl, overrideUrl: targetUrl };
         reloadSequence();
       } else {
         alert('Failed to set override: ' + ((resp && resp.error) || 'no response from service worker'));

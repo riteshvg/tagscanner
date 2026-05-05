@@ -341,16 +341,11 @@ window.addEventListener('message', function (event) {
       //Assigning Values in popup
       sessionStorage.setItem('launch_property_name', propertyName);
 
-      // Env name: prefer stored override selection, fall back to URL suffix, then Production
-      var envName = 'Production';
-      var overrideStorage = await new Promise(function (res) { chrome.storage.local.get('envOverride', res); });
-      if (overrideStorage.envOverride && overrideStorage.envOverride.enabled && overrideStorage.envOverride.envName) {
-        envName = overrideStorage.envOverride.envName;
-      } else if (scriptURL && scriptURL.includes('-staging.min.js')) {
-        envName = 'Staging';
-      } else if (scriptURL && scriptURL.includes('-development.min.js')) {
-        envName = 'Development';
-      }
+      // Env name from _satellite.environment.stage — reflects whichever script actually loaded
+      var stageRaw = satellite && satellite.environment && satellite.environment.stage;
+      var envName = stageRaw
+        ? stageRaw.charAt(0).toUpperCase() + stageRaw.slice(1)
+        : 'Production';
       sessionStorage.setItem('launch_property_environment', envName);
 
       document.getElementById('property_name').textContent =

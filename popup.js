@@ -359,12 +359,6 @@ window.addEventListener('message', function (event) {
         envIcon.className = (envName === 'Production') ? 'fas fa-cloud mr-1' : 'fas fa-flask mr-1';
         topbarEnv.appendChild(envIcon);
         topbarEnv.appendChild(document.createTextNode('Env: ' + envName));
-        if (envName !== 'Production') {
-          var envBadge = document.createElement('span');
-          envBadge.style.cssText = 'margin-left:6px;background:#fef3c7;color:#92400e;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.3px';
-          envBadge.textContent = envName.toUpperCase();
-          topbarEnv.appendChild(envBadge);
-        }
       }
 
       //Extension details

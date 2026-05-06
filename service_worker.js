@@ -97,12 +97,14 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   }
 });
 
-// Restore badge on browser startup if an override was active
+// Auto-disable env override on browser startup — declarativeNetRequest rules persist
+// across restarts so without this the dev/staging redirect would silently remain active.
 chrome.runtime.onStartup.addListener(function () {
   chrome.storage.local.get('envOverride', function (data) {
     if (data.envOverride && data.envOverride.enabled) {
-      chrome.action.setBadgeText({ text: 'OVR' });
-      chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' });
+      chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [ENV_OVERRIDE_RULE_ID] });
+      chrome.storage.local.remove('envOverride');
+      chrome.action.setBadgeText({ text: '' });
     }
   });
 });

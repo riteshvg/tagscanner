@@ -31,8 +31,11 @@ chrome.action.onClicked.addListener(async (tab) => {
   const allWindows = await chrome.windows.getAll({ populate: true });
   for (const win of allWindows) {
     if (win.type === 'popup' && win.tabs && win.tabs[0].url.startsWith(popupUrl)) {
-      // Unminimize if needed, then bring to front
-      chrome.windows.update(win.id, { focused: true, state: 'normal' });
+      // Minimize then immediately restore — forces the OS to bring the window
+      // to the top of the stack, beating Chrome's own browser window z-ordering.
+      chrome.windows.update(win.id, { state: 'minimized' }, function () {
+        chrome.windows.update(win.id, { state: 'normal', focused: true });
+      });
       // Brief badge pulse — only if OVR badge isn't already showing
       chrome.storage.local.get('envOverride', function (data) {
         if (!data.envOverride || !data.envOverride.enabled) {

@@ -31,19 +31,18 @@ chrome.action.onClicked.addListener(async (tab) => {
   const allWindows = await chrome.windows.getAll({ populate: true });
   for (const win of allWindows) {
     if (win.type === 'popup' && win.tabs && win.tabs[0].url.startsWith(popupUrl)) {
-      // Minimize then immediately restore — forces the OS to bring the window
-      // to the top of the stack, beating Chrome's own browser window z-ordering.
-      chrome.windows.update(win.id, { state: 'minimized' }, function () {
-        chrome.windows.update(win.id, { state: 'normal', focused: true });
-      });
+      // await both calls so the service worker stays alive between them —
+      // callback form can be suspended by MV3 between the two updates.
+      await chrome.windows.update(win.id, { state: 'minimized' });
+      await chrome.windows.update(win.id, { state: 'normal', focused: true });
+
       // Brief badge pulse — only if OVR badge isn't already showing
-      chrome.storage.local.get('envOverride', function (data) {
-        if (!data.envOverride || !data.envOverride.enabled) {
-          chrome.action.setBadgeText({ text: '↑' });
-          chrome.action.setBadgeBackgroundColor({ color: '#4e73df' });
-          setTimeout(() => chrome.action.setBadgeText({ text: '' }), 1500);
-        }
-      });
+      const data = await chrome.storage.local.get('envOverride');
+      if (!data.envOverride || !data.envOverride.enabled) {
+        await chrome.action.setBadgeText({ text: '↑' });
+        await chrome.action.setBadgeBackgroundColor({ color: '#4e73df' });
+        setTimeout(() => chrome.action.setBadgeText({ text: '' }), 1500);
+      }
       return;
     }
   }

@@ -91,9 +91,17 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
       // If message came through service worker, it might be wrapped in data property
       const actualRequest = request.data || request;
 
-      if (satellite && scriptURL) {
+      // Re-scan the DOM for the Tags script URL at response time — on React/SPA
+      // pages the script is injected dynamically and won't be in the DOM at load.
+      if (!scriptURL) {
+        const tags = [...document.querySelectorAll('script')]
+          .filter(s => s.src && s.src.includes('assets.adobedtm.com'));
+        if (tags.length) scriptURL = tags[0].src;
+      }
+
+      if (satellite && Object.keys(satellite).length > 0) {
         console.log('Sending satellite data back to popup');
-        sendResponse({ satellite: satellite, scriptURL: scriptURL });
+        sendResponse({ satellite: satellite, scriptURL: scriptURL || '' });
       } else {
         console.warn(
           'Satellite or scriptURL is undefined - checking if they need more time to load'
@@ -101,12 +109,18 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 
         // If satellite data isn't ready yet, wait a bit and try again
         setTimeout(() => {
-          if (satellite && scriptURL) {
+          // Re-scan once more before giving up
+          if (!scriptURL) {
+            const tags = [...document.querySelectorAll('script')]
+              .filter(s => s.src && s.src.includes('assets.adobedtm.com'));
+            if (tags.length) scriptURL = tags[0].src;
+          }
+          if (satellite && Object.keys(satellite).length > 0) {
             console.log('Satellite data available after delay');
             try {
               chrome.runtime.sendMessage({
                 satellite: satellite,
-                scriptURL: scriptURL,
+                scriptURL: scriptURL || '',
               });
             } catch (err) {
               console.error('Error sending delayed response:', err);

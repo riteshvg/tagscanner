@@ -11,6 +11,15 @@ window.addEventListener('message', function (event) {
   }
 });
 
+// Bring this window to the front when the user clicks the extension icon
+// while it's already open — self-focus from within the page works where
+// external chrome.windows.update calls are blocked by OS focus restrictions.
+chrome.runtime.onMessage.addListener(function (message) {
+  if (message.type === 'BRING_TO_FRONT') {
+    window.focus();
+  }
+});
+
 (async () => {
   // Read the tab ID stored by the service worker at click time — guaranteed to be
   // the tab the user clicked the extension icon on, regardless of open windows.

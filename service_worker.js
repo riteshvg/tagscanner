@@ -26,24 +26,31 @@
 chrome.action.onClicked.addListener(async (tab) => {
   const popupUrl = chrome.runtime.getURL('popup.html');
 
-  // If a TagScanner window is already open, focus it and exit — do NOT overwrite
-  // launch_tab_id, which would break env override reload targeting the original tab.
-  const allWindows = await chrome.windows.getAll({ populate: true });
-  for (const win of allWindows) {
-    if (win.type === 'popup' && win.tabs && win.tabs[0].url.startsWith(popupUrl)) {
-      // await both calls so the service worker stays alive between them —
-      // callback form can be suspended by MV3 between the two updates.
-      await chrome.windows.update(win.id, { state: 'minimized' });
-      await chrome.windows.update(win.id, { state: 'normal', focused: true });
+  // Look up the stored window ID — more reliable than scanning all windows.
+  const stored = await chrome.storage.local.get('tagscanner_window_id');
+  if (stored.tagscanner_window_id) {
+    try {
+      // Verify the window still exists (throws if it was closed).
+      await chrome.windows.get(stored.tagscanner_window_id);
 
-      // Brief badge pulse — only if OVR badge isn't already showing
+      // Restore if minimized, then focus via the Chrome API.
+      await chrome.windows.update(stored.tagscanner_window_id, { state: 'normal', focused: true });
+
+      // Also tell the popup page to call window.focus() on itself —
+      // self-focus from within the page context works where external API calls don't.
+      chrome.runtime.sendMessage({ type: 'BRING_TO_FRONT' }).catch(() => {});
+
+      // Brief badge pulse — only if OVR badge isn't already showing.
       const data = await chrome.storage.local.get('envOverride');
       if (!data.envOverride || !data.envOverride.enabled) {
-        await chrome.action.setBadgeText({ text: '↑' });
-        await chrome.action.setBadgeBackgroundColor({ color: '#4e73df' });
+        chrome.action.setBadgeText({ text: '↑' });
+        chrome.action.setBadgeBackgroundColor({ color: '#4e73df' });
         setTimeout(() => chrome.action.setBadgeText({ text: '' }), 1500);
       }
       return;
+    } catch (e) {
+      // Window no longer exists — clear stale ID and fall through to open a new one.
+      await chrome.storage.local.remove('tagscanner_window_id');
     }
   }
 
@@ -52,13 +59,24 @@ chrome.action.onClicked.addListener(async (tab) => {
     await chrome.storage.local.set({ launch_tab_id: tab.id });
   }
 
-  chrome.windows.create({
+  const newWin = await chrome.windows.create({
     url: popupUrl.split('#')[0],
     type: 'popup',
     width: 1500,
     height: 890,
     focused: true,
   });
+
+  // Store the window ID so we can reliably find it on the next icon click.
+  await chrome.storage.local.set({ tagscanner_window_id: newWin.id });
+});
+
+// Clear stored window ID when the TagScanner popup is closed.
+chrome.windows.onRemoved.addListener(async (windowId) => {
+  const data = await chrome.storage.local.get('tagscanner_window_id');
+  if (data.tagscanner_window_id === windowId) {
+    chrome.storage.local.remove('tagscanner_window_id');
+  }
 });
 
 // ── Environment Override ───────────────────────────────────────────────────

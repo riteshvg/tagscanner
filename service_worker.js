@@ -24,17 +24,25 @@
 // service_worker.js
 
 chrome.action.onClicked.addListener(async (tab) => {
-  // Store the originating tab ID before the popup opens so popup.js reads
-  // the correct tab regardless of how many windows are open.
+  const popupUrl = chrome.runtime.getURL('popup.html');
+
+  // If a TagScanner window is already open, focus it and exit — do NOT overwrite
+  // launch_tab_id, which would break env override reload targeting the original tab.
+  const allWindows = await chrome.windows.getAll({ populate: true });
+  for (const win of allWindows) {
+    if (win.type === 'popup' && win.tabs && win.tabs[0].url.startsWith(popupUrl)) {
+      chrome.windows.update(win.id, { focused: true });
+      return;
+    }
+  }
+
+  // No existing popup — safe to write the tab ID and open a new window.
   if (tab && tab.id) {
     await chrome.storage.local.set({ launch_tab_id: tab.id });
   }
 
-  let url = chrome.runtime.getURL('popup.html');
-  let cleanUrl = url.split('#')[0];
-
   chrome.windows.create({
-    url: cleanUrl,
+    url: popupUrl.split('#')[0],
     type: 'popup',
     width: 1500,
     height: 890,

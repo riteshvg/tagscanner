@@ -6,7 +6,6 @@
   var prodUrl         = '';
   var currentOverride = null;
 
-  var prodUrlEl   = document.getElementById('prodUrlDisplay');
   var overrideUrl = document.getElementById('overrideUrl');
   var enableBtn       = document.getElementById('enableBtn');
   var changeBtn       = document.getElementById('changeBtn');
@@ -39,14 +38,6 @@
 
   chrome.storage.local.get(['launch_script_url', STORAGE_KEY], function (data) {
     prodUrl = data.launch_script_url || '';
-
-    if (prodUrl) {
-      prodUrlEl.textContent = prodUrl;
-      prodUrlEl.classList.remove('empty');
-    } else {
-      prodUrlEl.textContent = 'No Tags script detected — open TagScanner on a page with Adobe Tags first.';
-    }
-
     currentOverride = data[STORAGE_KEY] || null;
     renderState();
   });

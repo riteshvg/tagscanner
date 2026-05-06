@@ -1,10 +1,19 @@
-window.addEventListener('load', myMain, false);
+// Guard against duplicate injection when executeScript re-injects into an already-loaded page
+if (window.__tagScannerContentScriptLoaded) {
+  // Script already running — skip re-initialisation to avoid duplicate listeners
+} else {
+  window.__tagScannerContentScriptLoaded = true;
+  initTagScanner();
+}
+
+function initTagScanner() {
 
 let scriptURL;
 
 function myMain(evt) {
-  //Injecting script to get satellite TODO: Set Delay for after page load or to wait for satellite to load.
   function injectScript(file_path, tag) {
+    // Don't re-inject if pass_satellite.js is already in the DOM
+    if (document.querySelector('script[src="' + file_path + '"]')) return;
     var node = document.getElementsByTagName(tag)[0];
     var script = document.createElement('script');
     script.setAttribute('type', 'text/javascript');
@@ -32,6 +41,13 @@ function myMain(evt) {
   } else {
     console.error('No matching script found.');
   }
+}
+
+// Run myMain immediately if page is already loaded (re-injection case), otherwise wait for load event
+if (document.readyState === 'complete') {
+  myMain();
+} else {
+  window.addEventListener('load', myMain, false);
 }
 
 //Listening for message from pass_satellite.js
@@ -151,3 +167,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // On load, extract and store rules if available
 extractComponentData();
+
+} // end initTagScanner

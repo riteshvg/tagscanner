@@ -12,10 +12,10 @@ window.addEventListener('message', function (event) {
 });
 
 (async () => {
-  const [tab] = await chrome.tabs.query({
-    active: true,
-    currentWindow: false,
-  });
+  // Read the tab ID stored by the service worker at click time — guaranteed to be
+  // the tab the user clicked the extension icon on, regardless of open windows.
+  const stored = await new Promise(r => chrome.storage.local.get('launch_tab_id', r));
+  const tab = stored.launch_tab_id ? { id: stored.launch_tab_id } : null;
 
   // const [tab] = await chrome.windows.create({
   //   url: 'popup.html', // URL of the page you want to open
@@ -458,7 +458,13 @@ window.addEventListener('message', function (event) {
       // Load flow view in Components Overview once data is ready (so flow has data to display)
       var componentIframe = document.getElementById('component-iframe');
       if (componentIframe && !componentIframe.src) {
-        componentIframe.src = 'display.html';
+        chrome.storage.local.get('envOverride', function (data) {
+          if (data.envOverride && data.envOverride.enabled) {
+            componentIframe.src = 'vendor/env-override.html';
+          } else {
+            componentIframe.src = 'display.html';
+          }
+        });
       }
 
       //Setting Display Properly if everything is proper
@@ -470,12 +476,44 @@ window.addEventListener('message', function (event) {
     } catch (error) {
       console.error(error);
       sessionStorage.setItem('launch_property_name', 'No Launch Code');
-      var set_display = document.getElementById('set_display');
-      // set_display.innerHTML = "No Adobge Tags Script Present";
-      set_display.style = 'display: none;';
+      document.getElementById('set_display').style.display = 'none';
+      showRefreshModal();
     }
   }
 })();
+
+function showRefreshModal() {
+  var modal = document.getElementById('refresh-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
+  document.getElementById('refresh-tab-btn').addEventListener('click', function () {
+    var btn = this;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px;"></i>Refreshing… <span id="refresh-countdown">8</span>s';
+
+    chrome.storage.local.get('launch_tab_id', function (data) {
+      if (data.launch_tab_id) chrome.tabs.reload(data.launch_tab_id);
+    });
+
+    // Count down, then reload the popup — gives the tab time to fully load
+    // and Adobe Tags (pass_satellite.js, 3s delay) to initialize before we query it.
+    var secs = 8;
+    var ticker = setInterval(function () {
+      secs--;
+      var countEl = document.getElementById('refresh-countdown');
+      if (countEl) countEl.textContent = secs;
+      if (secs <= 0) {
+        clearInterval(ticker);
+        window.location.reload();
+      }
+    }, 1000);
+  });
+
+  document.getElementById('refresh-modal-close').addEventListener('click', function () {
+    modal.style.display = 'none';
+  });
+}
 
 //TODO: Add button to open popup in new tab/window. currently doesn't work because messaging.
 //TODO: Possible to do this maybe if the new tab has a sends a message to content script instead of popup.js?

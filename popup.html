@@ -339,8 +339,26 @@
     Connection error: Please refresh the page and try again.
   </div>
 
-  <div id="id01" class="modal">
-    <span class="close" id="close" title="Close Modal">&times;</span>
+  <!-- Refresh Tab Modal — shown when Adobe Tags data cannot be read -->
+  <div id="refresh-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:12px;padding:32px 28px;max-width:400px;width:88%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+      <div style="width:52px;height:52px;background:#fff3cd;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
+        <i class="fas fa-sync-alt" style="color:#f59e0b;font-size:22px;"></i>
+      </div>
+      <h5 style="font-weight:700;color:#1a1a2e;margin:0 0 10px;">Adobe Tags Not Detected</h5>
+      <p style="font-size:13px;color:#6b7280;line-height:1.65;margin:0 0 24px;">
+        TagScanner couldn't read the Tags configuration on this tab.<br><br>
+        This usually happens when the extension was <strong>installed after the page loaded</strong>,
+        or the page doesn't have an Adobe Tags deployment.<br><br>
+        Refresh the tab you want to scan, then re-open TagScanner.
+      </p>
+      <button id="refresh-tab-btn" style="background:#4e73df;color:#fff;border:none;border-radius:6px;padding:10px 22px;font-size:13px;font-weight:600;cursor:pointer;margin-right:8px;min-width:160px;">
+        <i class="fas fa-sync-alt" style="margin-right:6px;"></i>Refresh Tab Now
+      </button>
+      <button id="refresh-modal-close" style="background:#f3f4f6;color:#6b7280;border:none;border-radius:6px;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;">
+        Dismiss
+      </button>
+    </div>
   </div>
 
   <!-- Page Wrapper -->

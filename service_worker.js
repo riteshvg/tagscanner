@@ -23,7 +23,13 @@
 
 // service_worker.js
 
-chrome.action.onClicked.addListener(() => {
+chrome.action.onClicked.addListener(async (tab) => {
+  // Store the originating tab ID before the popup opens so popup.js reads
+  // the correct tab regardless of how many windows are open.
+  if (tab && tab.id) {
+    await chrome.storage.local.set({ launch_tab_id: tab.id });
+  }
+
   let url = chrome.runtime.getURL('popup.html');
   let cleanUrl = url.split('#')[0];
 
@@ -40,11 +46,17 @@ chrome.action.onClicked.addListener(() => {
 
 var ENV_OVERRIDE_RULE_ID = 1001;
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
   if (message.type === 'SET_ENV_OVERRIDE') {
-    var prodUrl    = message.prodUrl;
+    var prodUrl     = message.prodUrl;
     var overrideUrl = message.overrideUrl;
 
+    // Use Promise API — callback form swallows errors in MV3 service workers.
+    // Use regexFilter with escaped URL for reliable exact-URL matching.
     chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: [ENV_OVERRIDE_RULE_ID],
       addRules: [{
@@ -52,34 +64,35 @@ chrome.runtime.onMessage.addListener(function (message, sender, sendResponse) {
         priority: 100,
         action:   { type: 'redirect', redirect: { url: overrideUrl } },
         condition: {
-          urlFilter:     '|' + prodUrl + '|',
+          regexFilter:   '^' + escapeRegex(prodUrl) + '$',
           resourceTypes: ['script']
         }
       }]
-    }, function () {
-      if (chrome.runtime.lastError) {
-        sendResponse({ success: false, error: chrome.runtime.lastError.message });
-        return;
-      }
+    }).then(function () {
       chrome.action.setBadgeText({ text: 'OVR' });
       chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' });
       chrome.storage.local.set({
         envOverride: { enabled: true, prodUrl: prodUrl, overrideUrl: overrideUrl }
       });
       sendResponse({ success: true });
+    }).catch(function (err) {
+      console.error('TagScanner env override error:', err);
+      sendResponse({ success: false, error: err.message || String(err) });
     });
     return true;
   }
 
   if (message.type === 'CLEAR_ENV_OVERRIDE') {
     chrome.declarativeNetRequest.updateDynamicRules(
-      { removeRuleIds: [ENV_OVERRIDE_RULE_ID] },
-      function () {
-        chrome.action.setBadgeText({ text: '' });
-        chrome.storage.local.remove('envOverride');
-        sendResponse({ success: true });
-      }
-    );
+      { removeRuleIds: [ENV_OVERRIDE_RULE_ID] }
+    ).then(function () {
+      chrome.action.setBadgeText({ text: '' });
+      chrome.storage.local.remove('envOverride');
+      sendResponse({ success: true });
+    }).catch(function (err) {
+      console.error('TagScanner env override clear error:', err);
+      sendResponse({ success: true }); // best-effort clear
+    });
     return true;
   }
 });

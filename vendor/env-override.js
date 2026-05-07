@@ -6,12 +6,36 @@
   var prodUrl         = '';
   var currentOverride = null;
 
-  var overrideUrl = document.getElementById('overrideUrl');
-  var enableBtn       = document.getElementById('enableBtn');
-  var changeBtn       = document.getElementById('changeBtn');
-  var activeBanner    = document.getElementById('activeBanner');
-  var activeBannerUrl = document.getElementById('activeBannerUrl');
-  var reloadStatus    = document.getElementById('reloadStatus');
+  var overrideUrl      = document.getElementById('overrideUrl');
+  var enableBtn        = document.getElementById('enableBtn');
+  var changeBtn        = document.getElementById('changeBtn');
+  var activeBanner     = document.getElementById('activeBanner');
+  var activeBannerUrl  = document.getElementById('activeBannerUrl');
+  var reloadStatus     = document.getElementById('reloadStatus');
+  var urlValidationMsg = document.getElementById('urlValidationMsg');
+  var urlValidationTxt = document.getElementById('urlValidationText');
+
+  function validateOverrideUrl(url) {
+    if (!url) return null; // empty — no message, just keep button disabled
+    if (/\basync\b/i.test(url))
+      return 'Remove the "async" keyword — paste only the URL, not the full script tag.';
+    if (/<|>|"/.test(url))
+      return 'Looks like a script tag was pasted. Paste only the URL (starting with https://).';
+    if (!/^https:\/\//i.test(url))
+      return 'URL must start with https://';
+    if (!/\.min\.js$/.test(url))
+      return 'URL must end with .min.js — remove any extra characters after it.';
+    return null; // valid
+  }
+
+  function showUrlValidation(msg) {
+    if (msg) {
+      urlValidationTxt.textContent = msg;
+      urlValidationMsg.style.display = '';
+    } else {
+      urlValidationMsg.style.display = 'none';
+    }
+  }
 
   // ── UI state ───────────────────────────────────────────────────────────
 
@@ -29,8 +53,9 @@
       enableBtn.className = 'btn-toggle state-enable';
       changeBtn.style.display = 'none';
     }
-    // Enable button only when there is a URL in the input (or override is already active)
-    enableBtn.disabled = !(currentOverride && currentOverride.enabled) && !overrideUrl.value.trim();
+    // Enable button only when there is a valid URL in the input (or override is already active)
+    var _val = overrideUrl.value.trim();
+    enableBtn.disabled = !(currentOverride && currentOverride.enabled) && (!_val || !!validateOverrideUrl(_val));
     reloadStatus.style.display = 'none';
   }
 
@@ -90,9 +115,11 @@
   // ── Events ─────────────────────────────────────────────────────────────
 
   overrideUrl.addEventListener('input', function () {
-    if (!(currentOverride && currentOverride.enabled)) {
-      enableBtn.disabled = !overrideUrl.value.trim();
-    }
+    if (currentOverride && currentOverride.enabled) return;
+    var val = overrideUrl.value.trim();
+    var err = validateOverrideUrl(val);
+    showUrlValidation(err);
+    enableBtn.disabled = !val || !!err;
   });
 
   // Change: reset the form so the user can enter a new environment URL.
@@ -101,11 +128,12 @@
   changeBtn.addEventListener('click', function () {
     currentOverride = null; // local reset only — storage + rule untouched
     overrideUrl.value = '';
+    showUrlValidation(null);
     activeBanner.style.display = 'none';
     changeBtn.style.display = 'none';
     enableBtn.innerHTML = '<i class="fas fa-toggle-off"></i> Enable Override';
     enableBtn.className = 'btn-toggle state-enable';
-    enableBtn.disabled = false;
+    enableBtn.disabled = true;
     overrideUrl.focus();
   });
 

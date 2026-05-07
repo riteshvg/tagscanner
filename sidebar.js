@@ -148,6 +148,43 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
+  function showPostSignInBanner() {
+    var existing = document.getElementById('post-signin-banner');
+    if (existing) existing.remove();
+
+    var banner = document.createElement('div');
+    banner.id = 'post-signin-banner';
+    banner.style.cssText = [
+      'position:fixed', 'bottom:20px', 'right:20px', 'z-index:9999',
+      'background:#1e3a5f', 'color:#fff', 'border-radius:10px',
+      'padding:14px 18px', 'max-width:300px', 'box-shadow:0 4px 20px rgba(0,0,0,0.25)',
+      'font-size:12.5px', 'line-height:1.5',
+    ].join(';');
+    banner.innerHTML = [
+      '<div style="display:flex;align-items:flex-start;gap:10px;">',
+        '<i class="fas fa-check-circle" style="color:#34d399;font-size:18px;margin-top:2px;flex-shrink:0;"></i>',
+        '<div>',
+          '<div style="font-weight:700;margin-bottom:4px;">Signed in!</div>',
+          '<div style="color:#d1d5db;">Run your first <strong style="color:#fff;">AI Health Scan</strong> via',
+          ' <a href="vendor/summary.html" target="iframe2" id="post-signin-summary-link"',
+          '   style="color:#61dafb;text-decoration:underline;cursor:pointer;">Summary</a>,',
+          ' or explain custom code from <a href="vendor/rule.html" target="iframe2" id="post-signin-rules-link"',
+          '   style="color:#61dafb;text-decoration:underline;cursor:pointer;">Rules</a>.',
+          '</div>',
+        '</div>',
+        '<button id="post-signin-close" style="background:none;border:none;color:#9ca3af;font-size:16px;cursor:pointer;padding:0 0 0 6px;flex-shrink:0;">&times;</button>',
+      '</div>',
+    ].join('');
+
+    document.body.appendChild(banner);
+
+    function dismiss() { if (banner.parentNode) banner.parentNode.removeChild(banner); }
+    document.getElementById('post-signin-close').addEventListener('click', dismiss);
+    document.getElementById('post-signin-summary-link').addEventListener('click', dismiss);
+    document.getElementById('post-signin-rules-link').addEventListener('click', dismiss);
+    setTimeout(dismiss, 12000);
+  }
+
   if (authBtn) {
     authBtn.addEventListener('click', async function () {
       if (isSignedIn()) {
@@ -171,6 +208,7 @@ document.addEventListener('DOMContentLoaded', function () {
           setAuthButtonState(true);
           renderTopbarUser();
           if (window._revealDashboardIfAdmin) window._revealDashboardIfAdmin();
+          showPostSignInBanner();
         } catch (err) {
           authBtn.innerHTML = '<i class="px-1 fas fa-exclamation-circle"></i><span>Failed</span>';
           setTimeout(function () { setAuthButtonState(false); }, 2000);

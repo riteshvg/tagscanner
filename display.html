@@ -84,6 +84,21 @@
       border-color: #c7d7fd;
       background: linear-gradient(135deg, #fafbff, #eff4ff);
     }
+    a.feature-card-link {
+      display: block; text-decoration: none; color: inherit;
+    }
+    a.feature-card-link .feature-card {
+      cursor: pointer;
+    }
+    a.feature-card-link .feature-card:hover {
+      box-shadow: 0 4px 20px rgba(78,115,223,0.18);
+      border-color: #93c5fd;
+    }
+    .feature-card .cta-arrow {
+      display: inline-block; margin-top: 10px;
+      font-size: 11px; font-weight: 700; color: #4e73df;
+      letter-spacing: 0.2px;
+    }
     .feature-icon {
       width: 36px; height: 36px; border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
@@ -166,7 +181,7 @@
   <!-- Hero -->
   <div class="hero">
     <div class="hero-eyebrow">Adobe Tags (Launch) Inspector</div>
-    <h1 class="hero-title">TagScanner <span>2.5.3</span></h1>
+    <h1 class="hero-title">TagScanner <span>2.5.4</span></h1>
     <p class="hero-subtitle">
       Inspect, audit, and understand your Adobe Tags property — from component relationships
       and size snapshots to AI-powered health reports and code explanations.
@@ -184,29 +199,35 @@
   </div>
   <div class="features-grid">
 
-    <div class="feature-card ai-card">
-      <div class="feature-icon icon-indigo"><i class="fas fa-heartbeat"></i></div>
-      <div class="feature-title">
-        AI Property Health Scan
-        <span class="badge-preview">Preview</span>
+    <a class="feature-card-link" href="vendor/summary.html" target="iframe2">
+      <div class="feature-card ai-card">
+        <div class="feature-icon icon-indigo"><i class="fas fa-heartbeat"></i></div>
+        <div class="feature-title">
+          AI Property Health Scan
+          <span class="badge-preview">Preview</span>
+        </div>
+        <p class="feature-desc">
+          Get an AI-generated health score (A–F), executive summary, critical issues, quick wins,
+          and ranked recommendations for your entire property.
+        </p>
+        <span class="cta-arrow"><i class="fas fa-arrow-right" style="margin-right:4px;font-size:9px;"></i>Open Summary &amp; Run Scan</span>
       </div>
-      <p class="feature-desc">
-        Get an AI-generated health score (A–F), executive summary, critical issues, quick wins,
-        and ranked recommendations for your entire property.
-      </p>
-    </div>
+    </a>
 
-    <div class="feature-card ai-card">
-      <div class="feature-icon icon-purple"><i class="fas fa-code"></i></div>
-      <div class="feature-title">
-        Custom Code Explanation
-        <span class="badge-preview">Preview</span>
+    <a class="feature-card-link" href="vendor/rule.html" target="iframe2">
+      <div class="feature-card ai-card">
+        <div class="feature-icon icon-purple"><i class="fas fa-code"></i></div>
+        <div class="feature-title">
+          Custom Code Explanation
+          <span class="badge-preview">Preview</span>
+        </div>
+        <p class="feature-desc">
+          Select any data element or rule with custom code and get a plain-English breakdown —
+          purpose, data sources, return values, risks, and debug commands.
+        </p>
+        <span class="cta-arrow"><i class="fas fa-arrow-right" style="margin-right:4px;font-size:9px;"></i>Open Rules &amp; Explain</span>
       </div>
-      <p class="feature-desc">
-        Select any data element or rule with custom code and get a plain-English breakdown —
-        purpose, data sources, return values, risks, and debug commands.
-      </p>
-    </div>
+    </a>
 
     <div class="feature-card">
       <div class="feature-icon icon-teal"><i class="fas fa-project-diagram"></i></div>

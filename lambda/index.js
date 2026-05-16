@@ -674,9 +674,18 @@ async function handleAuth(body, sourceIp) {
 // ── History handler ───────────────────────────────────────────────────────────
 
 async function handleHistory(body) {
-  const { sessionToken, limit, lastKey, propertyKey } = body;
+  const { sessionToken, limit, lastKey, propertyKey, ownerId } = body;
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session. Please sign in again.' });
+
+  // Admin can query any user's history by passing ownerId
+  let targetUserId = session.userId;
+  if (ownerId) {
+    if (!ADMIN_EMAIL || session.email.toLowerCase() !== ADMIN_EMAIL) {
+      return resp(403, { error: 'Admin access required.' });
+    }
+    targetUserId = ownerId;
+  }
 
   try {
     let params;
@@ -691,13 +700,13 @@ async function handleHistory(body) {
         Limit:                     Math.min(limit || 25, 50)
       };
     } else {
-      // Fallback: user-scoped
+      // User-scoped (current user or admin-specified via ownerId)
       params = {
         TableName:                 QUERIES_TABLE,
         KeyConditionExpression:    'userId = :uid',
-        ExpressionAttributeValues: { ':uid': session.userId },
+        ExpressionAttributeValues: { ':uid': targetUserId },
         ScanIndexForward:          false,
-        Limit:                     Math.min(limit || 25, 50)
+        Limit:                     Math.min(limit || 25, 100)
       };
     }
     if (lastKey) params.ExclusiveStartKey = lastKey;

@@ -829,6 +829,32 @@ async function handleGetFeedback(body) {
   }
 }
 
+// ── Admin: all chat questions across all users ────────────────────────────────
+
+async function handleAdminQueries(body) {
+  const { sessionToken } = body;
+  const session = await getSession(sessionToken);
+  if (!session) return resp(401, { error: 'Invalid or expired session.' });
+  if (!ADMIN_EMAIL || session.email.toLowerCase() !== ADMIN_EMAIL)
+    return resp(403, { error: 'Admin access required.' });
+
+  try {
+    const result = await ddb.send(new ScanCommand({
+      TableName: QUERIES_TABLE,
+      FilterExpression: '#t = :chat',
+      ExpressionAttributeNames: { '#t': 'type' },
+      ExpressionAttributeValues: { ':chat': 'chat' },
+      ProjectionExpression: 'userId, queryId, email, userName, requestSummary, resultJson, feedback, feedbackText, createdAt, tokens, propertyKey'
+    }));
+    const items = (result.Items || []).sort((a, b) =>
+      (b.createdAt || '').localeCompare(a.createdAt || ''));
+    return resp(200, { items });
+  } catch (err) {
+    console.error('handleAdminQueries error:', err.message);
+    return resp(500, { error: err.message || 'Could not fetch questions.' });
+  }
+}
+
 // ── Users list (admin only) ───────────────────────────────────────────────────
 
 async function handleUsers(body) {
@@ -996,6 +1022,9 @@ exports.handler = async (event) => {
 
     // ── Get general feedback (admin only) ────────────────────────────────────
     if (type === 'getFeedback') return await handleGetFeedback(body);
+
+    // ── Admin: all chat questions ────────────────────────────────────────────
+    if (type === 'adminQueries') return await handleAdminQueries(body);
 
     // ── Users (admin) ───────────────────────────────────────────────────────
     if (type === 'users') return await handleUsers(body);

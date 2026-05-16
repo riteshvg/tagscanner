@@ -60,7 +60,7 @@ const ADMIN_EMAIL    = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 
 const MAX_TOKENS_SCAN    = 1500;
 const MAX_TOKENS_EXPLAIN = 1000;
-const MAX_TOKENS_CHAT    = 600;
+const MAX_TOKENS_CHAT    = 2500;
 
 const bedrockClient = new BedrockRuntimeClient({ region: REGION });
 
@@ -316,9 +316,10 @@ How to respond:
 2. After giving the factual answer, add a brief expert observation when relevant — e.g. flag an unusually high count, a governance concern, a performance risk, or a best-practice deviation. One or two sentences is enough.
 3. If a number you report is worth contextualising (high, low, unusual), say so.
 4. When listing items, use a "-" bulleted list. Keep lists scannable.
-5. If the property_context does not contain enough information to answer, say so clearly — do not guess or fabricate.
-6. Do NOT return JSON. Return plain text only.
-7. Tone: friendly and professional, like a senior consultant. Avoid filler phrases like "Great question!" or "Certainly!".`;
+5. NEVER truncate a list mid-item. If the complete list is very long (>60 items), show all items — do not abbreviate or add "... and N more". The user is inspecting their property and needs the complete data.
+6. If the property_context does not contain enough information to answer, say so clearly — do not guess or fabricate.
+7. Do NOT return JSON. Return plain text only.
+8. Tone: friendly and professional, like a senior consultant. Avoid filler phrases like "Great question!" or "Certainly!".`;
 
 // Multi-turn version of invokeClaude — takes a messages array instead of a single string
 async function invokeClaudeChat(messages, maxTokens) {

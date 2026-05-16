@@ -41,9 +41,13 @@
 const { BedrockRuntimeClient, InvokeModelCommand } = require('@aws-sdk/client-bedrock-runtime');
 const { DynamoDBClient }                           = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+const { SNSClient, PublishCommand: SNSPublishCommand } = require('@aws-sdk/client-sns');
 const nodeCrypto = require('node:crypto');
 
 // ── Config ────────────────────────────────────────────────────────────────────
+
+const SNS_TOPIC_ARN  = (process.env.SNS_TOPIC_ARN || '').trim();
+const ALERT_PCT      = 0.75; // send alert when daily cost crosses this fraction of the limit
 
 const MODEL_ID       = process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-3-5-haiku-20241022-v1:0';
 const REGION         = process.env.BEDROCK_REGION   || process.env.AWS_REGION || 'us-east-1';
@@ -59,8 +63,9 @@ const MAX_TOKENS_EXPLAIN = 1000;
 
 const bedrockClient = new BedrockRuntimeClient({ region: REGION });
 
-const ddbClient = new DynamoDBClient({ region: REGION });
-const ddb       = DynamoDBDocumentClient.from(ddbClient);
+const ddbClient  = new DynamoDBClient({ region: REGION });
+const ddb        = DynamoDBDocumentClient.from(ddbClient);
+const snsClient  = SNS_TOPIC_ARN ? new SNSClient({ region: REGION }) : null;
 
 // ── Rate limiting (DynamoDB-backed, global across all Lambda instances) ──────
 
@@ -150,6 +155,50 @@ async function trackCost(inputTokens, outputTokens) {
   }
 }
 
+async function publishSNSAlert(subject, message) {
+  if (!snsClient || !SNS_TOPIC_ARN) return;
+  try {
+    await snsClient.send(new SNSPublishCommand({
+      TopicArn: SNS_TOPIC_ARN,
+      Subject:  subject.slice(0, 100),
+      Message:  message
+    }));
+  } catch (err) {
+    console.error('publishSNSAlert error:', err.message);
+  }
+}
+
+// Sends a 75% threshold alert once per day (deduped via RATE_TABLE).
+async function sendCostThresholdAlert(newCost, limit) {
+  const windowKey = new Date().toISOString().slice(0, 10);
+  const alertKey  = 'alert_75pct#' + windowKey;
+  const ttl       = Math.floor(Date.now() / 1000) + 25 * 60 * 60;
+
+  try {
+    const existing = await ddb.send(new GetCommand({ TableName: RATE_TABLE, Key: { pk: alertKey } }));
+    if (existing.Item) return; // already sent today
+    await ddb.send(new PutCommand({ TableName: RATE_TABLE, Item: { pk: alertKey, ttl } }));
+  } catch (err) {
+    console.error('sendCostThresholdAlert dedup error:', err.message);
+  }
+
+  const pct = Math.round((newCost / limit) * 100);
+  await publishSNSAlert(
+    'TagScanner Cost Alert — ' + pct + '% of daily budget used',
+    [
+      'TagScanner Bedrock cost alert',
+      '',
+      'Date:          ' + windowKey,
+      'Current spend: $' + newCost.toFixed(4),
+      'Daily limit:   $' + limit.toFixed(2),
+      'Usage:         ' + pct + '%',
+      '',
+      'AI will be auto-disabled when spend reaches $' + limit.toFixed(2) + '.',
+      'To raise or lower the limit, use the TagScanner dashboard.'
+    ].join('\n')
+  );
+}
+
 async function autoDisableAI(reason) {
   try {
     await ddb.send(new UpdateCommand({
@@ -160,6 +209,11 @@ async function autoDisableAI(reason) {
       ExpressionAttributeValues: { ':f': false, ':dr': reason }
     }));
     console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'ai_auto_disabled', reason }));
+    await publishSNSAlert(
+      'TagScanner AI Auto-Disabled — Cost Limit Reached',
+      ['TagScanner AI has been automatically disabled.', '', 'Reason: ' + reason,
+       '', 'Re-enable via the TagScanner dashboard when ready.'].join('\n')
+    );
   } catch (err) {
     console.error('autoDisableAI error:', err.message);
   }
@@ -313,8 +367,10 @@ async function getSession(sessionToken) {
   }
 }
 
-async function logQuery(userId, email, userName, type, requestSummary, tokens, resultJson, propertyKey) {
+async function logQuery(userId, email, userName, type, requestSummary, tokens, resultJson, propertyKey, siteUrl) {
   const queryId = new Date().toISOString() + '#' + randomId(8);
+  let siteHostname = '';
+  try { siteHostname = siteUrl ? new URL(siteUrl).hostname : ''; } catch (_) {}
   try {
     await ddb.send(new PutCommand({
       TableName: QUERIES_TABLE,
@@ -325,6 +381,8 @@ async function logQuery(userId, email, userName, type, requestSummary, tokens, r
         email,
         userName:      userName    || '',
         propertyKey:   propertyKey || '',
+        siteUrl:       siteUrl     || '',
+        siteHostname:  siteHostname,
         requestSummary,
         tokens:        tokens      || {},
         resultJson:    resultJson  || null,
@@ -655,7 +713,7 @@ async function handleUsers(body) {
       ddb.send(new ScanCommand({ TableName: USERS_TABLE })),
       ddb.send(new ScanCommand({
         TableName: QUERIES_TABLE,
-        ProjectionExpression: 'userId, #t, requestSummary, createdAt, tokens',
+        ProjectionExpression: 'userId, #t, requestSummary, createdAt, tokens, siteHostname',
         ExpressionAttributeNames: { '#t': 'type' }
       }))
     ]);
@@ -666,7 +724,7 @@ async function handleUsers(body) {
       if (!statsMap[q.userId]) {
         statsMap[q.userId] = {
           totalQueries: 0, totalScans: 0, totalExplains: 0,
-          properties: new Set(), lastActive: null,
+          properties: new Set(), sites: new Set(), lastActive: null,
           totalInputTokens: 0, totalOutputTokens: 0
         };
       }
@@ -676,6 +734,7 @@ async function handleUsers(body) {
         s.totalScans++;
         const match = (q.requestSummary || '').match(/^Property scan:\s*(.+)$/);
         if (match) s.properties.add(match[1].trim());
+        if (q.siteHostname) s.sites.add(q.siteHostname);
       } else if (q.type === 'explain') {
         s.totalExplains++;
       }
@@ -693,6 +752,7 @@ async function handleUsers(body) {
           totalScans:        s.totalScans,
           totalExplains:     s.totalExplains,
           properties:        Array.from(s.properties),
+          sites:             Array.from(s.sites),
           lastActive:        s.lastActive,
           totalInputTokens:  s.totalInputTokens,
           totalOutputTokens: s.totalOutputTokens
@@ -883,11 +943,12 @@ exports.handler = async (event) => {
       const report       = parseJSON(result.text);
       const propertyName = (payload.property && payload.property.name)        || 'Unknown property';
       const environment  = (payload.property && payload.property.environment) || 'Production';
+      const siteUrl      = (payload.property && payload.property.url)         || '';
       const propertyKey  = propertyName + '#' + environment;
 
       const [queryId, newDayCost] = await Promise.all([
         logQuery(identity.userId, identity.email, session.name, 'scan', 'Property scan: ' + propertyName,
-          { input: result.inputTokens, output: result.outputTokens }, report, propertyKey),
+          { input: result.inputTokens, output: result.outputTokens }, report, propertyKey, siteUrl),
         trackCost(result.inputTokens, result.outputTokens)
       ]);
 
@@ -898,6 +959,9 @@ exports.handler = async (event) => {
           identity.email, session.name, propertyName, environment).catch(() => {});
       }
 
+      if (newDayCost >= aiConfig.cost_limit_usd * ALERT_PCT) {
+        sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(() => {});
+      }
       if (newDayCost > aiConfig.cost_limit_usd) {
         autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached. AI disabled automatically.').catch(() => {});
       }
@@ -932,6 +996,9 @@ exports.handler = async (event) => {
       putExplainCache(codeHash, explanation, { input: result.inputTokens, output: result.outputTokens },
         identity.email, session.name, componentName, metadata && metadata.type, propertyKey).catch(() => {});
 
+      if (newDayCost >= aiConfig.cost_limit_usd * ALERT_PCT) {
+        sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(() => {});
+      }
       if (newDayCost > aiConfig.cost_limit_usd) {
         autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached. AI disabled automatically.').catch(() => {});
       }

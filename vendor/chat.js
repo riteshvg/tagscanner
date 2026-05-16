@@ -41,7 +41,7 @@
       if (m.role === 'user') {
         appendBubble('user', esc(m.text));
       } else {
-        appendBubble('assistant', renderMarkdownLite(m.text));
+        appendBubble('assistant', renderMarkdownLite(m.text), false, m.queryId || null);
       }
     });
   }
@@ -109,11 +109,10 @@
     var rules = rulesArr.slice(0, RULE_CAP).map(function (r) {
       var comps = [].concat(r.events || [], r.conditions || [], r.actions || []);
       return {
-        name:         r.name || r.id || 'Unnamed',
-        enabled:      r.enabled !== false,
-        events:       (r.events     || []).map(stripComponent),
-        conditions:   (r.conditions || []).map(stripComponent),
-        actions:      (r.actions    || []).map(stripComponent),
+        name:          r.name || r.id || 'Unnamed',
+        events:        (r.events     || []).map(stripComponent),
+        conditions:    (r.conditions || []).map(stripComponent),
+        actions:       (r.actions    || []).map(stripComponent),
         hasCustomCode: hasCustomCode(comps)
       };
     });
@@ -150,7 +149,8 @@
       property:     { name: propName, environment: propEnv, url: propUrl },
       rules:        rules,
       dataElements: dataElements,
-      extensions:   extensions
+      extensions:   extensions,
+      data_note:    'All rules shown are from the deployed container and are active. Disabled rules are excluded from the deployed library and are not visible here. Custom code content is not included — only component metadata is available.'
     };
     if (totalRules > RULE_CAP) ctx.note_rules = 'Truncated to ' + RULE_CAP + ' of ' + totalRules + ' total rules.';
     if (totalDE   > DE_CAP)   ctx.note_de    = 'Truncated to ' + DE_CAP   + ' of ' + totalDE   + ' total data elements.';
@@ -192,7 +192,7 @@
     return html;
   }
 
-  function appendBubble(role, htmlContent, isError) {
+  function appendBubble(role, htmlContent, isError, queryId) {
     emptyState.style.display = 'none';
     var row = document.createElement('div');
     row.className = 'msg-row ' + role;
@@ -203,6 +203,24 @@
     if (role === 'assistant' && !isError) {
       var footer = document.createElement('div');
       footer.className = 'msg-bubble-footer';
+
+      // Feedback buttons (left side)
+      var fbWrap = document.createElement('div');
+      fbWrap.className = 'msg-feedback';
+      if (queryId) {
+        fbWrap.innerHTML =
+          '<span class="msg-feedback-label">Helpful?</span>' +
+          '<button class="msg-fb-btn" data-rating="positive" title="Yes, helpful"><i class="fas fa-thumbs-up"></i></button>' +
+          '<button class="msg-fb-btn" data-rating="negative" title="Not helpful"><i class="fas fa-thumbs-down"></i></button>';
+        fbWrap.querySelectorAll('.msg-fb-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            submitChatFeedback(queryId, btn.getAttribute('data-rating'), fbWrap);
+          });
+        });
+      }
+      footer.appendChild(fbWrap);
+
+      // Copy button (right side)
       var copyBtn = document.createElement('button');
       copyBtn.className = 'msg-copy-btn';
       copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
@@ -217,6 +235,7 @@
         }).catch(function () {});
       });
       footer.appendChild(copyBtn);
+
       bubble.appendChild(footer);
     }
 
@@ -224,6 +243,28 @@
     chatBody.appendChild(row);
     chatBody.scrollTop = chatBody.scrollHeight;
     return row;
+  }
+
+  function submitChatFeedback(queryId, rating, container) {
+    var auth = window.parent.TagScannerAuth || window.TagScannerAuth;
+    var session = auth ? auth.getSession() : null;
+    if (!session) return;
+
+    // Optimistic UI update
+    var btns = container.querySelectorAll('.msg-fb-btn');
+    btns.forEach(function (b) {
+      b.disabled = true;
+      b.classList.toggle('voted-positive', b.getAttribute('data-rating') === 'positive' && rating === 'positive');
+      b.classList.toggle('voted-negative', b.getAttribute('data-rating') === 'negative' && rating === 'negative');
+    });
+
+    callLambda({
+      type: 'feedback', sessionToken: session.sessionToken,
+      queryId: queryId, rating: rating
+    }).catch(function () {
+      // revert on error
+      btns.forEach(function (b) { b.disabled = false; b.className = 'msg-fb-btn'; });
+    });
   }
 
   function showThinking() {
@@ -284,8 +325,9 @@
     .then(function (data) {
       removeThinking();
       var answer = data.answer || '';
-      appendBubble('assistant', renderMarkdownLite(answer));
-      displayMessages.push({ role: 'assistant', text: answer });
+      var qId = data.queryId || null;
+      appendBubble('assistant', renderMarkdownLite(answer), false, qId);
+      displayMessages.push({ role: 'assistant', text: answer, queryId: qId });
 
       // Update history for follow-up questions
       conversationHistory.push({ role: 'user',      content: JSON.stringify({ property_context: propertyContext, question: question }) });

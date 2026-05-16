@@ -132,11 +132,22 @@
     .msg-bubble li { margin-bottom: 3px; }
     .msg-bubble .error-text { color: #ef4444; }
 
-    /* Copy button */
+    /* Bubble footer (feedback + copy) */
     .msg-bubble-footer {
-      display: flex; justify-content: flex-end;
-      margin-top: 8px; padding-top: 6px; border-top: 1px solid #f0f1f4;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 8px; padding-top: 6px; border-top: 1px solid #f0f1f4; gap: 8px;
     }
+    .msg-feedback { display: flex; align-items: center; gap: 5px; }
+    .msg-feedback-label { font-size: 11px; color: #c4c9d4; }
+    .msg-fb-btn {
+      background: none; border: 1px solid #e3e6f0; border-radius: 4px;
+      color: #9ca3af; cursor: pointer; font-size: 11px; padding: 2px 7px;
+      transition: all 0.15s; line-height: 1.4;
+    }
+    .msg-fb-btn:hover { border-color: #4e73df; color: #4e73df; }
+    .msg-fb-btn.voted-positive { border-color: #10b981; color: #065f46; background: #d1fae5; }
+    .msg-fb-btn.voted-negative { border-color: #ef4444; color: #991b1b; background: #fee2e2; }
+    .msg-fb-btn:disabled { opacity: 0.5; cursor: default; }
     .msg-copy-btn {
       background: none; border: none; color: #9ca3af; cursor: pointer;
       font-size: 11px; padding: 2px 6px; border-radius: 4px;

@@ -313,9 +313,8 @@ Critical data limitations you must know:
 
 How to respond:
 1. Answer directly and accurately from the data in property_context. Never invent or guess rule names, extension names, or data element names.
-2. After giving the factual answer, add a brief expert observation when relevant — e.g. flag an unusually high count, a governance concern, a performance risk, or a best-practice deviation. One or two sentences is enough.
-3. If a number you report is worth contextualising (high, low, unusual), say so.
-4. When listing items, use a "-" bulleted list. Keep lists scannable.
+2. Be concise — give the factual answer and stop. Do not add observations, recommendations, governance notes, or best-practice commentary unless the user explicitly asks for it.
+3. When listing items, use a "-" bulleted list. Keep lists scannable.
 5. NEVER truncate a list mid-item. If the complete list is very long (>60 items), show all items — do not abbreviate or add "... and N more". The user is inspecting their property and needs the complete data.
 6. If the property_context does not contain enough information to answer, say so clearly — do not guess or fabricate.
 7. Do NOT return JSON. Return plain text only.

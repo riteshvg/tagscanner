@@ -58,6 +58,7 @@ chrome.runtime.onMessage.addListener(function (message) {
 
       satellite = response.satellite;
       scriptURL = response.scriptURL;
+      if (response.pixelInfo) window._tsPixelInfo = response.pixelInfo;
       console.log('in line 37 ' + scriptURL);
       if (scriptURL) {
         chrome.storage.local.set({ launch_script_url: scriptURL });
@@ -486,15 +487,25 @@ chrome.runtime.onMessage.addListener(function (message) {
       console.error(error);
       sessionStorage.setItem('launch_property_name', 'No Launch Code');
       document.getElementById('set_display').style.display = 'none';
-      showRefreshModal();
+      showRefreshModal(window._tsPixelInfo || null);
     }
   }
 })();
 
-function showRefreshModal() {
+function showRefreshModal(pixelInfo) {
   var modal = document.getElementById('refresh-modal');
   if (!modal) return;
   modal.style.display = 'flex';
+
+  // Show pixel/container note if a tag manager or pixel sandbox was detected
+  if (pixelInfo && pixelInfo.detected) {
+    var note = document.getElementById('pixel-impl-note');
+    var nameEl = document.getElementById('pixel-impl-name');
+    var platformEl = document.getElementById('pixel-impl-platform');
+    if (note) note.style.display = 'block';
+    if (nameEl) nameEl.textContent = pixelInfo.pixelName ? ' (' + pixelInfo.pixelName + ')' : '';
+    if (platformEl) platformEl.textContent = pixelInfo.platform || 'a pixel or container manager';
+  }
 
   document.getElementById('refresh-tab-btn').addEventListener('click', function () {
     var btn = this;

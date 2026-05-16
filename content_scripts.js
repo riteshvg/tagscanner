@@ -107,6 +107,9 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
           'Satellite or scriptURL is undefined - checking if they need more time to load'
         );
 
+        // Run pixel/container detection now so it's ready for the error response
+        var pixelInfo = detectPixelImpl();
+
         // If satellite data isn't ready yet, wait a bit and try again
         setTimeout(() => {
           // Re-scan once more before giving up
@@ -131,6 +134,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
               chrome.runtime.sendMessage({
                 type: 'CONNECTION_ERROR',
                 error: 'Could not find Adobe Tag Manager data on this page.',
+                pixelInfo: pixelInfo,
               });
             } catch (err) {
               console.error('Error sending error message:', err);
@@ -138,7 +142,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
           }
         }, 1500);
 
-        sendResponse({ pending: true });
+        sendResponse({ pending: true, pixelInfo: pixelInfo });
       }
     }
   } catch (error) {
@@ -181,5 +185,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // On load, extract and store rules if available
 extractComponentData();
+
+// Returns pixel/container detection result at call time — used inline in message handler
+function detectPixelImpl() {
+  try {
+    // ── Shopify Web Pixels Manager ──────────────────────────────────────────
+    var wpmScript = document.getElementById('web-pixels-manager-setup');
+    if (wpmScript) {
+      var wpmText = wpmScript.textContent || '';
+      var adobeMatch = wpmText.match(/"name"\s*:\s*"([^"]*(?:[Aa]dobe|AEP)[^"]*)"/i);
+      var pixelName = adobeMatch ? adobeMatch[1] : 'Adobe Experience Platform';
+      return { detected: true, platform: 'Shopify Web Pixels', pixelName: pixelName };
+    }
+
+    // ── Google Tag Manager ──────────────────────────────────────────────────
+    var gtmEl = document.querySelector('script[src*="googletagmanager.com/gtm.js"]') ||
+                document.querySelector('iframe[src*="googletagmanager.com/ns.html"]');
+    if (gtmEl) {
+      return { detected: true, platform: 'Google Tag Manager', pixelName: null };
+    }
+
+    // ── Tealium iQ ──────────────────────────────────────────────────────────
+    var tealiumEl = document.querySelector('script[src*="tags.tiqcdn.com"]') ||
+                    document.querySelector('script[src*="tealiumiq.com"]');
+    if (tealiumEl) {
+      return { detected: true, platform: 'Tealium iQ', pixelName: null };
+    }
+
+    // ── OneTrust (consent-gated) ────────────────────────────────────────────
+    var otEl = document.querySelector('script[src*="cookielaw.org"]') ||
+               document.querySelector('script[src*="onetrust.com"]') ||
+               document.getElementById('onetrust-consent-sdk');
+    if (otEl) {
+      return { detected: true, platform: 'OneTrust (consent-gated)', pixelName: null };
+    }
+
+    // ── Inline reference to adobedtm (dynamic injection) ───────────────────
+    var hasInlineRef = Array.from(document.querySelectorAll('script:not([src])')).some(function(s) {
+      return s.textContent && s.textContent.includes('adobedtm.com');
+    });
+    if (hasInlineRef) {
+      return { detected: true, platform: 'dynamic injection', pixelName: null };
+    }
+  } catch (e) {}
+  return null;
+}
 
 } // end initTagScanner

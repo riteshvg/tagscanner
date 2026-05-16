@@ -497,16 +497,6 @@ function showRefreshModal(pixelInfo) {
   if (!modal) return;
   modal.style.display = 'flex';
 
-  // Show pixel/container note if a tag manager or pixel sandbox was detected
-  if (pixelInfo && pixelInfo.detected) {
-    var note = document.getElementById('pixel-impl-note');
-    var nameEl = document.getElementById('pixel-impl-name');
-    var platformEl = document.getElementById('pixel-impl-platform');
-    if (note) note.style.display = 'block';
-    if (nameEl) nameEl.textContent = pixelInfo.pixelName ? ' (' + pixelInfo.pixelName + ')' : '';
-    if (platformEl) platformEl.textContent = pixelInfo.platform || 'a pixel or container manager';
-  }
-
   document.getElementById('refresh-tab-btn').addEventListener('click', function () {
     var btn = this;
     btn.disabled = true;

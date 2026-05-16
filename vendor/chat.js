@@ -161,6 +161,27 @@
     var bubble = document.createElement('div');
     bubble.className = 'msg-bubble' + (isError ? ' error-text' : '');
     bubble.innerHTML = htmlContent;
+
+    if (role === 'assistant' && !isError) {
+      var footer = document.createElement('div');
+      footer.className = 'msg-bubble-footer';
+      var copyBtn = document.createElement('button');
+      copyBtn.className = 'msg-copy-btn';
+      copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+      copyBtn.addEventListener('click', function () {
+        var clone = bubble.cloneNode(true);
+        var f = clone.querySelector('.msg-bubble-footer');
+        if (f) f.remove();
+        var text = (clone.innerText || clone.textContent).trim();
+        navigator.clipboard.writeText(text).then(function () {
+          copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+          setTimeout(function () { copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy'; }, 2000);
+        }).catch(function () {});
+      });
+      footer.appendChild(copyBtn);
+      bubble.appendChild(footer);
+    }
+
     row.appendChild(bubble);
     chatBody.appendChild(row);
     chatBody.scrollTop = chatBody.scrollHeight;

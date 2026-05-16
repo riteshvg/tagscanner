@@ -123,6 +123,17 @@
       });
     });
 
+    // Wire view-chat buttons
+    list.querySelectorAll('[data-view-chat]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        handleViewChat(
+          btn.getAttribute('data-query-id'),
+          btn.getAttribute('data-owner-id'),
+          btn
+        );
+      });
+    });
+
     // Wire feedback buttons
     list.querySelectorAll('[data-vote]').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -175,7 +186,7 @@
         q.tokens.input + ' in / ' + q.tokens.output + ' out tokens</div>';
     }
 
-    var downloadBtn = q.hasResult
+    var downloadBtn = (q.hasResult && q.type !== 'chat')
       ? '<button class="btn-download" data-download data-query-id="' + esc(q.queryId) + '" data-owner-id="' + esc(q.userId || '') + '" data-query-type="' + esc(q.type) + '" data-query-summary="' + esc(q.requestSummary || '') + '" title="Download result as PDF"><i class="fas fa-download"></i></button>'
       : '';
 
@@ -183,8 +194,16 @@
       ? '<button class="btn-view-explain" data-view-explain data-query-id="' + esc(q.queryId) + '" data-owner-id="' + esc(q.userId || '') + '" title="View explanation"><i class="fas fa-lightbulb"></i></button>'
       : '';
 
+    var viewChatBtn = (q.type === 'chat' && q.hasResult)
+      ? '<button class="btn-view-explain" data-view-chat data-query-id="' + esc(q.queryId) + '" data-owner-id="' + esc(q.userId || '') + '" title="View Q&amp;A"><i class="fas fa-comment-dots"></i></button>'
+      : '';
+
     var explainPanel = (q.type === 'explain' && q.hasResult)
       ? '<div id="explain-panel-' + esc(q.queryId) + '" class="history-explain-panel" style="display:none"></div>'
+      : '';
+
+    var chatPanel = (q.type === 'chat' && q.hasResult)
+      ? '<div id="chat-panel-' + esc(q.queryId) + '" class="history-explain-panel" style="display:none"></div>'
       : '';
 
     var userStr = (q.userName || q.email)
@@ -199,6 +218,7 @@
       '</div>' +
       '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">' +
       viewExplainBtn +
+      viewChatBtn +
       downloadBtn +
       '<span class="query-time">' + relativeTime(q.createdAt) + '</span>' +
       '</div>' +
@@ -207,6 +227,7 @@
       tokensStr +
       feedbackHtml +
       explainPanel +
+      chatPanel +
       '</div>';
   }
 
@@ -268,6 +289,77 @@
     } finally {
       btn.disabled = false;
       btn.innerHTML = '<i class="fas fa-lightbulb"></i>';
+    }
+  }
+
+  // ── View Chat Q&A ─────────────────────────────────────────────────────────
+
+  function renderAnswerText(text) {
+    var lines = String(text || '').split('\n');
+    var html = '', inList = false;
+    lines.forEach(function (line) {
+      var trimmed = line.trim();
+      if (trimmed.match(/^[-*]\s+/)) {
+        if (!inList) { html += '<ul style="margin:6px 0;padding-left:18px">'; inList = true; }
+        html += '<li>' + esc(trimmed.replace(/^[-*]\s+/, '')) + '</li>';
+      } else {
+        if (inList) { html += '</ul>'; inList = false; }
+        if (trimmed) html += esc(trimmed) + ' ';
+        else html += '<br>';
+      }
+    });
+    if (inList) html += '</ul>';
+    return html;
+  }
+
+  async function handleViewChat(queryId, ownerId, btn) {
+    var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
+    if (!session) return;
+
+    var panel = document.getElementById('chat-panel-' + queryId);
+    if (!panel) return;
+
+    if (panel.style.display !== 'none') {
+      panel.style.display = 'none';
+      btn.classList.remove('active');
+      return;
+    }
+
+    if (panel.dataset.loaded) {
+      panel.style.display = '';
+      btn.classList.add('active');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+      var detailBody = { type: 'detail', sessionToken: session.sessionToken, queryId: queryId };
+      if (ownerId && ownerId !== session.userId) detailBody.ownerId = ownerId;
+      var data = await callLambda(detailBody);
+      var result = data.item && data.item.resultJson;
+      if (!result) throw new Error('No content stored for this entry.');
+
+      panel.innerHTML =
+        '<div style="margin-bottom:12px">' +
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#9ca3af;margin-bottom:5px">Question</div>' +
+          '<div style="font-size:13px;color:#374151;font-weight:500">' + esc(result.question || '') + '</div>' +
+        '</div>' +
+        '<div>' +
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#9ca3af;margin-bottom:5px">Answer</div>' +
+          '<div style="font-size:13px;color:#374151;line-height:1.6">' + renderAnswerText(result.answer || '') + '</div>' +
+        '</div>';
+
+      panel.dataset.loaded = '1';
+      panel.style.display = '';
+      btn.classList.add('active');
+    } catch (err) {
+      panel.innerHTML = '<div style="padding:10px;color:#ef4444;font-size:12px"><i class="fas fa-exclamation-circle"></i> ' + esc(err.message || 'Failed to load.') + '</div>';
+      panel.style.display = '';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-comment-dots"></i>';
     }
   }
 

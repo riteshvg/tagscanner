@@ -5,8 +5,46 @@
 
   // ── State ──────────────────────────────────────────────────────────────────
   var conversationHistory = []; // { role, content } pairs sent to Lambda
+  var displayMessages     = []; // { role, text } for session restore
   var isLoading           = false;
   var consentGiven        = false;
+
+  var CHAT_HISTORY_KEY  = 'ts_chat_history';
+  var CHAT_MESSAGES_KEY = 'ts_chat_messages';
+
+  function saveChatState() {
+    try {
+      sessionStorage.setItem(CHAT_HISTORY_KEY,  JSON.stringify(conversationHistory));
+      sessionStorage.setItem(CHAT_MESSAGES_KEY, JSON.stringify(displayMessages));
+    } catch (e) {}
+  }
+
+  function loadChatState() {
+    try {
+      var h = sessionStorage.getItem(CHAT_HISTORY_KEY);
+      var m = sessionStorage.getItem(CHAT_MESSAGES_KEY);
+      if (h) conversationHistory = JSON.parse(h);
+      if (m) displayMessages     = JSON.parse(m);
+    } catch (e) {}
+  }
+
+  function clearChatState() {
+    try {
+      sessionStorage.removeItem(CHAT_HISTORY_KEY);
+      sessionStorage.removeItem(CHAT_MESSAGES_KEY);
+    } catch (e) {}
+  }
+
+  function restoreChatHistory() {
+    if (!displayMessages.length) return;
+    displayMessages.forEach(function (m) {
+      if (m.role === 'user') {
+        appendBubble('user', esc(m.text));
+      } else {
+        appendBubble('assistant', renderMarkdownLite(m.text));
+      }
+    });
+  }
 
   // ── DOM refs ───────────────────────────────────────────────────────────────
   var authGate       = document.getElementById('auth-gate');
@@ -231,6 +269,7 @@
     chatInput.style.height = '';
 
     appendBubble('user', esc(question));
+    displayMessages.push({ role: 'user', text: question });
     showThinking();
 
     var propertyContext = buildChatContext();
@@ -244,14 +283,17 @@
     })
     .then(function (data) {
       removeThinking();
-      var answerHtml = renderMarkdownLite(data.answer || '');
-      appendBubble('assistant', answerHtml);
+      var answer = data.answer || '';
+      appendBubble('assistant', renderMarkdownLite(answer));
+      displayMessages.push({ role: 'assistant', text: answer });
 
       // Update history for follow-up questions
       conversationHistory.push({ role: 'user',      content: JSON.stringify({ property_context: propertyContext, question: question }) });
-      conversationHistory.push({ role: 'assistant', content: data.answer || '' });
+      conversationHistory.push({ role: 'assistant', content: answer });
       // Keep last 8 messages (4 exchanges)
       if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
+
+      saveChatState();
     })
     .catch(function (err) {
       removeThinking();
@@ -340,6 +382,8 @@
   // Clear conversation
   btnClear.addEventListener('click', function () {
     conversationHistory = [];
+    displayMessages     = [];
+    clearChatState();
     chatBody.innerHTML  = '';
     chatBody.appendChild(emptyState);
     emptyState.style.display = 'flex';
@@ -360,6 +404,8 @@
     headerProp.textContent = propName + ' · ' + propEnv;
 
     showChatUI();
+    loadChatState();
+    restoreChatHistory();
   }
 
   init();

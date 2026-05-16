@@ -1,0 +1,345 @@
+(function () {
+  'use strict';
+
+  var TS_PROXY_URL = 'https://ihn2pz2dbcktbxvn36g6pfptda0jfnri.lambda-url.us-east-1.on.aws/';
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  var conversationHistory = []; // { role, content } pairs sent to Lambda
+  var isLoading           = false;
+  var consentGiven        = false;
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  var authGate       = document.getElementById('auth-gate');
+  var noPropGate     = document.getElementById('no-property-gate');
+  var chatBody       = document.getElementById('chat-body');
+  var inputArea      = document.getElementById('chat-input-area');
+  var emptyState     = document.getElementById('empty-state');
+  var chatInput      = document.getElementById('chat-input');
+  var btnSend        = document.getElementById('btn-send');
+  var btnClear       = document.getElementById('btn-clear-chat');
+  var headerProp     = document.getElementById('chat-header-prop');
+  var limitNote      = document.getElementById('chat-limit-note');
+  var signinError    = document.getElementById('signin-error');
+  var btnSignin      = document.getElementById('btn-signin');
+
+  // ── Lambda call ────────────────────────────────────────────────────────────
+  function callLambda(body) {
+    return fetch(TS_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+        return data;
+      });
+    });
+  }
+
+  // ── Property context builder ───────────────────────────────────────────────
+  function stripComponent(c) {
+    var mp = (c && c.modulePath) || '';
+    return {
+      extension: mp.split('/')[0] || (c && c.module) || 'unknown',
+      type:      (mp.split('/').pop() || '').replace('.js', '') || (c && c.type) || 'unknown'
+    };
+  }
+
+  function hasCustomCode(comps) {
+    return (Array.isArray(comps) ? comps : []).some(function (c) {
+      return c && c.settings && (c.settings.source || c.settings.code || c.settings.customCode);
+    });
+  }
+
+  function buildChatContext() {
+    var propName = sessionStorage.getItem('launch_property_name') || '';
+    var propEnv  = sessionStorage.getItem('launch_property_environment') || 'Production';
+    var propUrl  = sessionStorage.getItem('launch_page_url') || '';
+
+    var rulesRaw, deRaw, extRaw;
+    try { rulesRaw = JSON.parse(sessionStorage.getItem('_satellite._container.rules') || 'null'); } catch(e) { rulesRaw = null; }
+    try { deRaw    = JSON.parse(sessionStorage.getItem('_satellite._container.dataElements') || 'null'); } catch(e) { deRaw = null; }
+    try { extRaw   = JSON.parse(sessionStorage.getItem('_satellite._container.extension') || 'null'); } catch(e) { extRaw = null; }
+
+    var rulesArr = Array.isArray(rulesRaw)
+      ? rulesRaw
+      : (rulesRaw && typeof rulesRaw === 'object' ? Object.values(rulesRaw) : []);
+
+    // Cap at 150 rules to avoid token overrun on large properties
+    var RULE_CAP = 150;
+    var totalRules = rulesArr.length;
+    var rules = rulesArr.slice(0, RULE_CAP).map(function (r) {
+      var comps = [].concat(r.events || [], r.conditions || [], r.actions || []);
+      return {
+        name:         r.name || r.id || 'Unnamed',
+        enabled:      r.enabled !== false,
+        events:       (r.events     || []).map(stripComponent),
+        conditions:   (r.conditions || []).map(stripComponent),
+        actions:      (r.actions    || []).map(stripComponent),
+        hasCustomCode: hasCustomCode(comps)
+      };
+    });
+
+    // Cap at 200 data elements
+    var DE_CAP = 200;
+    var deKeys = deRaw && typeof deRaw === 'object' ? Object.keys(deRaw) : [];
+    var totalDE = deKeys.length;
+    var dataElements = deKeys.slice(0, DE_CAP).map(function (name) {
+      var d  = deRaw[name] || {};
+      var mp = d.modulePath || '';
+      return {
+        name:            name,
+        extension:       mp.split('/')[0] || 'unknown',
+        type:            (mp.split('/').pop() || '').replace('.js', '') || 'unknown',
+        storageDuration: d.storageDuration || null,
+        hasCustomCode:   !!(d.settings && (d.settings.source || d.settings.code || d.settings.customCode))
+      };
+    });
+
+    var extensions = [];
+    if (extRaw && typeof extRaw === 'object') {
+      extensions = Object.keys(extRaw).map(function (key) {
+        var e = extRaw[key] || {};
+        return {
+          name:        key,
+          displayName: e.displayName || key,
+          hasSettings: !!(e.settings && Object.keys(e.settings).length > 0)
+        };
+      });
+    }
+
+    var ctx = {
+      property:     { name: propName, environment: propEnv, url: propUrl },
+      rules:        rules,
+      dataElements: dataElements,
+      extensions:   extensions
+    };
+    if (totalRules > RULE_CAP) ctx.note_rules = 'Truncated to ' + RULE_CAP + ' of ' + totalRules + ' total rules.';
+    if (totalDE   > DE_CAP)   ctx.note_de    = 'Truncated to ' + DE_CAP   + ' of ' + totalDE   + ' total data elements.';
+    return ctx;
+  }
+
+  function hasPropertyData() {
+    return !!(sessionStorage.getItem('launch_property_name') &&
+              sessionStorage.getItem('launch_property_name') !== 'No Launch Code');
+  }
+
+  // ── Render helpers ─────────────────────────────────────────────────────────
+  function esc(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Convert "-" bullet lists and double newlines to basic HTML
+  function renderMarkdownLite(text) {
+    var lines = text.split('\n');
+    var html  = '';
+    var inList = false;
+    lines.forEach(function (line) {
+      var trimmed = line.trim();
+      if (trimmed.match(/^[-*]\s+/)) {
+        if (!inList) { html += '<ul>'; inList = true; }
+        html += '<li>' + esc(trimmed.replace(/^[-*]\s+/, '')) + '</li>';
+      } else {
+        if (inList) { html += '</ul>'; inList = false; }
+        if (trimmed === '') {
+          html += '<br>';
+        } else {
+          html += esc(trimmed) + ' ';
+        }
+      }
+    });
+    if (inList) html += '</ul>';
+    return html;
+  }
+
+  function appendBubble(role, htmlContent, isError) {
+    emptyState.style.display = 'none';
+    var row = document.createElement('div');
+    row.className = 'msg-row ' + role;
+    var bubble = document.createElement('div');
+    bubble.className = 'msg-bubble' + (isError ? ' error-text' : '');
+    bubble.innerHTML = htmlContent;
+    row.appendChild(bubble);
+    chatBody.appendChild(row);
+    chatBody.scrollTop = chatBody.scrollHeight;
+    return row;
+  }
+
+  function showThinking() {
+    var row = document.createElement('div');
+    row.id = 'thinking-row';
+    row.className = 'msg-row assistant';
+    row.innerHTML = '<div class="msg-bubble thinking-bubble"><span></span><span></span><span></span></div>';
+    chatBody.appendChild(row);
+    chatBody.scrollTop = chatBody.scrollHeight;
+  }
+
+  function removeThinking() {
+    var el = document.getElementById('thinking-row');
+    if (el) el.remove();
+  }
+
+  // ── Send message ───────────────────────────────────────────────────────────
+  function sendMessage(question) {
+    question = question.trim();
+    if (!question || isLoading) return;
+
+    var session = window.parent.TagScannerAuth
+      ? window.parent.TagScannerAuth.getSession()
+      : (window.TagScannerAuth ? window.TagScannerAuth.getSession() : null);
+    if (!session) { showAuthGate(); return; }
+
+    // Consent check — only on first send
+    var consentPromise = consentGiven
+      ? Promise.resolve(true)
+      : (window.parent.TagScannerAuth || window.TagScannerAuth).requireExplainConsent();
+
+    consentPromise.then(function (granted) {
+      if (!granted) return;
+      consentGiven = true;
+      doSend(question, session);
+    });
+  }
+
+  function doSend(question, session) {
+    isLoading = true;
+    btnSend.disabled = true;
+    chatInput.value  = '';
+    chatInput.style.height = '';
+
+    appendBubble('user', esc(question));
+    showThinking();
+
+    var propertyContext = buildChatContext();
+
+    callLambda({
+      type:                'chat',
+      sessionToken:        session.sessionToken,
+      question:            question,
+      propertyContext:     propertyContext,
+      conversationHistory: conversationHistory
+    })
+    .then(function (data) {
+      removeThinking();
+      var answerHtml = renderMarkdownLite(data.answer || '');
+      appendBubble('assistant', answerHtml);
+
+      // Update history for follow-up questions
+      conversationHistory.push({ role: 'user',      content: JSON.stringify({ property_context: propertyContext, question: question }) });
+      conversationHistory.push({ role: 'assistant', content: data.answer || '' });
+      // Keep last 8 messages (4 exchanges)
+      if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
+    })
+    .catch(function (err) {
+      removeThinking();
+      var msg = err.message || 'Something went wrong.';
+      if (msg.indexOf('Daily AI request limit') > -1) {
+        limitNote.style.display = 'block';
+        appendBubble('assistant', '<span class="error-text">Daily AI limit reached. Try again tomorrow.</span>');
+      } else if (msg.indexOf('temporarily disabled') > -1) {
+        appendBubble('assistant', '<span class="error-text">AI features are temporarily unavailable.</span>');
+      } else {
+        appendBubble('assistant', '<span class="error-text">Error: ' + esc(msg) + '</span>');
+      }
+    })
+    .finally(function () {
+      isLoading = false;
+      btnSend.disabled = false;
+      chatInput.focus();
+    });
+  }
+
+  // ── Auth gate ──────────────────────────────────────────────────────────────
+  function showAuthGate() {
+    authGate.style.display    = 'flex';
+    chatBody.style.display    = 'none';
+    inputArea.style.display   = 'none';
+  }
+
+  function showChatUI() {
+    authGate.style.display    = 'none';
+    noPropGate.style.display  = 'none';
+    chatBody.style.display    = 'flex';
+    inputArea.style.display   = 'block';
+  }
+
+  function showNoPropGate() {
+    authGate.style.display    = 'none';
+    noPropGate.style.display  = 'flex';
+    chatBody.style.display    = 'none';
+    inputArea.style.display   = 'none';
+  }
+
+  btnSignin.addEventListener('click', function () {
+    btnSignin.disabled    = true;
+    btnSignin.textContent = 'Signing in…';
+    signinError.style.display = 'none';
+
+    var auth = window.parent.TagScannerAuth || window.TagScannerAuth;
+    auth.signInWithGoogle()
+      .then(function () { init(); })
+      .catch(function (e) {
+        signinError.textContent   = e.message || 'Sign-in failed.';
+        signinError.style.display = 'block';
+        btnSignin.disabled        = false;
+        btnSignin.innerHTML       = '<i class="fas fa-sign-in-alt"></i> Sign in with Google';
+      });
+  });
+
+  // ── Input behaviour ────────────────────────────────────────────────────────
+  chatInput.addEventListener('input', function () {
+    // Auto-grow
+    this.style.height = '';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    btnSend.disabled = !this.value.trim() || isLoading;
+  });
+
+  chatInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!btnSend.disabled) sendMessage(chatInput.value);
+    }
+  });
+
+  btnSend.addEventListener('click', function () {
+    sendMessage(chatInput.value);
+  });
+
+  // Suggestion chips
+  document.querySelectorAll('.chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      chatInput.value = chip.textContent;
+      chatInput.dispatchEvent(new Event('input'));
+      chatInput.focus();
+    });
+  });
+
+  // Clear conversation
+  btnClear.addEventListener('click', function () {
+    conversationHistory = [];
+    chatBody.innerHTML  = '';
+    chatBody.appendChild(emptyState);
+    emptyState.style.display = 'flex';
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  function init() {
+    var auth = window.parent.TagScannerAuth || window.TagScannerAuth;
+    if (!auth) { showAuthGate(); return; }
+
+    var session = auth.getSession();
+    if (!session) { showAuthGate(); return; }
+
+    if (!hasPropertyData()) { showNoPropGate(); return; }
+
+    var propName = sessionStorage.getItem('launch_property_name') || 'Unknown Property';
+    var propEnv  = sessionStorage.getItem('launch_property_environment') || 'Production';
+    headerProp.textContent = propName + ' · ' + propEnv;
+
+    showChatUI();
+  }
+
+  init();
+})();

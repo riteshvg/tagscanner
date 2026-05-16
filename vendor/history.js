@@ -144,8 +144,8 @@
   }
 
   function renderCard(q) {
-    var badgeClass = q.type === 'scan' ? 'badge-scan' : 'badge-explain';
-    var badgeLabel = q.type === 'scan' ? 'Scan' : 'Explain';
+    var badgeClass = q.type === 'scan' ? 'badge-scan' : q.type === 'chat' ? 'badge-chat' : 'badge-explain';
+    var badgeLabel = q.type === 'scan' ? 'Scan' : q.type === 'chat' ? 'Chat' : 'Explain';
     var feedbackHtml = '';
 
     if (q.feedback) {

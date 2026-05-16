@@ -60,6 +60,7 @@ const ADMIN_EMAIL    = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 
 const MAX_TOKENS_SCAN    = 1500;
 const MAX_TOKENS_EXPLAIN = 1000;
+const MAX_TOKENS_CHAT    = 600;
 
 const bedrockClient = new BedrockRuntimeClient({ region: REGION });
 
@@ -296,6 +297,120 @@ Required structure:
 Be specific about paths. If code is minified, note it as a medium risk.`;
 
 // ── Bedrock invocation ────────────────────────────────────────────────────────
+
+const CHAT_SYSTEM_PROMPT = `You are a helpful Adobe Tags (Launch / Data Collection) property assistant embedded in the TagScanner Chrome extension.
+
+You will receive a JSON object with two fields:
+- "property_context": a structured summary of the user's Tags property (rules, data elements, extensions, property metadata)
+- "question": the user's natural language question about their property
+
+Rules:
+1. Answer ONLY from the data in property_context. Never invent rule names, extension names, or data element names.
+2. Keep answers concise — aim for 3-8 sentences or a short bullet list.
+3. When listing items, format as a plain bulleted list using "-" prefixes.
+4. If the answer requires counting, always state the exact count.
+5. If the property_context does not contain enough information to answer, say so in one sentence.
+6. Do NOT return JSON. Return plain text only.
+7. Never ask clarifying questions — answer with what you have.`;
+
+// Multi-turn version of invokeClaude — takes a messages array instead of a single string
+async function invokeClaudeChat(messages, maxTokens) {
+  const isNova = MODEL_ID.startsWith('amazon.nova');
+  let bodyObj;
+
+  if (isNova) {
+    bodyObj = {
+      system: [{ text: CHAT_SYSTEM_PROMPT }],
+      messages: messages.map(m => ({ role: m.role, content: [{ text: m.content }] })),
+      inferenceConfig: { max_new_tokens: maxTokens, temperature: 0.3 }
+    };
+  } else {
+    bodyObj = {
+      anthropic_version: 'bedrock-2023-05-31',
+      max_tokens: maxTokens,
+      temperature: 0.3,
+      system: CHAT_SYSTEM_PROMPT,
+      messages: messages.map(m => ({ role: m.role, content: m.content }))
+    };
+  }
+
+  const cmd = new InvokeModelCommand({
+    modelId: MODEL_ID,
+    contentType: 'application/json',
+    accept: 'application/json',
+    body: Buffer.from(JSON.stringify(bodyObj))
+  });
+
+  const raw  = await bedrockClient.send(cmd);
+  const data = JSON.parse(Buffer.from(raw.body).toString());
+
+  const text = isNova
+    ? (data.output && data.output.message && data.output.message.content && data.output.message.content[0] && data.output.message.content[0].text || '')
+    : (data.content && data.content[0] && data.content[0].text || '');
+
+  return {
+    text,
+    inputTokens:  isNova ? (data.usage && data.usage.inputTokens  || 0) : (data.usage && data.usage.input_tokens  || 0),
+    outputTokens: isNova ? (data.usage && data.usage.outputTokens || 0) : (data.usage && data.usage.output_tokens || 0)
+  };
+}
+
+// ── Chat handler ──────────────────────────────────────────────────────────────
+
+async function handleChat(body, session, identity, aiConfig, todayCost) {
+  const { question, propertyContext, conversationHistory } = body;
+
+  if (!question || typeof question !== 'string' || !question.trim()) {
+    return resp(400, { error: 'Missing question.' });
+  }
+  if (!propertyContext || typeof propertyContext !== 'object') {
+    return resp(400, { error: 'Missing propertyContext.' });
+  }
+
+  // Build message history (last 4 exchanges = 8 messages max)
+  const MAX_HISTORY = 8;
+  const cleanHistory = (Array.isArray(conversationHistory) ? conversationHistory : [])
+    .slice(-MAX_HISTORY)
+    .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .map(m => ({ role: m.role, content: m.content.slice(0, 3000) }));
+
+  // Current user turn embeds property context + question
+  const userPayload = JSON.stringify({
+    property_context: propertyContext,
+    question: question.trim().slice(0, 500)
+  });
+
+  const messages = [...cleanHistory, { role: 'user', content: userPayload }];
+
+  const result = await invokeClaudeChat(messages, MAX_TOKENS_CHAT);
+
+  const propertyName = (propertyContext.property && propertyContext.property.name) || 'Unknown';
+  const environment  = (propertyContext.property && propertyContext.property.environment) || '';
+  const propertyKey  = propertyName + (environment ? '#' + environment : '');
+  const siteUrl      = (propertyContext.property && propertyContext.property.url) || '';
+
+  const [queryId, newDayCost] = await Promise.all([
+    logQuery(identity.userId, identity.email, session.name, 'chat',
+      'Chat: ' + question.trim().slice(0, 120),
+      { input: result.inputTokens, output: result.outputTokens },
+      { question: question.trim(), answer: result.text },
+      propertyKey, siteUrl),
+    trackCost(result.inputTokens, result.outputTokens)
+  ]);
+
+  if (newDayCost >= aiConfig.cost_limit_usd * ALERT_PCT) {
+    sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(() => {});
+  }
+  if (newDayCost > aiConfig.cost_limit_usd) {
+    autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached.').catch(() => {});
+  }
+
+  return resp(200, {
+    answer:  result.text,
+    tokens:  { input: result.inputTokens, output: result.outputTokens },
+    queryId: queryId || null
+  });
+}
 
 async function invokeClaude(systemPrompt, userMessage, maxTokens) {
   const isNova = MODEL_ID.startsWith('amazon.nova');
@@ -1010,7 +1125,10 @@ exports.handler = async (event) => {
       });
     }
 
-    return resp(400, { error: 'Invalid type. Use: auth, scan, explain, history, feedback.' });
+    // ── Chat ──────────────────────────────────────────────────────────────────
+    if (type === 'chat') return handleChat(body, session, identity, aiConfig, todayCost);
+
+    return resp(400, { error: 'Invalid type. Use: auth, scan, explain, chat, history, feedback.' });
 
   } catch (err) {
     console.error('Lambda error:', err);

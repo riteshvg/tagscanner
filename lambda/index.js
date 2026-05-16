@@ -381,6 +381,31 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .map(m => ({ role: m.role, content: m.content.slice(0, 3000) }));
 
+  const propertyName = (propertyContext.property && propertyContext.property.name) || 'Unknown';
+  const environment  = (propertyContext.property && propertyContext.property.environment) || '';
+  const propertyKey  = propertyName + (environment ? '#' + environment : '');
+  const siteUrl      = (propertyContext.property && propertyContext.property.url) || '';
+
+  // Cache check — only for standalone (first-turn) questions with no prior history
+  let chatCacheKey = null;
+  if (cleanHistory.length === 0) {
+    const ctxHash = nodeCrypto.createHash('sha256').update(JSON.stringify(propertyContext)).digest('hex').slice(0, 8);
+    chatCacheKey = 'chat#' + nodeCrypto.createHash('sha256')
+      .update(question.trim().toLowerCase() + '|' + propertyKey + '|' + ctxHash)
+      .digest('hex').slice(0, 16);
+
+    const cached = await getChatCache(chatCacheKey);
+    if (cached && cached.answer) {
+      console.log(JSON.stringify({ ts: new Date().toISOString(), userId: identity.userId, type: 'chat_cache_hit', chatCacheKey }));
+      const queryId = await logQuery(identity.userId, identity.email, session.name, 'chat',
+        'Chat: ' + question.trim().slice(0, 120),
+        { input: 0, output: 0 },
+        { question: question.trim(), answer: cached.answer },
+        propertyKey, siteUrl);
+      return resp(200, { answer: cached.answer, tokens: { input: 0, output: 0 }, queryId: queryId || null, fromCache: true });
+    }
+  }
+
   // Current user turn embeds property context + question
   const userPayload = JSON.stringify({
     property_context: propertyContext,
@@ -391,11 +416,6 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
 
   const result = await invokeClaudeChat(messages, MAX_TOKENS_CHAT);
 
-  const propertyName = (propertyContext.property && propertyContext.property.name) || 'Unknown';
-  const environment  = (propertyContext.property && propertyContext.property.environment) || '';
-  const propertyKey  = propertyName + (environment ? '#' + environment : '');
-  const siteUrl      = (propertyContext.property && propertyContext.property.url) || '';
-
   const [queryId, newDayCost] = await Promise.all([
     logQuery(identity.userId, identity.email, session.name, 'chat',
       'Chat: ' + question.trim().slice(0, 120),
@@ -404,6 +424,11 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
       propertyKey, siteUrl),
     trackCost(result.inputTokens, result.outputTokens)
   ]);
+
+  // Populate cache for future first-turn requests with the same question + property
+  if (chatCacheKey) {
+    putChatCache(chatCacheKey, result.text, { input: result.inputTokens, output: result.outputTokens }, propertyKey).catch(() => {});
+  }
 
   if (newDayCost >= aiConfig.cost_limit_usd * ALERT_PCT) {
     sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(() => {});
@@ -587,6 +612,37 @@ async function putExplainCache(codeHash, explanation, tokens, email, name, compo
     }));
   } catch (err) {
     console.error('putExplainCache error:', err.message);
+  }
+}
+
+// ── Chat cache helpers (keyed on question + property context hash) ────────────
+
+async function getChatCache(cacheKey) {
+  try {
+    const result = await ddb.send(new GetCommand({ TableName: SCAN_CACHE_TABLE, Key: { cache_key: cacheKey } }));
+    return result.Item || null;
+  } catch (err) {
+    console.error('getChatCache error:', err.message);
+    return null;
+  }
+}
+
+async function putChatCache(cacheKey, answer, tokens, propertyKey) {
+  const ttl = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7-day TTL
+  try {
+    await ddb.send(new PutCommand({
+      TableName: SCAN_CACHE_TABLE,
+      Item: {
+        cache_key:   cacheKey,
+        answer:      answer,
+        tokens:      tokens,
+        cached_at:   new Date().toISOString(),
+        property_key: propertyKey || '',
+        ttl:         ttl
+      }
+    }));
+  } catch (err) {
+    console.error('putChatCache error:', err.message);
   }
 }
 

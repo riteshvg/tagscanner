@@ -180,12 +180,6 @@
         '</div>';
     }
 
-    var tokensStr = '';
-    if (q.tokens && (q.tokens.input || q.tokens.output)) {
-      tokensStr = '<div class="query-tokens"><i class="fas fa-coins" style="margin-right:4px;font-size:10px"></i>' +
-        q.tokens.input + ' in / ' + q.tokens.output + ' out tokens</div>';
-    }
-
     var downloadBtn = (q.hasResult && q.type !== 'chat')
       ? '<button class="btn-download" data-download data-query-id="' + esc(q.queryId) + '" data-owner-id="' + esc(q.userId || '') + '" data-query-type="' + esc(q.type) + '" data-query-summary="' + esc(q.requestSummary || '') + '" title="Download result as PDF"><i class="fas fa-download"></i></button>'
       : '';
@@ -206,9 +200,14 @@
       ? '<div id="chat-panel-' + esc(q.queryId) + '" class="history-explain-panel" style="display:none"></div>'
       : '';
 
-    var userStr = (q.userName || q.email)
-      ? '<div class="query-user"><i class="fas fa-user-circle"></i>' + esc(q.userName || q.email) + '</div>'
-      : '';
+    var userStr = '';
+    if (q.userName || q.email) {
+      var userLabel = q.userName ? esc(q.userName) : '';
+      var emailLabel = q.email ? ' &middot; <span style="color:#9ca3af">' + esc(q.email) + '</span>' : '';
+      userStr = '<div class="query-user"><i class="fas fa-user-circle"></i>'
+        + '<span style="font-size:11px;color:#6b7280">Asked by:</span> '
+        + userLabel + emailLabel + '</div>';
+    }
 
     return '<div class="query-card" id="card-' + esc(q.queryId) + '">' +
       '<div class="query-card-header">' +
@@ -224,7 +223,6 @@
       '</div>' +
       '</div>' +
       userStr +
-      tokensStr +
       feedbackHtml +
       explainPanel +
       chatPanel +

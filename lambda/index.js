@@ -730,8 +730,9 @@ async function handleAuth(body, sourceIp) {
     return resp(500, { error: 'Could not create session. Please try again.' });
   }
 
+  const isAdmin = ADMIN_EMAIL && email.toLowerCase() === ADMIN_EMAIL;
   console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'login', email }));
-  return resp(200, { sessionToken, userId, email, name, picture });
+  return resp(200, { sessionToken, userId, email, name, picture, isAdmin: !!isAdmin });
 }
 
 // ── History handler ───────────────────────────────────────────────────────────

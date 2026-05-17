@@ -11,6 +11,8 @@
 
   var CHAT_HISTORY_KEY  = 'ts_chat_history';
   var CHAT_MESSAGES_KEY = 'ts_chat_messages';
+  var CHAT_COUNT_KEY    = 'ts_chat_count';
+  var BETA_LIMIT        = 10;
 
   function saveChatState() {
     try {
@@ -32,7 +34,34 @@
     try {
       sessionStorage.removeItem(CHAT_HISTORY_KEY);
       sessionStorage.removeItem(CHAT_MESSAGES_KEY);
+      sessionStorage.removeItem(CHAT_COUNT_KEY);
     } catch (e) {}
+  }
+
+  function getChatCount() {
+    try { return parseInt(sessionStorage.getItem(CHAT_COUNT_KEY) || '0', 10); } catch (e) { return 0; }
+  }
+
+  function incrementChatCount() {
+    try { sessionStorage.setItem(CHAT_COUNT_KEY, getChatCount() + 1); } catch (e) {}
+  }
+
+  function updateLimitBar(isAdmin) {
+    var bar = document.getElementById('chat-limit-bar');
+    if (!bar) return;
+    if (isAdmin) { bar.style.display = 'none'; return; }
+    var used = getChatCount();
+    var remaining = BETA_LIMIT - used;
+    bar.style.display = 'block';
+    bar.className = remaining <= 2 ? (remaining <= 0 ? 'block' : 'warn') : '';
+    if (remaining <= 0) {
+      bar.textContent = 'Beta limit reached (10/10). Clear conversation to reset or wait for next session.';
+      btnSend.disabled = true;
+      chatInput.disabled = true;
+      chatInput.placeholder = 'Beta question limit reached.';
+    } else {
+      bar.textContent = remaining + ' of ' + BETA_LIMIT + ' beta questions remaining';
+    }
   }
 
   function restoreChatHistory() {
@@ -58,6 +87,15 @@
   var headerProp     = document.getElementById('chat-header-prop');
   var limitNote      = document.getElementById('chat-limit-note');
   var signinError    = document.getElementById('signin-error');
+  var betaBanner     = document.getElementById('beta-banner');
+  var betaBannerClose = document.getElementById('beta-banner-close');
+
+  if (betaBannerClose) {
+    betaBannerClose.addEventListener('click', function () {
+      betaBanner.style.display = 'none';
+      try { sessionStorage.setItem('ts_beta_banner_dismissed', '1'); } catch (e) {}
+    });
+  }
   var btnSignin      = document.getElementById('btn-signin');
 
   // ── Lambda call ────────────────────────────────────────────────────────────
@@ -299,6 +337,11 @@
     consentPromise.then(function (granted) {
       if (!granted) return;
       consentGiven = true;
+      // Beta limit check for non-admin users
+      if (!session.isAdmin && getChatCount() >= BETA_LIMIT) {
+        updateLimitBar(false);
+        return;
+      }
       doSend(question, session);
     });
   }
@@ -335,6 +378,8 @@
       // Keep last 8 messages (4 exchanges)
       if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
 
+      incrementChatCount();
+      updateLimitBar(session.isAdmin);
       saveChatState();
     })
     .catch(function (err) {
@@ -423,12 +468,17 @@
 
   // Clear conversation
   btnClear.addEventListener('click', function () {
+    var auth = window.parent.TagScannerAuth || window.TagScannerAuth;
+    var session = auth ? auth.getSession() : null;
     conversationHistory = [];
     displayMessages     = [];
     clearChatState();
     chatBody.innerHTML  = '';
     chatBody.appendChild(emptyState);
     emptyState.style.display = 'flex';
+    chatInput.disabled = false;
+    chatInput.placeholder = 'Ask about your Tags property…';
+    if (session && !session.isAdmin) updateLimitBar(false);
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
@@ -448,6 +498,13 @@
     showChatUI();
     loadChatState();
     restoreChatHistory();
+
+    // Show beta banner for non-admin users (once per session)
+    if (!session.isAdmin) {
+      var dismissed = sessionStorage.getItem('ts_beta_banner_dismissed');
+      if (!dismissed && betaBanner) betaBanner.style.display = 'block';
+      updateLimitBar(false);
+    }
   }
 
   init();

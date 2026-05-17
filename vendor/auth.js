@@ -185,12 +185,12 @@
         '</div>',
         '<div>',
         '<div style="font-size:15px;font-weight:700;color:#111827">How AI Analysis Works</div>',
-        '<div style="font-size:11px;color:#6b7280;margin-top:1px">A quick note before your first AI Scan or Explain</div>',
+        '<div style="font-size:11px;color:#6b7280;margin-top:1px">A quick note before your first AI Scan, Explain, or Ask AI</div>',
         '</div></div>',
 
         '<p style="margin:0 0 14px;font-size:13px;color:#374151;line-height:1.6">',
         'TagScanner uses <strong>AWS Bedrock</strong> (Amazon\'s managed AI service) to analyze your Tags property. ',
-        'When you run a Scan or Explain, your property data — rule names, data element names, custom code, and ',
+        'When you run a Scan, Explain, or Ask AI, your property data — rule names, data element names, custom code, and ',
         'extension details — is sent to an LLM (Claude) for analysis and the result is returned to you.',
         '</p>',
 

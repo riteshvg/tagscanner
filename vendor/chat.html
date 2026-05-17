@@ -188,8 +188,7 @@
       cursor: pointer; font-size: 13px; padding: 0; line-height: 1;
     }
     #chat-limit-bar {
-      display: none; padding: 4px 12px;
-      font-size: 11px; color: #9ca3af; text-align: right;
+      font-size: 11px; color: #9ca3af; white-space: nowrap; flex-shrink: 0;
     }
     #chat-limit-bar.warn  { color: #f59e0b; }
     #chat-limit-bar.block { color: #ef4444; font-weight: 600; }
@@ -241,6 +240,7 @@
       </div>
       <div id="chat-header-prop">Loading property…</div>
     </div>
+    <div id="chat-limit-bar" style="display:none;text-align:right"></div>
     <button id="btn-clear-chat" title="Clear conversation">
       <i class="fas fa-redo-alt"></i> Clear
     </button>
@@ -294,7 +294,6 @@
 
   <!-- Input area -->
   <div id="chat-input-area" style="display:none">
-    <div id="chat-limit-bar"></div>
     <div id="chat-limit-note">Daily AI limit shared with Scan &amp; Explain features.</div>
     <div id="chat-form">
       <textarea id="chat-input" rows="1" placeholder="Ask about your Tags property…"></textarea>

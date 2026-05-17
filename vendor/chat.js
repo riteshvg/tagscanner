@@ -55,12 +55,12 @@
     bar.style.display = 'block';
     bar.className = remaining <= 2 ? (remaining <= 0 ? 'block' : 'warn') : '';
     if (remaining <= 0) {
-      bar.textContent = 'Beta limit reached (10/10) for this property. Questions reset when the beta period ends.';
+      bar.textContent = '0 / ' + BETA_LIMIT + ' questions left (beta)';
       btnSend.disabled = true;
       chatInput.disabled = true;
       chatInput.placeholder = 'Beta question limit reached for this property.';
     } else {
-      bar.textContent = remaining + ' of ' + BETA_LIMIT + ' beta questions remaining for this property';
+      bar.textContent = remaining + ' / ' + BETA_LIMIT + ' questions left (beta)';
     }
   }
 

@@ -434,7 +434,7 @@ chrome.runtime.onMessage.addListener(function (message) {
         propertyName: propertyName || 'Unknown',
         environment: 'Production',
         rulesCount: rulesArray.length,
-        dataElementsCount: typeof dataElements === 'object' ? Object.keys(dataElements).length : 0,
+        dataElementsCount: (satellite._rawDECount != null) ? satellite._rawDECount : (typeof dataElements === 'object' ? Object.keys(dataElements).length : 0),
         extensionsCount: typeof extensions === 'object' ? Object.keys(extensions).length : 0,
         customCodeRulesCount: customCodeRules
       };
@@ -456,7 +456,11 @@ chrome.runtime.onMessage.addListener(function (message) {
       //Data Element details
       var deStr = JSON.stringify(dataElements);
       sessionStorage.setItem('_satellite._container.dataElements', deStr);
-      var deCount = typeof dataElements === 'object' ? Object.keys(dataElements).length : 0;
+      // Use the raw count captured before serialization (preserves elements that may be
+      // uncloneable) — falls back to Object.keys if not available
+      var deCount = (satellite._rawDECount != null)
+        ? satellite._rawDECount
+        : (typeof dataElements === 'object' ? Object.keys(dataElements).length : 0);
       document.getElementById('dataelement').innerHTML = deCount;
       sessionStorage.setItem('dataelement-length', deCount);
       if (document.getElementById('topbar-de')) {

@@ -47,39 +47,55 @@ function getSatellite() {
       var snapshot = {};
 
       mergedNames.forEach((deName) => {
-        var base = sourceDE[deName] || runtimeDE[deName] || {};
-        var deClone = cloneJsonSafe(base);
-        var runtimeDef = runtimeDE[deName];
-        var runtimeSource =
-          runtimeDef &&
-          runtimeDef.settings &&
-          typeof runtimeDef.settings === 'object'
-            ? runtimeDef.settings.source
-            : null;
+        try {
+          var base = sourceDE[deName] || runtimeDE[deName] || {};
+          var deClone = cloneJsonSafe(base);
+          var runtimeDef = runtimeDE[deName];
+          var runtimeSource =
+            runtimeDef &&
+            runtimeDef.settings &&
+            typeof runtimeDef.settings === 'object'
+              ? runtimeDef.settings.source
+              : null;
 
-        if (
-          runtimeSource !== null &&
-          runtimeSource !== undefined &&
-          (typeof runtimeSource === 'function' || typeof runtimeSource === 'string')
-        ) {
-          if (!deClone.settings || typeof deClone.settings !== 'object') {
-            deClone.settings = {};
+          if (
+            runtimeSource !== null &&
+            runtimeSource !== undefined &&
+            (typeof runtimeSource === 'function' || typeof runtimeSource === 'string')
+          ) {
+            if (!deClone.settings || typeof deClone.settings !== 'object') {
+              deClone.settings = {};
+            }
+            var sourceText =
+              typeof runtimeSource === 'function'
+                ? runtimeSource.toString()
+                : runtimeSource;
+            deClone.settings.source = stripFunctionWrapper(sourceText);
           }
-          var sourceText =
-            typeof runtimeSource === 'function'
-              ? runtimeSource.toString()
-              : runtimeSource;
-          deClone.settings.source = stripFunctionWrapper(sourceText);
-        }
 
-        snapshot[deName] = deClone;
+          snapshot[deName] = deClone;
+        } catch (elemErr) {
+          // Serialization failed for this element — preserve key with minimal safe info
+          try {
+            var fallback = sourceDE[deName] || runtimeDE[deName];
+            snapshot[deName] = {
+              modulePath: (fallback && typeof fallback.modulePath === 'string') ? fallback.modulePath : ''
+            };
+          } catch (_) {
+            snapshot[deName] = {};
+          }
+        }
       });
 
       return snapshot;
     }
 
+    // Capture raw count before any serialization so it reflects the true container count
+    var rawDECount = Object.keys((container && container.dataElements) || {}).length;
+
     console.log('in line 5 in pass_satellite ' + container);
     main.satellite = cloneJsonSafe(container);
+    main.dataElementsRawCount = rawDECount;
     try {
       var deSnapshot = buildDataElementsSnapshot(container);
       if (deSnapshot && Object.keys(deSnapshot).length > 0) {

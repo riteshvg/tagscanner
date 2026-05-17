@@ -61,6 +61,9 @@ window.addEventListener(
 
     if (event.data.type === 'FROM_PAGE') {
       satellite = event.data.essential?.satellite;
+      if (event.data.essential?.dataElementsRawCount != null) {
+        satellite._rawDECount = event.data.essential.dataElementsRawCount;
+      }
       console.log(satellite);
     }
   },

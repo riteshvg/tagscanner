@@ -335,6 +335,19 @@ chrome.runtime.onMessage.addListener(function (message) {
         autoWidth(wsExt, extRows);
         XLSX.utils.book_append_sheet(wb, wsExt, 'Extensions');
 
+        var wsAbout = XLSX.utils.aoa_to_sheet([
+          ['TagScanner', 'Adobe Tags (Launch) Inspector'],
+          ['Version', '2.5.4'],
+          ['', ''],
+          ['Property', propertyName],
+          ['Generated', new Date().toLocaleString()],
+          ['', ''],
+          ['Disclaimer', 'Provided as-is. No affiliation or endorsement from Adobe.'],
+          ['Feedback', 'tagscannerfeedback@gmail.com'],
+        ]);
+        wsAbout['!cols'] = [{ wch: 14 }, { wch: 60 }];
+        XLSX.utils.book_append_sheet(wb, wsAbout, 'About');
+
         var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
         var blob = new Blob([wbout], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

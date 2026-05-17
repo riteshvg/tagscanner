@@ -2751,7 +2751,14 @@ function exportMainRulesTableToCSV() {
   });
 
   var csvLines = [headers.map(toCsvCell).join(',')].concat(rows.map(function (r) { return r.map(toCsvCell).join(','); }));
-  var csvContent = '\uFEFF' + csvLines.join('\r\n');
+  var rulesPropName = sessionStorage.getItem('launch_property_name') || '';
+  var brandingPrefix = [
+    '"Exported by TagScanner v2.5.4 \u2014 Adobe Tags (Launch) Inspector"',
+    '"Property: ' + rulesPropName.replace(/"/g, '""') + ' | Generated: ' + new Date().toLocaleString() + '"',
+    '"tagscannerfeedback@gmail.com \u2014 Provided as-is. No affiliation with Adobe."',
+    '',
+  ].join('\r\n');
+  var csvContent = '\uFEFF' + brandingPrefix + '\r\n' + csvLines.join('\r\n');
   var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   var link = document.createElement('a');
   link.href = URL.createObjectURL(blob);

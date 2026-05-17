@@ -1956,7 +1956,14 @@ if (download_button[0]) {
         return [i + 1, r.name, r.typeLabel, extName, mp, storageDuration, defaultValue, cleanText, forceLower, settingsJson, codeExport, ruleNames, extNames, deNames].map(toCsvCell).join(',');
       })
     );
-    var csvContent = '\uFEFF' + csvLines.join('\r\n');
+    var dePropName = sessionStorage.getItem('launch_property_name') || '';
+    var brandingPrefix = [
+      '"Exported by TagScanner v2.5.4 \u2014 Adobe Tags (Launch) Inspector"',
+      '"Property: ' + dePropName.replace(/"/g, '""') + ' | Generated: ' + new Date().toLocaleString() + '"',
+      '"tagscannerfeedback@gmail.com \u2014 Provided as-is. No affiliation with Adobe."',
+      '',
+    ].join('\r\n');
+    var csvContent = '\uFEFF' + brandingPrefix + '\r\n' + csvLines.join('\r\n');
     var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     var a = document.createElement('a');
     a.download = 'dataelements_export.csv';

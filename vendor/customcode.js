@@ -239,7 +239,11 @@ document.addEventListener('DOMContentLoaded', function () {
       downloadLink.download = 'custom_code_data_elements.csv';
 
       // Create CSV content
-      let csvContent = 'Data Element Name,Type,Extension,Found Names,Code\n';
+      const ccPropName = sessionStorage.getItem('launch_property_name') || '';
+      let csvContent = '"Exported by TagScanner v2.5.4 — Adobe Tags (Launch) Inspector"\r\n' +
+        '"Property: ' + ccPropName.replace(/"/g, '""') + ' | Generated: ' + new Date().toLocaleString() + '"\r\n' +
+        '"tagscannerfeedback@gmail.com — Provided as-is. No affiliation with Adobe."\r\n\r\n' +
+        'Data Element Name,Type,Extension,Found Names,Code\n';
       filteredElements.forEach((element) => {
         // Escape quotes in the code
         const escapedCode = element.code.replace(/"/g, '""');

@@ -224,6 +224,20 @@ function exportFullXlsx() {
     autoWidth(ws3, extData);
     XLSX.utils.book_append_sheet(wb, ws3, 'Extensions');
 
+    var exportPropName = sessionStorage.getItem('launch_property_name') || '';
+    var wsAbout = XLSX.utils.aoa_to_sheet([
+      ['TagScanner', 'Adobe Tags (Launch) Inspector'],
+      ['Version', '2.5.4'],
+      ['', ''],
+      ['Property', exportPropName],
+      ['Generated', new Date().toLocaleString()],
+      ['', ''],
+      ['Disclaimer', 'Provided as-is. No affiliation or endorsement from Adobe.'],
+      ['Feedback', 'tagscannerfeedback@gmail.com'],
+    ]);
+    wsAbout['!cols'] = [{ wch: 14 }, { wch: 60 }];
+    XLSX.utils.book_append_sheet(wb, wsAbout, 'About');
+
     // Use XLSX.write + manual blob download — more reliable in extension iframes
     // than XLSX.writeFile which may use an internal path that doesn't fire from nested frames
     var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });

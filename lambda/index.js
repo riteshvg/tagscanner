@@ -107,6 +107,39 @@ async function isRateLimited(userId) {
   }
 }
 
+// ── Beta chat limit (persistent, per user per property) ──────────────────────
+
+const BETA_CHAT_LIMIT = 10;
+
+async function getChatBetaCount(userId, propertyKey) {
+  const pk = 'chatbeta#' + userId + '#' + propertyKey;
+  try {
+    const result = await ddb.send(new GetCommand({ TableName: RATE_TABLE, Key: { pk } }));
+    return result.Item ? (result.Item.count || 0) : 0;
+  } catch (err) {
+    console.error('getChatBetaCount error:', err.message);
+    return 0;
+  }
+}
+
+async function incrementChatBetaCount(userId, propertyKey) {
+  const pk = 'chatbeta#' + userId + '#' + propertyKey;
+  try {
+    const result = await ddb.send(new UpdateCommand({
+      TableName:                 RATE_TABLE,
+      Key:                       { pk },
+      UpdateExpression:          'ADD #c :one',
+      ExpressionAttributeNames:  { '#c': 'count' },
+      ExpressionAttributeValues: { ':one': 1 },
+      ReturnValues:              'ALL_NEW'
+    }));
+    return result.Attributes.count || 0;
+  } catch (err) {
+    console.error('incrementChatBetaCount error:', err.message);
+    return 0;
+  }
+}
+
 // ── AI kill-switch helpers ────────────────────────────────────────────────────
 
 async function getAIConfig() {
@@ -386,6 +419,17 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
   const propertyKey  = propertyName + (environment ? '#' + environment : '');
   const siteUrl      = (propertyContext.property && propertyContext.property.url) || '';
 
+  // Beta limit — skip for admin
+  const isAdminUser = ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL;
+  const betaCount = isAdminUser ? 0 : await getChatBetaCount(identity.userId, propertyKey);
+  if (!isAdminUser && betaCount >= BETA_CHAT_LIMIT) {
+    return resp(429, {
+      error: 'Beta question limit reached for this property (' + BETA_CHAT_LIMIT + '/' + BETA_CHAT_LIMIT + '). The limit resets when the beta period ends.',
+      betaLimitReached: true,
+      chatCount: betaCount
+    });
+  }
+
   // Cache check — only for standalone (first-turn) questions with no prior history
   let chatCacheKey = null;
   if (cleanHistory.length === 0) {
@@ -430,6 +474,12 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     putChatCache(chatCacheKey, result.text, { input: result.inputTokens, output: result.outputTokens }, propertyKey).catch(() => {});
   }
 
+  // Increment beta count (fire-and-forget for non-admin)
+  let newBetaCount = betaCount;
+  if (!isAdminUser) {
+    newBetaCount = await incrementChatBetaCount(identity.userId, propertyKey);
+  }
+
   if (newDayCost >= aiConfig.cost_limit_usd * ALERT_PCT) {
     sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(() => {});
   }
@@ -438,9 +488,10 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
   }
 
   return resp(200, {
-    answer:  result.text,
-    tokens:  { input: result.inputTokens, output: result.outputTokens },
-    queryId: queryId || null
+    answer:    result.text,
+    tokens:    { input: result.inputTokens, output: result.outputTokens },
+    queryId:   queryId || null,
+    chatCount: isAdminUser ? null : newBetaCount
   });
 }
 

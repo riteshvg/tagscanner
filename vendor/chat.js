@@ -11,8 +11,18 @@
 
   var CHAT_HISTORY_KEY  = 'ts_chat_history';
   var CHAT_MESSAGES_KEY = 'ts_chat_messages';
-  var CHAT_COUNT_KEY    = 'ts_chat_count';
   var BETA_LIMIT        = 10;
+
+  // Persistent beta count stored in localStorage, keyed by userId + propertyKey
+  function betaCountKey(session, propKey) {
+    return 'ts_beta_count_' + (session.userId || '') + '_' + (propKey || '');
+  }
+  function getBetaCount(session, propKey) {
+    try { return parseInt(localStorage.getItem(betaCountKey(session, propKey)) || '0', 10); } catch (e) { return 0; }
+  }
+  function setBetaCount(session, propKey, n) {
+    try { localStorage.setItem(betaCountKey(session, propKey), n); } catch (e) {}
+  }
 
   function saveChatState() {
     try {
@@ -34,33 +44,23 @@
     try {
       sessionStorage.removeItem(CHAT_HISTORY_KEY);
       sessionStorage.removeItem(CHAT_MESSAGES_KEY);
-      sessionStorage.removeItem(CHAT_COUNT_KEY);
     } catch (e) {}
   }
 
-  function getChatCount() {
-    try { return parseInt(sessionStorage.getItem(CHAT_COUNT_KEY) || '0', 10); } catch (e) { return 0; }
-  }
-
-  function incrementChatCount() {
-    try { sessionStorage.setItem(CHAT_COUNT_KEY, getChatCount() + 1); } catch (e) {}
-  }
-
-  function updateLimitBar(isAdmin) {
+  function updateLimitBar(isAdmin, used) {
     var bar = document.getElementById('chat-limit-bar');
     if (!bar) return;
     if (isAdmin) { bar.style.display = 'none'; return; }
-    var used = getChatCount();
-    var remaining = BETA_LIMIT - used;
+    var remaining = BETA_LIMIT - (used || 0);
     bar.style.display = 'block';
     bar.className = remaining <= 2 ? (remaining <= 0 ? 'block' : 'warn') : '';
     if (remaining <= 0) {
-      bar.textContent = 'Beta limit reached (10/10). Clear conversation to reset or wait for next session.';
+      bar.textContent = 'Beta limit reached (10/10) for this property. Questions reset when the beta period ends.';
       btnSend.disabled = true;
       chatInput.disabled = true;
-      chatInput.placeholder = 'Beta question limit reached.';
+      chatInput.placeholder = 'Beta question limit reached for this property.';
     } else {
-      bar.textContent = remaining + ' of ' + BETA_LIMIT + ' beta questions remaining';
+      bar.textContent = remaining + ' of ' + BETA_LIMIT + ' beta questions remaining for this property';
     }
   }
 
@@ -337,10 +337,13 @@
     consentPromise.then(function (granted) {
       if (!granted) return;
       consentGiven = true;
-      // Beta limit check for non-admin users
-      if (!session.isAdmin && getChatCount() >= BETA_LIMIT) {
-        updateLimitBar(false);
-        return;
+      // Beta limit check for non-admin users (client-side guard; server enforces authoritatively)
+      if (!session.isAdmin) {
+        var propKey = (sessionStorage.getItem('launch_property_name') || '') + '#' + (sessionStorage.getItem('launch_property_environment') || '');
+        if (getBetaCount(session, propKey) >= BETA_LIMIT) {
+          updateLimitBar(false, BETA_LIMIT);
+          return;
+        }
       }
       doSend(question, session);
     });
@@ -378,14 +381,23 @@
       // Keep last 8 messages (4 exchanges)
       if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
 
-      incrementChatCount();
-      updateLimitBar(session.isAdmin);
+      if (!session.isAdmin && typeof data.chatCount === 'number') {
+        var pKey = (sessionStorage.getItem('launch_property_name') || '') + '#' + (sessionStorage.getItem('launch_property_environment') || '');
+        setBetaCount(session, pKey, data.chatCount);
+        updateLimitBar(false, data.chatCount);
+      }
       saveChatState();
     })
     .catch(function (err) {
       removeThinking();
       var msg = err.message || 'Something went wrong.';
-      if (msg.indexOf('Daily AI request limit') > -1) {
+      if (msg.indexOf('Beta question limit reached') > -1) {
+        var pKey2 = (sessionStorage.getItem('launch_property_name') || '') + '#' + (sessionStorage.getItem('launch_property_environment') || '');
+        var s2 = window.parent.TagScannerAuth ? window.parent.TagScannerAuth.getSession() : (window.TagScannerAuth ? window.TagScannerAuth.getSession() : null);
+        if (s2) setBetaCount(s2, pKey2, BETA_LIMIT);
+        updateLimitBar(false, BETA_LIMIT);
+        appendBubble('assistant', '<span class="error-text">Beta question limit reached for this property (10/10).</span>');
+      } else if (msg.indexOf('Daily AI request limit') > -1) {
         limitNote.style.display = 'block';
         appendBubble('assistant', '<span class="error-text">Daily AI limit reached. Try again tomorrow.</span>');
       } else if (msg.indexOf('temporarily disabled') > -1) {
@@ -468,17 +480,13 @@
 
   // Clear conversation
   btnClear.addEventListener('click', function () {
-    var auth = window.parent.TagScannerAuth || window.TagScannerAuth;
-    var session = auth ? auth.getSession() : null;
     conversationHistory = [];
     displayMessages     = [];
     clearChatState();
     chatBody.innerHTML  = '';
     chatBody.appendChild(emptyState);
     emptyState.style.display = 'flex';
-    chatInput.disabled = false;
-    chatInput.placeholder = 'Ask about your Tags property…';
-    if (session && !session.isAdmin) updateLimitBar(false);
+    // Beta count is NOT reset on clear — it's persistent per property
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
@@ -499,11 +507,12 @@
     loadChatState();
     restoreChatHistory();
 
-    // Show beta banner for non-admin users (once per session)
+    // Show beta banner + limit bar for non-admin users
     if (!session.isAdmin) {
+      var propKey = propName + '#' + propEnv;
       var dismissed = sessionStorage.getItem('ts_beta_banner_dismissed');
       if (!dismissed && betaBanner) betaBanner.style.display = 'block';
-      updateLimitBar(false);
+      updateLimitBar(false, getBetaCount(session, propKey));
     }
   }
 

@@ -139,6 +139,15 @@ document.addEventListener('DOMContentLoaded', function () {
   renderTopbarUser();
   if (window._revealDashboardIfAdmin) window._revealDashboardIfAdmin();
 
+  // Expose so iframes (e.g. chat.html) can notify the sidebar after signing in
+  window.TagScannerSidebar = {
+    refreshAuthState: function () {
+      setAuthButtonState(isSignedIn());
+      renderTopbarUser();
+      if (window._revealDashboardIfAdmin) window._revealDashboardIfAdmin();
+    }
+  };
+
   // React to sign-in/out happening inside iframes (dashboard, etc.)
   window.addEventListener('storage', function (e) {
     if (e.key === 'tagscanner_session') {

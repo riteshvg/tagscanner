@@ -441,7 +441,13 @@
 
     var auth = window.parent.TagScannerAuth || window.TagScannerAuth;
     auth.signInWithGoogle()
-      .then(function () { init(); })
+      .then(function () {
+        // Notify parent sidebar to flip Sign In → Sign Out
+        if (window.parent && window.parent.TagScannerSidebar) {
+          window.parent.TagScannerSidebar.refreshAuthState();
+        }
+        init();
+      })
       .catch(function (e) {
         signinError.textContent   = e.message || 'Sign-in failed.';
         signinError.style.display = 'block';

@@ -374,10 +374,9 @@ chrome.runtime.onMessage.addListener(function (message) {
       //Extension details
       var extensionStr = JSON.stringify(extensions);
       sessionStorage.setItem('_satellite._container.extension', extensionStr);
-      extensionStr = extensionStr.split('hostedLibFilesBaseUrl');
-      var extCount = extensionStr.length - 1;
+      var extCount = typeof extensions === 'object' ? Object.keys(extensions).length : 0;
       document.getElementById('extensions').textContent = extCount;
-      sessionStorage.setItem('extensions-length', extensionStr.length - 1);
+      sessionStorage.setItem('extensions-length', extCount);
       var topbarExt = document.getElementById('topbar-ext');
       if (topbarExt) {
         topbarExt.textContent = '';
@@ -457,10 +456,9 @@ chrome.runtime.onMessage.addListener(function (message) {
       //Data Element details
       var deStr = JSON.stringify(dataElements);
       sessionStorage.setItem('_satellite._container.dataElements', deStr);
-      deStr = deStr.split('modulePath');
-      var deCount = deStr.length - 1;
+      var deCount = typeof dataElements === 'object' ? Object.keys(dataElements).length : 0;
       document.getElementById('dataelement').innerHTML = deCount;
-      sessionStorage.setItem('dataelement-length', deStr.length - 1);
+      sessionStorage.setItem('dataelement-length', deCount);
       if (document.getElementById('topbar-de')) {
         document.getElementById('topbar-de').innerHTML = '<i class="fas fa-database mr-1"></i>Data Elements: ' + deCount;
       }

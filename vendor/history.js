@@ -518,10 +518,6 @@
     var dateStr = meta.createdAt ? new Date(meta.createdAt).toLocaleString() : new Date().toLocaleString();
     doc.text('Analyzed: ' + dateStr + '   |   Exported: ' + new Date().toLocaleString(), margin, y);
     y += 13;
-    if (meta.tokens) {
-      doc.text('Tokens: ' + (meta.tokens.input || 0) + ' input / ' + (meta.tokens.output || 0) + ' output', margin, y);
-      y += 13;
-    }
     if (meta.summary) {
       doc.setTextColor(55, 65, 81);
       doc.setFont(undefined, 'bold');

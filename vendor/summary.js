@@ -1434,8 +1434,7 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
   } else {
     leftMeta = 'Just analyzed';
   }
-  var rightMeta = (tokens && !fromCache) ? ((tokens.input || 0) + ' in / ' + (tokens.output || 0) + ' out tokens &middot; $' + (costUsd || 0).toFixed(4)) : '';
-  meta.innerHTML = '<span>' + leftMeta + '</span><span>' + rightMeta + '</span>';
+  meta.innerHTML = '<span>' + leftMeta + '</span>';
   container.appendChild(meta);
 
   // Score + executive summary

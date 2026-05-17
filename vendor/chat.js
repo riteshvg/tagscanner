@@ -83,7 +83,6 @@
   var emptyState     = document.getElementById('empty-state');
   var chatInput      = document.getElementById('chat-input');
   var btnSend        = document.getElementById('btn-send');
-  var btnClear       = document.getElementById('btn-clear-chat');
   var headerProp     = document.getElementById('chat-header-prop');
   var limitNote      = document.getElementById('chat-limit-note');
   var signinError    = document.getElementById('signin-error');
@@ -484,16 +483,6 @@
     });
   });
 
-  // Clear conversation
-  btnClear.addEventListener('click', function () {
-    conversationHistory = [];
-    displayMessages     = [];
-    clearChatState();
-    chatBody.innerHTML  = '';
-    chatBody.appendChild(emptyState);
-    emptyState.style.display = 'flex';
-    // Beta count is NOT reset on clear — it's persistent per property
-  });
 
   // ── Init ───────────────────────────────────────────────────────────────────
   function init() {

@@ -194,10 +194,47 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(dismiss, 12000);
   }
 
+  // Navigation tracking
+  var _navMap = [
+    { id: 'home-menu-link',         section: 'Home' },
+    { id: 'extension-menu-link',    section: 'Extensions' },
+    { id: 'rule-menu-link',         section: 'Rules' },
+    { id: 'dataelements-menu-link', section: 'Data Elements' },
+    { id: 'flow-menu-link',         section: 'Flow' },
+    { id: 'codesearch-menu-link',   section: 'Search' },
+    { id: 'envoverride-menu-link',  section: 'Env Override' },
+    { id: 'summary-menu-link',      section: 'Summary' },
+    { id: 'chat-menu-link',         section: 'Ask AI' },
+    { id: 'feedback-menu-link',     section: 'Feedback' },
+    { id: 'history-menu-link',      section: 'History' }
+  ];
+  _navMap.forEach(function (item) {
+    var el = document.getElementById(item.id);
+    if (el) {
+      el.addEventListener('click', function () {
+        if (window.TagScannerAnalytics) {
+          TagScannerAnalytics.page('TagScanner:' + item.section, {
+            events: 'event11,event12',
+            v5:     item.section,
+            c2:     item.section
+          });
+          TagScannerAnalytics.suppressNextPageView('TagScanner:' + item.section);
+        }
+      });
+    }
+  });
+
   if (authBtn) {
     authBtn.addEventListener('click', async function () {
       if (isSignedIn()) {
         // Sign out
+        if (window.TagScannerAnalytics) {
+          TagScannerAnalytics.track('Auth:Sign Out', {
+            pageName: 'TagScanner:Sidebar',
+            events:   'event10',
+            c2:       'Sidebar'
+          });
+        }
         try { localStorage.removeItem('tagscanner_session'); } catch (e) {}
         try { localStorage.removeItem('tagscanner_user'); } catch (e) {}
         renderTopbarUser();
@@ -217,6 +254,13 @@ document.addEventListener('DOMContentLoaded', function () {
           setAuthButtonState(true);
           renderTopbarUser();
           if (window._revealDashboardIfAdmin) window._revealDashboardIfAdmin();
+          if (window.TagScannerAnalytics) {
+            TagScannerAnalytics.track('Auth:Sign In', {
+              pageName: 'TagScanner:Sidebar',
+              events:   'event9',
+              c2:       'Sidebar'
+            });
+          }
           showPostSignInBanner();
         } catch (err) {
           authBtn.innerHTML = '<i class="px-1 fas fa-exclamation-circle"></i><span>Failed</span>';

@@ -772,5 +772,8 @@
     });
   }
 
+  var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+  if (_tsA) _tsA.page('TagScanner:History', { events: 'event12' });
+
   loadHistory(false);
 })();

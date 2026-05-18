@@ -481,6 +481,8 @@
       alert('No extensions to export. Load a property first.');
       return;
     }
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.track('Export:CSV:Extensions', { pageName: 'TagScanner:Extensions', events: 'event4', v5: 'CSV', c2: 'Export' });
     buildUsageMap();
     function toCsvCell(val) {
       return '"' + String(val == null ? '' : val).replace(/"/g, '""') + '"';
@@ -680,6 +682,9 @@
   }
 
   function init() {
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.page('TagScanner:Extensions', { events: 'event12' });
+
     var extMain = document.getElementById('ext-main');
     var noData = document.getElementById('no-data-alert');
     var loader = document.getElementById('set_display');

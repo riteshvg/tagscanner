@@ -236,6 +236,8 @@
 
   function downloadPDF() {
     if (!lastReport) return;
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.track('Export:PDF:AI Report', { pageName: 'TagScanner:AI Report', events: 'event4', v5: 'PDF', c2: 'Export' });
     var propName = sessionStorage.getItem('launch_property_name') || 'Adobe Tags Property';
     var JsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
     if (JsPDF) {

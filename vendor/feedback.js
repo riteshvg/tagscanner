@@ -1,6 +1,9 @@
 (function () {
   var TS_PROXY_URL = 'https://ihn2pz2dbcktbxvn36g6pfptda0jfnri.lambda-url.us-east-1.on.aws/';
 
+  var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+  if (_tsA) _tsA.page('TagScanner:Feedback', { events: 'event12' });
+
   // Pre-fill from active session if signed in
   try {
     var raw = localStorage.getItem('tagscanner_user');

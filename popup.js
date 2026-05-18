@@ -284,6 +284,14 @@ chrome.runtime.onMessage.addListener(function (message) {
         wsAbout['!cols'] = [{ wch: 14 }, { wch: 60 }];
         XLSX.utils.book_append_sheet(wb, wsAbout, 'About');
 
+        if (window.TagScannerAnalytics) {
+          TagScannerAnalytics.track('Export:XLSX', {
+            pageName: 'TagScanner:Home',
+            events:   'event4',
+            v5:       'XLSX',
+            c2:       'Export'
+          });
+        }
         var wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
         var blob = new Blob([wbout], {
           type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -390,6 +398,19 @@ chrome.runtime.onMessage.addListener(function (message) {
       if (chrome.storage && chrome.storage.local) {
         chrome.storage.local.set({ tagscanner_snapshot: snapshot });
       }
+      if (window.TagScannerAnalytics) {
+        chrome.storage.local.get('ts_first_scan_done', function (data) {
+          if (!data.ts_first_scan_done) {
+            chrome.storage.local.set({ ts_first_scan_done: true });
+            TagScannerAnalytics.page('TagScanner:Home', {
+              events: 'event1,event12',
+              v5:     propertyName,
+              c2:     'Home'
+            });
+            TagScannerAnalytics.suppressNextPageView('TagScanner:Home');
+          }
+        });
+      }
       var iframe = document.getElementById('component-iframe');
       if (iframe && iframe.contentWindow) {
         try {
@@ -439,6 +460,14 @@ chrome.runtime.onMessage.addListener(function (message) {
       console.error(error);
       sessionStorage.setItem('launch_property_name', 'No Launch Code');
       document.getElementById('set_display').style.display = 'none';
+      if (window.TagScannerAnalytics) {
+        TagScannerAnalytics.track('Property:Scan:Error', {
+          pageName: 'TagScanner:Home',
+          events:   'event8',
+          v5:       'Scan Error',
+          c2:       'Home'
+        });
+      }
       showRefreshModal(window._tsPixelInfo || null);
     }
   }

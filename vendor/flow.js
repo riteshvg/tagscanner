@@ -686,6 +686,9 @@
   }
 
   function run() {
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.page('TagScanner:Flow', { events: 'event12' });
+
     var loader = document.getElementById('flowLoader');
     var container = document.getElementById('flowChart');
     var searchInput = document.getElementById('flowSearch');

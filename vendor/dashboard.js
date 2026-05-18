@@ -396,6 +396,7 @@
       var s         = u.stats || {};
       var name      = esc(u.name  || '—');
       var email     = esc(u.email || '—');
+      var emailHash = u.emailHash ? u.emailHash.slice(0, 16) + '…' : '';
       var joined    = u.createdAt  ? new Date(u.createdAt).toLocaleDateString()  : '—';
       var lastActive = s.lastActive ? relativeTime(s.lastActive) : (u.lastLoginAt ? relativeTime(u.lastLoginAt) : '—');
 
@@ -436,6 +437,8 @@
         '<td><div class="user-name-cell">' + avatarHtml + '<span style="font-size:12px;font-weight:500">' + name + '</span></div></td>' +
         '<td style="white-space:nowrap">' + email +
           '<button class="copy-btn" data-copy="' + email + '" title="Copy email"><i class="fas fa-copy"></i></button>' +
+          (u.emailHash ? '<br><span style="font-size:10px;color:#9ca3af;font-family:monospace" title="SHA-256 hash — matches eVar7 in Adobe Analytics">' + emailHash + '</span>' +
+            '<button class="copy-btn" data-copy="' + esc(u.emailHash) + '" title="Copy full hash"><i class="fas fa-copy"></i></button>' : '') +
         '</td>' +
         '<td>' + activityHtml + '</td>' +
         '<td>' + propsHtml + '</td>' +
@@ -765,6 +768,9 @@
   });
 
   // ── Boot ──────────────────────────────────────────────────────────────────
+
+  var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+  if (_tsA) _tsA.page('TagScanner:Dashboard', { events: 'event12' });
 
   init();
 

@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', function () {
   var loader = document.getElementById('set_display');
   if (loader) loader.style.display = 'none';
 
+  var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+  if (_tsA) _tsA.page('TagScanner:Home', { events: 'event12' });
+
   var exportBtn = document.getElementById('export-all-csv-btn');
   if (exportBtn) exportBtn.addEventListener('click', exportFullXlsx);
 });
@@ -191,6 +194,8 @@ function exportFullXlsx() {
     alert('Excel library not loaded. Please reload the page and try again.');
     return;
   }
+  var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+  if (_tsA) _tsA.track('Export:XLSX:All', { pageName: 'TagScanner:Home', events: 'event4', v5: 'XLSX', c2: 'Export' });
 
   var rules = safeJson('_satellite._container.rules');
   var de    = safeJson('_satellite._container.dataElements');

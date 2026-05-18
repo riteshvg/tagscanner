@@ -287,6 +287,8 @@ var appendScript = sessionStorage.getItem('unique_launch_code');
         csv.push(row.join(","));
       }
       // Download CSV file
+      var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+      if (_tsA) _tsA.track('Export:CSV:AA Variables', { pageName: 'TagScanner:AA Variables', events: 'event4', v5: 'CSV', c2: 'Export' });
       downloadCSV(csv.join("\n"), "aa_variable.csv");
     } 
     

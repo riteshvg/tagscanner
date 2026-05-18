@@ -354,6 +354,16 @@
     chatInput.value  = '';
     chatInput.style.height = '';
 
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) {
+      _tsA.track('Ask AI:Question', {
+        pageName: 'TagScanner:Ask AI',
+        events:   'event2',
+        v5:       'Ask AI',
+        c2:       'Ask AI'
+      });
+    }
+
     appendBubble('user', esc(question));
     displayMessages.push({ role: 'user', text: question });
     showThinking();
@@ -371,6 +381,14 @@
       removeThinking();
       var answer = data.answer || '';
       var qId = data.queryId || null;
+      if (_tsA) {
+        _tsA.track('Ask AI:Answer', {
+          pageName: 'TagScanner:Ask AI',
+          events:   'event3',
+          v5:       'Ask AI',
+          c2:       'Ask AI'
+        });
+      }
       appendBubble('assistant', renderMarkdownLite(answer), false, qId);
       displayMessages.push({ role: 'assistant', text: answer, queryId: qId });
 
@@ -424,6 +442,8 @@
     noPropGate.style.display  = 'none';
     chatBody.style.display    = 'flex';
     inputArea.style.display   = 'block';
+    var tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (tsA) tsA.page('TagScanner:Ask AI', { events: 'event12' });
   }
 
   function showNoPropGate() {
@@ -512,4 +532,11 @@
   }
 
   init();
+
+  // Re-check auth when the session is written by another frame (e.g. sidebar sign-in)
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'tagscanner_session') {
+      init();
+    }
+  });
 })();

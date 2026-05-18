@@ -1,3 +1,6 @@
+var _tsA_de = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+if (_tsA_de) _tsA_de.page('TagScanner:Data Elements', { events: 'event12' });
+
 var de_details_node = document.getElementById('dataelement_details');
 var dataElementsExportRows = null; // filled when table is built, used by Export CSV
 if (de_details_node) {
@@ -1921,6 +1924,8 @@ if (download_button[0]) {
       alert('No data elements to export. Load a property first.');
       return;
     }
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.track('Export:CSV:Data Elements', { pageName: 'TagScanner:Data Elements', events: 'event4', v5: 'CSV', c2: 'Export' });
     function toCsvCell(val) {
       return '"' + String(val == null ? '' : val).replace(/"/g, '""') + '"';
     }

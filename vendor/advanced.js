@@ -17,6 +17,9 @@
 
   if (!validateBtn || !validateMsg || !fetchOptionsSection || !fetchBtn || !resultsEl) return;
 
+  var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+  if (_tsA) _tsA.page('TagScanner:Advanced', { events: 'event12' });
+
   var credentialsValid = false;
   var currentAccessToken = null;
   var currentClientId = null;

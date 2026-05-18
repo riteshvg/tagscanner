@@ -256,6 +256,10 @@ document.addEventListener('DOMContentLoaded', function () {
       downloadLink.style.color = 'black';
       downloadLink.innerHTML = 'Export CSV File ';
       downloadLink.style.textAlign = 'right';
+      downloadLink.addEventListener('click', function () {
+        var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+        if (_tsA) _tsA.track('Export:CSV:Custom Code', { pageName: 'TagScanner:Data Elements', events: 'event4', v5: 'CSV', c2: 'Export' });
+      });
       downloadButton.appendChild(downloadLink);
     }
   }

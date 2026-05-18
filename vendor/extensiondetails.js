@@ -73,6 +73,8 @@ const params = new Proxy(new URLSearchParams(window.location.search), {
       }
       // Download CSV file
       console.log('Hey')
+      var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+      if (_tsA) _tsA.track('Export:CSV:Extension Details', { pageName: 'TagScanner:Extensions', events: 'event4', v5: 'CSV', c2: 'Export' });
       downloadCSV(csv.join("\n"), value+"_extension.csv");
     } 
     

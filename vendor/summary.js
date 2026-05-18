@@ -30,6 +30,9 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
+  var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+  if (_tsA) _tsA.page('TagScanner:Summary', { events: 'event12' });
+
   // Remove all h6 headers from component lists
   const headers = document.querySelectorAll('.component-list h6');
   headers.forEach((header) => {
@@ -1077,6 +1080,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var downloadBtn = document.getElementById('download-pdf');
     if (downloadBtn) {
       downloadBtn.addEventListener('click', function () {
+        var _tsA2 = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+        if (_tsA2) _tsA2.track('Export:PDF', { pageName: 'TagScanner:Summary', events: 'event4', v5: 'PDF', c2: 'Export' });
         window.print();
       });
     }
@@ -1305,6 +1310,8 @@ async function handleScanClick() {
     var consented = await window.TagScannerAuth.requireExplainConsent();
     if (!consented) return;
   }
+  var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+  if (_tsA) _tsA.track('Summary:AI Scan', { pageName: 'TagScanner:Summary', events: 'event5', v5: 'Summary', c2: 'AI Scan' });
   // Always require a Google OAuth session — ignore legacy localStorage email
   var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
   if (!session) {

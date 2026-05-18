@@ -1,3 +1,6 @@
+var _tsA_prop = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+if (_tsA_prop) _tsA_prop.page('TagScanner:Property', { events: 'event12' });
+
 var set_display = document.getElementById('set_display');
     set_display.style="display: none;"
 

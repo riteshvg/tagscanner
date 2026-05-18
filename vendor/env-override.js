@@ -65,6 +65,8 @@
     prodUrl = data.launch_script_url || '';
     currentOverride = data[STORAGE_KEY] || null;
     renderState();
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.page('TagScanner:Env Override', { events: 'event12' });
   });
 
   // ── Reload sequence ────────────────────────────────────────────────────
@@ -144,6 +146,8 @@
     if (currentOverride && currentOverride.enabled) {
       chrome.runtime.sendMessage({ type: 'CLEAR_ENV_OVERRIDE' }, function () {
         if (chrome.runtime.lastError) { console.warn(chrome.runtime.lastError); }
+        var tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+        if (tsA) tsA.track('Env Override:Disabled', { pageName: 'TagScanner:Env Override', events: 'event7', v5: 'Env Override', c2: 'Env Override' });
         currentOverride = null;
         reloadSequence();
       });
@@ -189,6 +193,8 @@
           envOverride: { enabled: true, prodUrl: prodUrl, overrideUrl: targetUrl }
         });
         currentOverride = { enabled: true, prodUrl: prodUrl, overrideUrl: targetUrl };
+        var tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+        if (tsA) tsA.track('Env Override:Enabled', { pageName: 'TagScanner:Env Override', events: 'event6', v5: 'Env Override', c2: 'Env Override' });
         reloadSequence();
       } else {
         alert('Failed to set override: ' + ((resp && resp.error) || 'no response from service worker'));

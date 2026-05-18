@@ -1,3 +1,6 @@
+var _tsA_rule = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+if (_tsA_rule) _tsA_rule.page('TagScanner:Rules', { events: 'event12' });
+
 var rule_details_node = document.getElementById('rule_details');
 if (rule_details_node) {
   try {
@@ -2617,6 +2620,8 @@ if (download_button && download_button.length > 0) {
 }
 
 function exportMainRulesTableToCSV() {
+  var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+  if (_tsA) _tsA.track('Export:CSV:Rules', { pageName: 'TagScanner:Rules', events: 'event4', v5: 'CSV', c2: 'Export' });
   var rulesRaw = sessionStorage.getItem('_satellite._container.rules');
   var rulesArray = [];
   if (rulesRaw && rulesRaw.trim() !== '') {

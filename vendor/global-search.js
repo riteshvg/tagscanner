@@ -356,6 +356,9 @@
   // ── Init ─────────────────────────────────────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', function () {
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.page('TagScanner:Search', { events: 'event12' });
+
     loadData();
     wireCardClicks();
 

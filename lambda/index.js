@@ -253,6 +253,43 @@ async function autoDisableAI(reason) {
   }
 }
 
+// ── Adobe Analytics server-side tracking ─────────────────────────────────────
+
+const AA_RSID            = 'ageo1xxsintagscanner';
+const AA_TRACKING_SERVER = 'adobeintriteshgupta.sc.omtrdc.net';
+const AA_ENDPOINT        = `https://${AA_TRACKING_SERVER}/b/ss/${AA_RSID}/0`;
+const AA_APP_VERSION     = '2.5.4';
+
+function hashEmailSync(email) {
+  if (!email) return '';
+  return nodeCrypto.createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
+}
+
+// Fire-and-forget GET hit to the Adobe Analytics Data Insertion API.
+// Called after each meaningful server event; never awaited so it cannot
+// add latency or break the main response path.
+function trackAA(params) {
+  try {
+    const base = {
+      // ── Required ─────────────────────────────────────────────────────────
+      ce:  'UTF-8',                                  // character encoding
+      g:   'https://tagscanner-lambda',              // pageURL placeholder for server-side hits
+      ts:  new Date().toISOString(),                // ISO 8601 timestamp
+      // ── Recommended ──────────────────────────────────────────────────────
+      ch:  'TagScanner',                            // site section / channel
+      // ── Custom dimensions ─────────────────────────────────────────────────
+      v4:  AA_APP_VERSION,                          // eVar4: app version
+    };
+    const merged = Object.assign({}, base, params);
+    if (merged.pev2 && !merged.v9) merged.v9 = merged.pev2;
+    if (merged.pageName && !merged.v11) merged.v11 = merged.pageName;
+    const qs = Object.keys(merged)
+      .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(merged[k] != null ? merged[k] : ''))
+      .join('&');
+    fetch(`${AA_ENDPOINT}?${qs}`, { method: 'GET' }).catch(() => {});
+  } catch (_) {}
+}
+
 // ── CORS ──────────────────────────────────────────────────────────────────────
 
 const CORS_HEADERS = {
@@ -458,6 +495,7 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
 
   const messages = [...cleanHistory, { role: 'user', content: userPayload }];
 
+  trackAA({ vid: identity.userId, pageName: 'TagScanner:Ask AI', pe: 'lnk_o', pev2: 'Ask AI:Question', events: 'event2', v1: propertyName, v2: environment, v3: isAdminUser ? 'admin' : 'user', v5: 'Ask AI', v7: hashEmailSync(identity.email), v8: question.trim().slice(0, 255) });
   const result = await invokeClaudeChat(messages, MAX_TOKENS_CHAT);
 
   const [queryId, newDayCost] = await Promise.all([
@@ -487,6 +525,7 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached.').catch(() => {});
   }
 
+  trackAA({ vid: identity.userId, pageName: 'TagScanner:Ask AI', pe: 'lnk_o', pev2: 'Ask AI:Answer', events: 'event3', v1: propertyName, v2: environment, v3: isAdminUser ? 'admin' : 'user', v5: 'Ask AI', v7: hashEmailSync(identity.email) });
   return resp(200, {
     answer:    result.text,
     tokens:    { input: result.inputTokens, output: result.outputTokens },
@@ -783,6 +822,7 @@ async function handleAuth(body, sourceIp) {
 
   const isAdmin = ADMIN_EMAIL && email.toLowerCase() === ADMIN_EMAIL;
   console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'login', email }));
+  trackAA({ vid: userId, pageName: 'TagScanner:Server', pe: 'lnk_o', pev2: 'Auth:Sign In', events: 'event9', v3: isAdmin ? 'admin' : 'user', v7: hashEmailSync(email) });
   return resp(200, { sessionToken, userId, email, name, picture, isAdmin: !!isAdmin });
 }
 
@@ -858,6 +898,7 @@ async function handleFeedback(body) {
         ':at': new Date().toISOString()
       }
     }));
+    trackAA({ vid: session.userId, pageName: 'TagScanner:Ask AI', pe: 'lnk_o', pev2: 'Ask AI:Feedback:' + rating, events: 'event13', v5: 'Feedback', v6: rating, v7: hashEmailSync(session.email) });
     return resp(200, { ok: true });
   } catch (err) {
     console.error('feedback error:', err.message);
@@ -1012,6 +1053,7 @@ async function handleUsers(body) {
     const users = (usersResult.Items || []).map(u => {
       const s = statsMap[u.userId];
       return Object.assign({}, u, {
+        emailHash: hashEmailSync(u.email || ''),
         stats: s ? {
           totalQueries:      s.totalQueries,
           totalScans:        s.totalScans,
@@ -1234,6 +1276,7 @@ exports.handler = async (event) => {
         autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached. AI disabled automatically.').catch(() => {});
       }
 
+      trackAA({ vid: identity.userId, pageName: 'TagScanner:Summary', pe: 'lnk_o', pev2: 'Summary:AI Scan', events: 'event5', v1: propertyName, v2: environment, v3: (ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL) ? 'admin' : 'user', v5: 'Summary', v7: hashEmailSync(identity.email) });
       return resp(200, {
         report,
         tokens:  { input: result.inputTokens, output: result.outputTokens },
@@ -1271,6 +1314,7 @@ exports.handler = async (event) => {
         autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached. AI disabled automatically.').catch(() => {});
       }
 
+      trackAA({ vid: identity.userId, pageName: 'TagScanner:Rules', pe: 'lnk_o', pev2: 'Code:Explain', events: 'event5', v1: propertyKey || '', v3: (ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL) ? 'admin' : 'user', v5: 'Explain', v7: hashEmailSync(identity.email) });
       return resp(200, {
         explanation,
         tokens:  { input: result.inputTokens, output: result.outputTokens },

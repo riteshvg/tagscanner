@@ -86,7 +86,7 @@
         // postMessage to popup.html (the direct parent frame) — it listens for this
         // and calls window.location.reload() on the top-level popup window.
         setTimeout(function () {
-          window.parent.postMessage({ type: 'TAGSCANNER_RELOAD' }, '*');
+          window.parent.postMessage({ type: 'TAGSCANNER_RELOAD' }, 'chrome-extension://' + chrome.runtime.id);
         }, 500);
       }
 

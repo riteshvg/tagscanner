@@ -6,6 +6,7 @@ var satellite = {};
 
 // Allow the Env Override iframe to trigger a full popup reload via postMessage
 window.addEventListener('message', function (event) {
+  if (event.origin !== 'chrome-extension://' + chrome.runtime.id) return;
   if (event.data && event.data.type === 'TAGSCANNER_RELOAD') {
     window.location.reload();
   }
@@ -392,9 +393,10 @@ chrome.runtime.onMessage.addListener(function (message) {
       var iframe = document.getElementById('component-iframe');
       if (iframe && iframe.contentWindow) {
         try {
-          iframe.contentWindow.postMessage({ type: 'TAGSCANNER_SNAPSHOT', data: snapshot }, '*');
+          var extOrigin = 'chrome-extension://' + chrome.runtime.id;
+          iframe.contentWindow.postMessage({ type: 'TAGSCANNER_SNAPSHOT', data: snapshot }, extOrigin);
           if (tagscannerRules.length > 0) {
-            iframe.contentWindow.postMessage({ type: 'TAGSCANNER_RULES', data: tagscannerRules }, '*');
+            iframe.contentWindow.postMessage({ type: 'TAGSCANNER_RULES', data: tagscannerRules }, extOrigin);
           }
         } catch (e) {
           console.warn('TagScanner: could not postMessage to component iframe', e);

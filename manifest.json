@@ -39,8 +39,5 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'",
     "sandbox": "sandbox allow-scripts allow-forms allow-popups allow-modals; script-src 'self'; child-src 'self'"
-  },
-  "sandbox": {
-    "pages": ["satellite_sandbox.html"]
   }
 }

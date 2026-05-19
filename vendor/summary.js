@@ -1493,6 +1493,8 @@ async function runAIScan(user, config) {
     console.error('AI scan failed:', err);
     showAIState('prompt');
     setAIScanError('Scan failed: ' + (err.message || 'Unknown error'));
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.track('Summary:AI Scan:Error', { pageName: 'TagScanner:Summary', events: 'event8', v9: (err.message || 'Unknown').slice(0, 100), c2: 'AI Scan' });
   }
 }
 

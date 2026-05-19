@@ -408,19 +408,24 @@
     .catch(function (err) {
       removeThinking();
       var msg = err.message || 'Something went wrong.';
+      var _tsA_c = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
       if (msg.indexOf('Beta question limit reached') > -1) {
         var pKey2 = (sessionStorage.getItem('launch_property_name') || '') + '#' + (sessionStorage.getItem('launch_property_environment') || '');
         var s2 = window.parent.TagScannerAuth ? window.parent.TagScannerAuth.getSession() : (window.TagScannerAuth ? window.TagScannerAuth.getSession() : null);
         if (s2) setBetaCount(s2, pKey2, BETA_LIMIT);
         updateLimitBar(false, BETA_LIMIT);
         appendBubble('assistant', '<span class="error-text">Beta question limit reached for this property (10/10).</span>');
+        if (_tsA_c) _tsA_c.track('Chat:Limit:Beta', { pageName: 'TagScanner:Ask AI', events: 'event14', v9: 'Beta Limit Reached', c2: 'Ask AI' });
       } else if (msg.indexOf('Daily AI request limit') > -1) {
         limitNote.style.display = 'block';
         appendBubble('assistant', '<span class="error-text">Daily AI limit reached. Try again tomorrow.</span>');
+        if (_tsA_c) _tsA_c.track('Chat:Limit:Daily', { pageName: 'TagScanner:Ask AI', events: 'event14', v9: 'Daily Limit Reached', c2: 'Ask AI' });
       } else if (msg.indexOf('temporarily disabled') > -1) {
         appendBubble('assistant', '<span class="error-text">AI features are temporarily unavailable.</span>');
+        if (_tsA_c) _tsA_c.track('Chat:Error:Disabled', { pageName: 'TagScanner:Ask AI', events: 'event8', v9: 'AI Disabled', c2: 'Ask AI' });
       } else {
         appendBubble('assistant', '<span class="error-text">Error: ' + esc(msg) + '</span>');
+        if (_tsA_c) _tsA_c.track('Chat:Error', { pageName: 'TagScanner:Ask AI', events: 'event8', v9: msg.slice(0, 100), c2: 'Ask AI' });
       }
     })
     .finally(function () {

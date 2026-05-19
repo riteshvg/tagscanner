@@ -8,7 +8,12 @@ if (de_details_node) {
   if (!de_value || de_value.trim() === '') {
     de_details_node.innerHTML = '<tbody><tr><td colspan="6" style="text-align:center;padding:20px">No data elements found.</td></tr></tbody>';
   } else {
-    const dataElements = JSON.parse(de_value);
+    let dataElements;
+    try { dataElements = JSON.parse(de_value); } catch (_parseErr) {
+      if (_tsA_de) _tsA_de.track('Error:Parse:DataElements', { pageName: 'TagScanner:Data Elements', events: 'event15', v9: 'Parse Error: DEs', c2: 'Data Elements' });
+      de_details_node.innerHTML = '<tbody><tr><td colspan="6" style="text-align:center;padding:20px">Error loading data elements.</td></tr></tbody>';
+    }
+    if (dataElements) {
 
   // --- Helpers ---
   function isHttpUrl(str) {
@@ -1907,6 +1912,7 @@ if (de_details_node) {
       showPage(1);
     }, 220));
   }
+  } // if (dataElements)
   }
 
   // Optional sort (by column index) – can be wired to header clicks like rule.js

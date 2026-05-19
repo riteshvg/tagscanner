@@ -1,6 +1,8 @@
 (function () {
   'use strict';
 
+  var _tsA_ext = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+
   var ROWS_PER_PAGE = 9999;
   var currentPage = 1;
   var builtExtensionCount = 0; // set in buildTable so footer count is correct regardless of DOM
@@ -22,6 +24,7 @@
     try {
       return JSON.parse(raw);
     } catch (e) {
+      if (_tsA_ext) _tsA_ext.track('Error:Parse:Extensions', { pageName: 'TagScanner:Extensions', events: 'event15', v9: 'Parse Error: Extension', c2: 'Extensions' });
       return null;
     }
   }
@@ -33,6 +36,7 @@
       var o = JSON.parse(raw);
       return Array.isArray(o) ? o : (o && o.rules && Array.isArray(o.rules) ? o.rules : []);
     } catch (e) {
+      if (_tsA_ext) _tsA_ext.track('Error:Parse:Rules:Ext', { pageName: 'TagScanner:Extensions', events: 'event15', v9: 'Parse Error: Rules (Ext)', c2: 'Extensions' });
       return [];
     }
   }
@@ -44,6 +48,7 @@
       var o = JSON.parse(raw);
       return typeof o === 'object' && o !== null ? o : {};
     } catch (e) {
+      if (_tsA_ext) _tsA_ext.track('Error:Parse:DEs:Ext', { pageName: 'TagScanner:Extensions', events: 'event15', v9: 'Parse Error: DEs (Ext)', c2: 'Extensions' });
       return {};
     }
   }

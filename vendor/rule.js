@@ -11,6 +11,7 @@ if (rule_details_node) {
       obj = JSON.parse(rule);
     } catch (parseErr) {
       console.error('Invalid rules JSON:', parseErr);
+      if (_tsA_rule) _tsA_rule.track('Error:Parse:Rules', { pageName: 'TagScanner:Rules', events: 'event15', v9: 'Parse Error: Rules', c2: 'Rules' });
     }
   }
 

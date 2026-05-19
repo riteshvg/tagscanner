@@ -74,7 +74,7 @@
           ce:  'UTF-8',                    // character encoding
           // chrome-extension:// URLs are filtered by AA; map pageName to a stable https URL
           g:   'https://tagscanner.extension/' + ((params && params.pageName) || 'home').replace('TagScanner:', '').toLowerCase().replace(/\s+/g, '-'),
-          ts:  Math.floor(Date.now() / 1000).toString(), // Unix epoch seconds — AA DIA rejects ISO strings
+          // ts omitted — timestamp-disabled suites reject hits that include ts; AA timestamps on receipt
           // ── Recommended ───────────────────────────────────────────────────
           ch:  'TagScanner',              // site section / channel
           r:   document.referrer || '',   // referrer URL

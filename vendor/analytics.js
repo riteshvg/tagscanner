@@ -73,7 +73,7 @@
           mid: ecid,                       // 38-digit ECID — used by AA for unique visitor counting
           ce:  'UTF-8',                    // character encoding
           // chrome-extension:// URLs are filtered by AA; map pageName to a stable https URL
-          g:   'https://tagscanner.extension/' + ((params && params.pageName) || 'home').replace('TagScanner:', '').toLowerCase().replace(/\s+/g, '-'),
+          g:   'https://tagscanner.extension/' + ((params && params.pageName) || 'home').replace('TagScanner:', '').toLowerCase().replace(/\s+/g, '-') + '?v=' + APP_VERSION,
           ts:  Math.floor(Date.now() / 1000).toString(), // Unix epoch seconds — AA DIA rejects ISO strings
           // ── Recommended ───────────────────────────────────────────────────
           ch:  'TagScanner',              // site section / channel

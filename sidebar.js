@@ -317,6 +317,7 @@ document.addEventListener('DOMContentLoaded', function () {
     { id: 'envoverride-menu-link',  section: 'Env Override' },
     { id: 'summary-menu-link',      section: 'Summary' },
     { id: 'chat-menu-link',         section: 'Ask AI' },
+    { id: 'monitor-menu-link',      section: 'Monitor' },
     { id: 'feedback-menu-link',     section: 'Feedback' },
     { id: 'history-menu-link',      section: 'History' }
   ];

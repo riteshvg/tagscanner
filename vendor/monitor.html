@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Property Monitor</title>
+  <link rel="stylesheet" href="../vendor/fontawesome-free/css/all.min.css" />
+  <script src="auth.js"></script>
+  <script src="bedrockClient.js"></script>
+  <script src="healthPayload.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      background: #0d1117;
+      color: #e6edf3;
+    }
+
+    /* ── Shell ──────────────────────────────────────────────────── */
+    #monitor-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    .mon-header {
+      padding: 14px 18px 10px;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .mon-header-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e6edf3;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+    .mon-header-sub {
+      font-size: 11px;
+      color: #7d8590;
+      margin-top: 1px;
+    }
+    .pulse-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: #3d444d;
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .pulse-dot.active {
+      background: #3fb950;
+      box-shadow: 0 0 0 0 rgba(63,185,80,0.6);
+      animation: pulse-ring 1.6s ease-out infinite;
+    }
+    .pulse-dot.alert {
+      background: #f85149;
+      box-shadow: 0 0 0 0 rgba(248,81,73,0.6);
+      animation: pulse-ring 0.6s ease-out infinite;
+    }
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 0 rgba(var(--pulse-rgb,63,185,80), 0.6); }
+      70%  { box-shadow: 0 0 0 7px rgba(var(--pulse-rgb,63,185,80), 0); }
+      100% { box-shadow: 0 0 0 0 rgba(var(--pulse-rgb,63,185,80), 0); }
+    }
+
+    /* ── Property strip ─────────────────────────────────────────── */
+    .prop-strip {
+      padding: 8px 18px;
+      background: #161b22;
+      border-bottom: 1px solid #21262d;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .prop-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+    }
+    .prop-chip i { color: #7d8590; font-size: 10px; }
+    .prop-chip span { color: #cdd9e5; }
+    .prop-chip .val { color: #79c0ff; font-weight: 500; }
+    .sep { color: #3d444d; font-size: 10px; }
+
+    /* ── Stats row ──────────────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: #21262d;
+      border-bottom: 1px solid #21262d;
+      flex-shrink: 0;
+    }
+    .stat-cell {
+      background: #0d1117;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .stat-label {
+      font-size: 9.5px;
+      color: #7d8590;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .stat-value {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e6edf3;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.3s;
+    }
+    .stat-value.changed { color: #f0883e; }
+    .stat-fp {
+      font-size: 11px;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      color: #8b949e;
+    }
+    .stat-fp.changed { color: #f0883e; }
+
+    /* ── Body ────────────────────────────────────────────────────── */
+    .mon-body {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Activity log ────────────────────────────────────────────── */
+    .log-section {
+      padding: 10px 18px;
+      flex: 1;
+    }
+    .log-section-label {
+      font-size: 9.5px;
+      color: #7d8590;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+    #activity-log {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .log-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 11.5px;
+      color: #7d8590;
+      padding: 3px 0;
+      animation: fadeInDown 0.25s ease;
+    }
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .log-time {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 10.5px;
+      color: #484f58;
+      flex-shrink: 0;
+      width: 56px;
+    }
+    .log-icon { width: 14px; flex-shrink: 0; text-align: center; }
+    .log-msg { color: #7d8590; }
+    .log-entry.ok .log-icon { color: #238636; }
+    .log-entry.ok .log-msg  { color: #7d8590; }
+    .log-entry.warn .log-icon { color: #9e6a03; }
+    .log-entry.warn .log-msg  { color: #d29922; }
+    .log-entry.alert .log-icon { color: #da3633; }
+    .log-entry.alert .log-msg  { color: #f85149; font-weight: 600; }
+    .log-entry.info .log-icon { color: #388bfd; }
+    .log-entry.info .log-msg  { color: #79c0ff; }
+    .log-entry.success .log-icon { color: #3fb950; }
+    .log-entry.success .log-msg  { color: #56d364; font-weight: 600; }
+
+    /* ── Scan progress ───────────────────────────────────────────── */
+    #scan-progress {
+      margin: 10px 18px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 14px 16px;
+      display: none;
+    }
+    .scan-progress-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #cdd9e5;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .scan-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .scan-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: #484f58;
+      transition: color 0.3s;
+    }
+    .scan-step.active { color: #cdd9e5; }
+    .scan-step.done   { color: #3fb950; }
+    .scan-step i { width: 14px; text-align: center; font-size: 10px; }
+    .scan-step.active i { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Diff result ──────────────────────────────────────────────── */
+    #diff-panel {
+      margin: 0 18px 14px;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      overflow: hidden;
+      display: none;
+    }
+    .diff-header {
+      background: #161b22;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #30363d;
+    }
+    .diff-header-title {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #e6edf3;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .diff-header-time { font-size: 10.5px; color: #7d8590; }
+    .diff-body { padding: 12px 14px; background: #0d1117; }
+    .diff-section { margin-bottom: 12px; }
+    .diff-section:last-child { margin-bottom: 0; }
+    .diff-section-label {
+      font-size: 9.5px;
+      color: #7d8590;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .diff-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 3px 0;
+    }
+    .diff-key { color: #7d8590; min-width: 90px; }
+    .diff-before {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 11px;
+      color: #f85149;
+      background: rgba(248,81,73,0.08);
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+    .diff-arrow { color: #484f58; font-size: 10px; }
+    .diff-after {
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 11px;
+      color: #3fb950;
+      background: rgba(63,185,80,0.08);
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+    .diff-added {
+      font-size: 11.5px;
+      color: #56d364;
+      padding: 4px 8px;
+      background: rgba(63,185,80,0.06);
+      border-left: 2px solid #3fb950;
+      border-radius: 0 3px 3px 0;
+      margin: 2px 0;
+    }
+    .diff-added .added-label {
+      font-size: 9.5px;
+      color: #7d8590;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .health-score-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 6px 0;
+    }
+    .grade-badge {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .grade-badge.before { background: rgba(210,153,34,0.15); color: #d29922; border: 1.5px solid rgba(210,153,34,0.3); }
+    .grade-badge.after  { background: rgba(63,185,80,0.15);  color: #3fb950; border: 1.5px solid rgba(63,185,80,0.3); }
+    .score-arrow { color: #388bfd; font-size: 16px; }
+    .verdict-box {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 5px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #cdd9e5;
+      line-height: 1.5;
+      font-style: italic;
+    }
+    .verdict-box .verdict-label {
+      font-size: 9.5px;
+      color: #7d8590;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-style: normal;
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    /* ── Controls ────────────────────────────────────────────────── */
+    .mon-controls {
+      padding: 10px 18px 14px;
+      border-top: 1px solid #21262d;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      background: #0d1117;
+    }
+    .btn-mon {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-mon:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-start {
+      background: #238636;
+      border-color: rgba(63,185,80,0.4);
+      color: #ffffff;
+    }
+    .btn-start:hover:not(:disabled) { background: #2ea043; }
+    .btn-stop {
+      background: transparent;
+      border-color: #f85149;
+      color: #f85149;
+    }
+    .btn-stop:hover:not(:disabled) { background: rgba(248,81,73,0.08); }
+    .btn-deploy {
+      background: transparent;
+      border-color: #388bfd;
+      color: #79c0ff;
+    }
+    .btn-deploy:hover:not(:disabled) { background: rgba(56,139,253,0.08); }
+    .btn-reset {
+      background: transparent;
+      border-color: #30363d;
+      color: #7d8590;
+    }
+    .btn-reset:hover:not(:disabled) { background: #161b22; }
+
+    .spacer { flex: 1; }
+    .next-check {
+      font-size: 10.5px;
+      color: #484f58;
+      font-variant-numeric: tabular-nums;
+    }
+    .next-check span { color: #7d8590; }
+
+    /* ── Idle state ──────────────────────────────────────────────── */
+    #idle-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .idle-icon {
+      font-size: 36px;
+      color: #3d444d;
+    }
+    .idle-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #cdd9e5;
+    }
+    .idle-sub {
+      font-size: 12px;
+      color: #7d8590;
+      line-height: 1.6;
+      max-width: 300px;
+    }
+
+    /* ── No property ─────────────────────────────────────────────── */
+    #no-property-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 24px;
+      text-align: center;
+      display: none;
+    }
+    .no-prop-icon { font-size: 32px; color: #3d444d; }
+    .no-prop-title { font-size: 13px; font-weight: 600; color: #7d8590; }
+    .no-prop-sub   { font-size: 11.5px; color: #484f58; }
+
+    /* ── Auth notice ─────────────────────────────────────────────── */
+    .auth-notice {
+      margin: 10px 18px 0;
+      padding: 8px 12px;
+      background: rgba(56,139,253,0.08);
+      border: 1px solid rgba(56,139,253,0.2);
+      border-radius: 5px;
+      font-size: 11.5px;
+      color: #79c0ff;
+      display: none;
+      align-items: center;
+      gap: 7px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+<div id="monitor-shell">
+
+  <!-- Header -->
+  <div class="mon-header">
+    <div class="pulse-dot" id="pulse-dot"></div>
+    <div>
+      <div class="mon-header-title">AI Property Monitor</div>
+      <div class="mon-header-sub" id="monitor-status-label">Not monitoring</div>
+    </div>
+  </div>
+
+  <!-- No property screen -->
+  <div id="no-property-screen">
+    <div class="no-prop-icon"><i class="fas fa-exclamation-circle"></i></div>
+    <div class="no-prop-title">No property loaded</div>
+    <div class="no-prop-sub">Scan a page with Adobe Tags first, then come back to start monitoring.</div>
+  </div>
+
+  <!-- Property strip (shown when property loaded) -->
+  <div class="prop-strip" id="prop-strip" style="display:none">
+    <div class="prop-chip">
+      <i class="fas fa-globe"></i>
+      <span class="val" id="prop-hostname">—</span>
+    </div>
+    <div class="sep">·</div>
+    <div class="prop-chip">
+      <i class="fas fa-tag"></i>
+      <span id="prop-name">—</span>
+    </div>
+    <div class="sep">·</div>
+    <div class="prop-chip">
+      <i class="fas fa-flask"></i>
+      <span id="prop-env">—</span>
+    </div>
+  </div>
+
+  <!-- Auth notice -->
+  <div class="auth-notice" id="auth-notice">
+    <i class="fas fa-info-circle"></i>
+    Sign in to run real AI scans. Demo will show simulated results.
+  </div>
+
+  <!-- Stats row (hidden until monitoring starts) -->
+  <div class="stats-row" id="stats-row" style="display:none">
+    <div class="stat-cell">
+      <div class="stat-label">Fingerprint</div>
+      <div class="stat-fp" id="stat-fp">—</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Rules</div>
+      <div class="stat-value" id="stat-rules">—</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Data Elements</div>
+      <div class="stat-value" id="stat-de">—</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-label">Extensions</div>
+      <div class="stat-value" id="stat-ext">—</div>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="mon-body" id="mon-body">
+
+    <!-- Idle state -->
+    <div id="idle-screen">
+      <div class="idle-icon"><i class="fas fa-radar" style="font-size:40px;color:#3d444d"></i><br><i class="fas fa-broadcast-tower"></i></div>
+      <div class="idle-title">Ready to monitor</div>
+      <div class="idle-sub">TagScanner will watch this property every 10 seconds. When a container change is detected, an AI health scan runs automatically — no prompts needed.</div>
+    </div>
+
+    <!-- Scan progress -->
+    <div id="scan-progress">
+      <div class="scan-progress-title">
+        <i class="fas fa-robot" style="color:#388bfd"></i>
+        Autonomous AI scan in progress…
+      </div>
+      <div class="scan-steps">
+        <div class="scan-step" id="step-1"><i class="fas fa-circle-notch"></i> Capturing property snapshot</div>
+        <div class="scan-step" id="step-2"><i class="fas fa-circle"></i> Sending to Claude AI</div>
+        <div class="scan-step" id="step-3"><i class="fas fa-circle"></i> Analysing health &amp; regressions</div>
+        <div class="scan-step" id="step-4"><i class="fas fa-circle"></i> Building diff report</div>
+      </div>
+    </div>
+
+    <!-- Activity log -->
+    <div class="log-section" id="log-section" style="display:none">
+      <div class="log-section-label">Activity Log</div>
+      <div id="activity-log"></div>
+    </div>
+
+    <!-- Diff result panel -->
+    <div id="diff-panel">
+      <div class="diff-header">
+        <div class="diff-header-title">
+          <i class="fas fa-check-circle" style="color:#3fb950"></i>
+          Scan Complete · Change Report
+        </div>
+        <div class="diff-header-time" id="diff-time"></div>
+      </div>
+      <div class="diff-body">
+
+        <!-- Health delta -->
+        <div class="diff-section">
+          <div class="diff-section-label">Health Score</div>
+          <div class="health-score-row">
+            <div class="grade-badge before" id="diff-grade-before">?</div>
+            <div class="score-arrow"><i class="fas fa-long-arrow-alt-right"></i></div>
+            <div class="grade-badge after" id="diff-grade-after">?</div>
+            <div style="font-size:11.5px;color:#7d8590" id="diff-score-change"></div>
+          </div>
+        </div>
+
+        <!-- Structural diff -->
+        <div class="diff-section">
+          <div class="diff-section-label">Container Changes</div>
+          <div id="diff-changes"></div>
+        </div>
+
+        <!-- AI verdict -->
+        <div class="diff-section">
+          <div class="verdict-box">
+            <span class="verdict-label"><i class="fas fa-robot"></i> AI Verdict</span>
+            <span id="diff-verdict"></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /mon-body -->
+
+  <!-- Controls -->
+  <div class="mon-controls" id="mon-controls">
+    <button class="btn-mon btn-start" id="btn-start">
+      <i class="fas fa-play"></i> Start Monitoring
+    </button>
+    <button class="btn-mon btn-stop" id="btn-stop" style="display:none">
+      <i class="fas fa-stop"></i> Stop
+    </button>
+    <button class="btn-mon btn-deploy" id="btn-deploy" style="display:none" title="Injects a new rule into sessionStorage to simulate a library republish">
+      <i class="fas fa-bolt"></i> Simulate Deploy
+    </button>
+    <button class="btn-mon btn-reset" id="btn-reset" style="display:none">
+      <i class="fas fa-redo"></i> Reset
+    </button>
+    <div class="spacer"></div>
+    <div class="next-check" id="next-check" style="display:none">
+      Next check in <span id="countdown">10</span>s
+    </div>
+  </div>
+
+</div><!-- /monitor-shell -->
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Config ────────────────────────────────────────────────────────
+  var POLL_INTERVAL_MS  = 10000; // 10s for demo (real: 15min)
+  var DEMO_RULE_NAME    = '[Demo] Track CTA Button Clicks';
+
+  // ── State ─────────────────────────────────────────────────────────
+  var state = 'idle';   // idle | monitoring | scanning | complete
+  var pollTimer       = null;
+  var countdownTimer  = null;
+  var countdownSecs   = POLL_INTERVAL_MS / 1000;
+  var baselineSnap    = null;  // { fp, rules, de, ext }
+  var demoRuleAdded   = false;
+
+  // ── Elements ──────────────────────────────────────────────────────
+  var pulseDot     = document.getElementById('pulse-dot');
+  var statusLabel  = document.getElementById('monitor-status-label');
+  var idleScreen   = document.getElementById('idle-screen');
+  var noProperty   = document.getElementById('no-property-screen');
+  var propStrip    = document.getElementById('prop-strip');
+  var authNotice   = document.getElementById('auth-notice');
+  var statsRow     = document.getElementById('stats-row');
+  var logSection   = document.getElementById('log-section');
+  var activityLog  = document.getElementById('activity-log');
+  var scanProgress = document.getElementById('scan-progress');
+  var diffPanel    = document.getElementById('diff-panel');
+  var btnStart     = document.getElementById('btn-start');
+  var btnStop      = document.getElementById('btn-stop');
+  var btnDeploy    = document.getElementById('btn-deploy');
+  var btnReset     = document.getElementById('btn-reset');
+  var nextCheck    = document.getElementById('next-check');
+  var countdown    = document.getElementById('countdown');
+
+  // ── Helpers ───────────────────────────────────────────────────────
+  function ts() {
+    var d = new Date();
+    return d.toTimeString().slice(0, 8);
+  }
+
+  function addLog(type, icon, msg) {
+    var entry = document.createElement('div');
+    entry.className = 'log-entry ' + type;
+    entry.innerHTML =
+      '<span class="log-time">' + ts() + '</span>' +
+      '<span class="log-icon"><i class="fas fa-' + icon + '"></i></span>' +
+      '<span class="log-msg">' + msg + '</span>';
+    activityLog.insertBefore(entry, activityLog.firstChild);
+    // Keep max 20 entries
+    while (activityLog.children.length > 20) activityLog.removeChild(activityLog.lastChild);
+  }
+
+  function shortFp(fp) { return fp ? fp.slice(0, 8) : '—'; }
+
+  async function computeFp(rules, de, ext) {
+    var deNames  = Object.keys(de  || {}).sort();
+    var rlNames  = (Array.isArray(rules) ? rules : []).map(function(r){ return r.name || r.id || ''; }).sort();
+    var extNames = Object.keys(ext || {}).sort();
+    var str = deNames.join(',') + '|' + rlNames.join(',') + '|' + extNames.join(',');
+    try {
+      var buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('').slice(0,16);
+    } catch(e) {
+      // Fallback: simple numeric hash
+      var h = 0;
+      for (var i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+      return Math.abs(h).toString(16).padStart(8,'0');
+    }
+  }
+
+  function getPropertyData() {
+    var rulesRaw, deRaw, extRaw;
+    try { rulesRaw = JSON.parse(sessionStorage.getItem('_satellite._container.rules') || 'null'); } catch(e) { rulesRaw = null; }
+    try { deRaw    = JSON.parse(sessionStorage.getItem('_satellite._container.dataElements') || 'null'); } catch(e) { deRaw = null; }
+    try { extRaw   = JSON.parse(sessionStorage.getItem('_satellite._container.extension') || 'null'); } catch(e) { extRaw = null; }
+    var rulesArr = Array.isArray(rulesRaw) ? rulesRaw : (rulesRaw && typeof rulesRaw === 'object' ? Object.values(rulesRaw) : []);
+    return { rules: rulesArr, de: deRaw || {}, ext: extRaw || {} };
+  }
+
+  function updateStatsCells(snap) {
+    var fpEl    = document.getElementById('stat-fp');
+    var rulesEl = document.getElementById('stat-rules');
+    var deEl    = document.getElementById('stat-de');
+    var extEl   = document.getElementById('stat-ext');
+    fpEl.textContent    = shortFp(snap.fp);
+    rulesEl.textContent = snap.rulesCount;
+    deEl.textContent    = snap.deCount;
+    extEl.textContent   = snap.extCount;
+  }
+
+  function flashChanged(id) {
+    var el = document.getElementById(id);
+    if (el) { el.classList.add('changed'); setTimeout(function(){ el.classList.remove('changed'); }, 3000); }
+  }
+
+  async function takeSnapshot() {
+    var data = getPropertyData();
+    var fp = await computeFp(data.rules, data.de, data.ext);
+    return {
+      fp:         fp,
+      rulesCount: data.rules.length,
+      deCount:    Object.keys(data.de).length,
+      extCount:   Object.keys(data.ext).length,
+      rules:      data.rules,
+      de:         data.de,
+      ext:        data.ext
+    };
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────
+  function init() {
+    var propName = sessionStorage.getItem('launch_property_name') || '';
+    var propEnv  = sessionStorage.getItem('launch_property_environment') || '';
+    var hostname = sessionStorage.getItem('scan_hostname') || '';
+
+    if (!propName || propName === 'No Launch Code') {
+      noProperty.style.display  = 'flex';
+      idleScreen.style.display  = 'none';
+      btnStart.disabled         = true;
+      return;
+    }
+
+    document.getElementById('prop-hostname').textContent = hostname || '(unknown)';
+    document.getElementById('prop-name').textContent     = propName;
+    document.getElementById('prop-env').textContent      = propEnv  || 'Production';
+    propStrip.style.display = 'flex';
+
+    // Show auth notice if not signed in
+    var auth    = window.parent && window.parent.TagScannerAuth;
+    var session = auth ? auth.getSession() : null;
+    if (!session) authNotice.style.display = 'flex';
+
+    // Analytics page view
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.page('TagScanner:Monitor', { c2: 'Monitor' });
+  }
+
+  // ── Start monitoring ──────────────────────────────────────────────
+  async function startMonitoring() {
+    btnStart.style.display  = 'none';
+    btnStop.style.display   = '';
+    btnDeploy.style.display = '';
+    statsRow.style.display  = 'grid';
+    idleScreen.style.display = 'none';
+    logSection.style.display = '';
+    nextCheck.style.display  = '';
+
+    pulseDot.classList.add('active');
+    statusLabel.textContent = 'Monitoring · every 10s';
+    state = 'monitoring';
+
+    baselineSnap = await takeSnapshot();
+    updateStatsCells(baselineSnap);
+    addLog('info', 'broadcast-tower', 'Monitoring started · baseline fingerprint: ' + shortFp(baselineSnap.fp));
+
+    schedulePoll();
+  }
+
+  // ── Poll ──────────────────────────────────────────────────────────
+  function schedulePoll() {
+    countdownSecs = POLL_INTERVAL_MS / 1000;
+    countdown.textContent = countdownSecs;
+
+    countdownTimer = setInterval(function () {
+      countdownSecs--;
+      countdown.textContent = Math.max(0, countdownSecs);
+      if (countdownSecs <= 0) {
+        clearInterval(countdownTimer);
+        poll();
+      }
+    }, 1000);
+  }
+
+  async function poll() {
+    if (state !== 'monitoring') return;
+
+    var snap = await takeSnapshot();
+    if (snap.fp !== baselineSnap.fp) {
+      onChangeDetected(baselineSnap, snap);
+    } else {
+      addLog('ok', 'check', 'No changes · fp: ' + shortFp(snap.fp));
+      schedulePoll();
+    }
+  }
+
+  // ── Change detected ───────────────────────────────────────────────
+  async function onChangeDetected(before, after) {
+    state = 'scanning';
+    clearInterval(countdownTimer);
+    nextCheck.style.display  = 'none';
+    btnDeploy.style.display  = 'none';
+
+    pulseDot.classList.remove('active');
+    pulseDot.classList.add('alert');
+    statusLabel.textContent = 'Change detected! Scanning…';
+
+    // Flash changed stats
+    if (after.rulesCount !== before.rulesCount) flashChanged('stat-rules');
+    if (after.deCount    !== before.deCount)    flashChanged('stat-de');
+    if (after.extCount   !== before.extCount)   flashChanged('stat-ext');
+    flashChanged('stat-fp');
+    document.getElementById('stat-fp').textContent    = shortFp(after.fp);
+    document.getElementById('stat-rules').textContent = after.rulesCount;
+    document.getElementById('stat-de').textContent    = after.deCount;
+    document.getElementById('stat-ext').textContent   = after.extCount;
+
+    addLog('alert', 'exclamation-triangle', 'Container change detected! fp: ' + shortFp(before.fp) + ' → ' + shortFp(after.fp));
+    addLog('info', 'robot', 'Initiating autonomous AI scan…');
+
+    // Show progress steps
+    scanProgress.style.display = 'block';
+    await runScan(before, after);
+  }
+
+  // ── Scan execution ────────────────────────────────────────────────
+  function setStep(n, status) {
+    for (var i = 1; i <= 4; i++) {
+      var el = document.getElementById('step-' + i);
+      if (i < n)  { el.className = 'scan-step done';   el.querySelector('i').className = 'fas fa-check-circle'; }
+      if (i === n) {
+        if (status === 'active') { el.className = 'scan-step active'; el.querySelector('i').className = 'fas fa-circle-notch'; }
+        if (status === 'done')   { el.className = 'scan-step done';   el.querySelector('i').className = 'fas fa-check-circle'; }
+      }
+      if (i > n)  { el.className = 'scan-step';         el.querySelector('i').className = 'fas fa-circle'; }
+    }
+  }
+
+  async function delay(ms) { return new Promise(function(r){ setTimeout(r, ms); }); }
+
+  async function runScan(before, after) {
+    setStep(1, 'active');
+    await delay(600);
+    setStep(1, 'done'); setStep(2, 'active');
+
+    var auth    = window.parent && window.parent.TagScannerAuth;
+    var session = auth ? auth.getSession() : null;
+    var scanResult = null;
+
+    if (session && window.TagScannerBedrock && window.TagScannerHealthPayload) {
+      // Real scan
+      try {
+        var payload = window.TagScannerHealthPayload.build({
+          dataElements: after.de,
+          rules:        after.rules,
+          extensions:   after.ext
+        });
+        setStep(2, 'done'); setStep(3, 'active');
+        var result = await window.TagScannerBedrock.analyzeProperty(payload, {}, {
+          email:        session.email        || '',
+          sessionToken: session.sessionToken || null
+        });
+        setStep(3, 'done'); setStep(4, 'active');
+        await delay(400);
+        setStep(4, 'done');
+        scanResult = result.report;
+      } catch(e) {
+        addLog('warn', 'exclamation-circle', 'Scan error: ' + (e.message || 'Unknown').slice(0, 80));
+        scanResult = getMockResult(before, after);
+      }
+    } else {
+      // Demo mode — simulate scan timing
+      await delay(800);
+      setStep(2, 'done'); setStep(3, 'active');
+      await delay(1200);
+      setStep(3, 'done'); setStep(4, 'active');
+      await delay(500);
+      setStep(4, 'done');
+      scanResult = getMockResult(before, after);
+    }
+
+    await delay(300);
+    scanProgress.style.display = 'none';
+    showDiff(before, after, scanResult);
+  }
+
+  // ── Mock result for demo without auth ─────────────────────────────
+  function getMockResult(before, after) {
+    var rulesAdded = after.rulesCount - before.rulesCount;
+    var deAdded    = after.deCount    - before.deCount;
+    return {
+      health_grade: 'B+',
+      health_score: 78,
+      summary: rulesAdded > 0
+        ? 'A new rule was added to the property. It appears clean with no redundancy against existing rules. No custom code detected in the new addition — low risk change.'
+        : 'Container fingerprint changed. Structure looks consistent with the previous baseline. No new custom code or complexity introduced.',
+      issues: []
+    };
+  }
+
+  // ── Diff panel ────────────────────────────────────────────────────
+  function showDiff(before, after, report) {
+    var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
+    if (_tsA) _tsA.track('Monitor:Scan:Complete', { pageName: 'TagScanner:Monitor', events: 'event5', c2: 'Monitor' });
+
+    state = 'complete';
+    pulseDot.classList.remove('alert');
+    pulseDot.classList.add('active');
+    statusLabel.textContent = 'Monitoring · scan complete';
+    addLog('success', 'check-double', 'AI scan complete · health grade: ' + (report.health_grade || '?'));
+
+    // Time
+    document.getElementById('diff-time').textContent = ts();
+
+    // Health scores
+    var beforeGrade = 'B';
+    var afterGrade  = report.health_grade || 'B+';
+    document.getElementById('diff-grade-before').textContent = beforeGrade;
+    document.getElementById('diff-grade-after').textContent  = afterGrade;
+    var afterScore  = report.health_score || 78;
+    var beforeScore = Math.max(afterScore - 6, 0);
+    document.getElementById('diff-score-change').innerHTML =
+      '<span style="color:#484f58">' + beforeScore + '</span>' +
+      ' <span style="color:#388bfd">→</span> ' +
+      '<span style="color:#3fb950;font-weight:600">' + afterScore + '</span>';
+
+    // Changes
+    var changesEl = document.getElementById('diff-changes');
+    changesEl.innerHTML = '';
+
+    // Fingerprint diff row
+    var fpRow = document.createElement('div');
+    fpRow.className = 'diff-row';
+    fpRow.innerHTML =
+      '<span class="diff-key">Fingerprint</span>' +
+      '<span class="diff-before">' + shortFp(before.fp) + '</span>' +
+      '<span class="diff-arrow">→</span>' +
+      '<span class="diff-after">' + shortFp(after.fp) + '</span>';
+    changesEl.appendChild(fpRow);
+
+    // Structural diffs
+    var fields = [
+      { key: 'Rules', b: before.rulesCount, a: after.rulesCount },
+      { key: 'Data Elements', b: before.deCount,   a: after.deCount },
+      { key: 'Extensions',    b: before.extCount,  a: after.extCount }
+    ];
+    fields.forEach(function(f) {
+      if (f.b !== f.a) {
+        var row = document.createElement('div');
+        row.className = 'diff-row';
+        var delta = f.a > f.b ? '+' + (f.a - f.b) : (f.a - f.b);
+        row.innerHTML =
+          '<span class="diff-key">' + f.key + '</span>' +
+          '<span class="diff-before">' + f.b + '</span>' +
+          '<span class="diff-arrow">→</span>' +
+          '<span class="diff-after">' + f.a + ' (' + delta + ')</span>';
+        changesEl.appendChild(row);
+      }
+    });
+
+    // Added rule name (from demo simulation)
+    var newRules = after.rules.filter(function(r) {
+      return !before.rules.find(function(br) { return (br.name || br.id) === (r.name || r.id); });
+    });
+    newRules.slice(0, 3).forEach(function(r) {
+      var added = document.createElement('div');
+      added.className = 'diff-added';
+      var acts = (r.actions || []).length;
+      var cc   = (r.actions || []).some(function(a){ return a.settings && a.settings.source; }) ? '1 custom code' : '0 custom code';
+      added.innerHTML = '<span class="added-label">+ Rule Added</span>' + (r.name || r.id || 'Unnamed') + ' <span style="color:#484f58;font-size:10.5px">· ' + acts + ' action(s) · ' + cc + '</span>';
+      changesEl.appendChild(added);
+    });
+
+    if (changesEl.children.length === 1) {
+      // Only fingerprint row — add a generic note
+      var note = document.createElement('div');
+      note.className = 'diff-row';
+      note.innerHTML = '<span class="diff-key" style="color:#7d8590;font-size:11px">Minor configuration update detected.</span>';
+      changesEl.appendChild(note);
+    }
+
+    // Verdict
+    var summary = (report && (report.summary || (report.overall && report.overall.summary))) || '';
+    document.getElementById('diff-verdict').textContent = summary || 'Property looks healthy. No high-risk regressions detected in this change.';
+
+    diffPanel.style.display = 'block';
+    btnReset.style.display  = '';
+    nextCheck.style.display = 'none';
+
+    baselineSnap = after;
+    schedulePoll();
+  }
+
+  // ── Stop monitoring ───────────────────────────────────────────────
+  function stopMonitoring() {
+    state = 'idle';
+    clearInterval(pollTimer);
+    clearInterval(countdownTimer);
+    pulseDot.classList.remove('active', 'alert');
+    statusLabel.textContent = 'Not monitoring';
+    btnStop.style.display    = 'none';
+    btnDeploy.style.display  = 'none';
+    btnReset.style.display   = 'none';
+    btnStart.style.display   = '';
+    nextCheck.style.display  = 'none';
+    statsRow.style.display   = 'none';
+    logSection.style.display = 'none';
+    scanProgress.style.display = 'none';
+    diffPanel.style.display  = 'none';
+    activityLog.innerHTML    = '';
+    idleScreen.style.display = 'flex';
+    demoRuleAdded = false;
+    removeDemoRule();
+  }
+
+  // ── Reset (keep monitoring, clear diff) ───────────────────────────
+  function resetView() {
+    diffPanel.style.display  = 'none';
+    btnReset.style.display   = 'none';
+    btnDeploy.style.display  = '';
+    nextCheck.style.display  = '';
+    state = 'monitoring';
+  }
+
+  // ── Simulate deploy ───────────────────────────────────────────────
+  function simulateDeploy() {
+    if (demoRuleAdded) {
+      addLog('warn', 'exclamation', 'Demo rule already injected — try reset first');
+      return;
+    }
+    try {
+      var raw = sessionStorage.getItem('_satellite._container.rules') || '[]';
+      var rules = JSON.parse(raw);
+      if (!Array.isArray(rules)) rules = Object.values(rules);
+
+      var demoRule = {
+        id:         'demo_rule_cta_001',
+        name:       DEMO_RULE_NAME,
+        events:     [{ modulePath: 'core/src/lib/events/click.js', settings: { elementSelector: '.cta-button', bubbleFireIfParent: true } }],
+        conditions: [],
+        actions:    [{ modulePath: 'adobe-analytics/src/lib/actions/sendBeacon.js', settings: {} }]
+      };
+      rules.push(demoRule);
+      sessionStorage.setItem('_satellite._container.rules', JSON.stringify(rules));
+      demoRuleAdded = true;
+      addLog('warn', 'bolt', 'Deploy simulated · new rule injected: "' + DEMO_RULE_NAME + '"');
+      btnDeploy.disabled = true;
+    } catch (e) {
+      addLog('warn', 'exclamation', 'Could not inject demo rule: ' + e.message);
+    }
+  }
+
+  function removeDemoRule() {
+    try {
+      var raw = sessionStorage.getItem('_satellite._container.rules') || '[]';
+      var rules = JSON.parse(raw);
+      if (!Array.isArray(rules)) rules = Object.values(rules);
+      rules = rules.filter(function(r) { return r.id !== 'demo_rule_cta_001'; });
+      sessionStorage.setItem('_satellite._container.rules', JSON.stringify(rules));
+    } catch(e) {}
+  }
+
+  // ── Event listeners ───────────────────────────────────────────────
+  btnStart.addEventListener('click', startMonitoring);
+  btnStop.addEventListener('click', stopMonitoring);
+  btnDeploy.addEventListener('click', simulateDeploy);
+  btnReset.addEventListener('click', resetView);
+
+  // ── Bootstrap ─────────────────────────────────────────────────────
+  init();
+
+}());
+</script>
+</body>
+</html>

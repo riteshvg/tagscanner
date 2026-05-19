@@ -57,9 +57,12 @@
   }
 
   function getPropCtx() {
+    var hostname = '';
+    try { hostname = sessionStorage.getItem('scan_hostname') || ''; } catch (e) {}
     return {
-      name: sessionStorage.getItem('launch_property_name') || '',
-      env:  sessionStorage.getItem('launch_property_environment') || ''
+      name:     sessionStorage.getItem('launch_property_name') || '',
+      env:      sessionStorage.getItem('launch_property_environment') || '',
+      hostname: hostname
     };
   }
 
@@ -83,6 +86,7 @@
           v2:  p.env,                     // eVar2: environment
           v3:  s ? (s.isAdmin ? 'admin' : 'user') : 'anonymous', // eVar3: user role
           v4:  APP_VERSION,               // eVar4: TagScanner version
+          v6:  p.hostname,               // eVar6: scanned website hostname
           c1:  p.name,                    // prop1: property name (pathing)
           c2:  (params && params.pageName) || ''  // prop2: current section
         };

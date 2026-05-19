@@ -56,7 +56,7 @@ chrome.action.onClicked.addListener(async (tab) => {
 
   // No existing popup — safe to write the tab ID and open a new window.
   if (tab && tab.id) {
-    await chrome.storage.local.set({ launch_tab_id: tab.id });
+    await chrome.storage.local.set({ launch_tab_id: tab.id, launch_tab_url: tab.url || '' });
   }
 
   const newWin = await chrome.windows.create({

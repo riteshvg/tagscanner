@@ -43,8 +43,13 @@ chrome.runtime.onMessage.addListener(function (message) {
 (async () => {
   // Read the tab ID stored by the service worker at click time — guaranteed to be
   // the tab the user clicked the extension icon on, regardless of open windows.
-  const stored = await new Promise(r => chrome.storage.local.get('launch_tab_id', r));
+  const stored = await new Promise(r => chrome.storage.local.get(['launch_tab_id', 'launch_tab_url'], r));
   const tab = stored.launch_tab_id ? { id: stored.launch_tab_id } : null;
+  var scanHostname = '';
+  if (stored.launch_tab_url) {
+    try { scanHostname = new URL(stored.launch_tab_url).hostname; } catch (e) {}
+  }
+  try { sessionStorage.setItem('scan_hostname', scanHostname); } catch (e) {}
 
   // const [tab] = await chrome.windows.create({
   //   url: 'popup.html', // URL of the page you want to open
@@ -337,6 +342,15 @@ chrome.runtime.onMessage.addListener(function (message) {
       document.getElementById('property_name').textContent =
         'PROPERTY NAME: ' + propertyName;
       document.getElementById('environment_name').textContent = 'Environment: ' + envName;
+
+      var topbarWebsite = document.getElementById('topbar-website');
+      if (topbarWebsite && scanHostname) {
+        topbarWebsite.textContent = '';
+        var siteIcon = document.createElement('i');
+        siteIcon.className = 'fas fa-globe mr-1';
+        topbarWebsite.appendChild(siteIcon);
+        topbarWebsite.appendChild(document.createTextNode(scanHostname));
+      }
 
       var topbarEnv = document.getElementById('topbar-env');
       if (topbarEnv) {

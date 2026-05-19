@@ -194,6 +194,118 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(dismiss, 12000);
   }
 
+  // ── Share & Invite ───────────────────────────────────────────────────────
+
+  var CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/tagscanner/ajcohbbmajdcbppmmogdpkfhagjiedii';
+
+  var shareBtn   = document.getElementById('share-button-sidebar');
+  var sharePanel = document.getElementById('share-panel');
+  var copyBtn    = document.getElementById('share-copy-btn');
+  var copyLabel  = document.getElementById('share-copy-label');
+  var linkedinBtn = document.getElementById('share-linkedin-btn');
+  var emailBtn   = document.getElementById('share-email-btn');
+
+  if (shareBtn && sharePanel) {
+    shareBtn.addEventListener('click', function () {
+      var isOpen = sharePanel.style.display !== 'none';
+      sharePanel.style.display = isOpen ? 'none' : 'block';
+      shareBtn.style.background = isOpen ? '' : 'rgba(255,255,255,0.1)';
+    });
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener('mouseenter', function () { copyBtn.style.background = 'rgba(255,255,255,0.08)'; });
+    copyBtn.addEventListener('mouseleave', function () { copyBtn.style.background = 'transparent'; });
+    copyBtn.addEventListener('click', function () {
+      navigator.clipboard.writeText(CHROME_STORE_URL).then(function () {
+        copyLabel.textContent = 'Link copied!';
+        copyBtn.style.borderColor = '#34d399';
+        copyBtn.querySelector('i').style.color = '#34d399';
+        setTimeout(function () {
+          copyLabel.textContent = 'Copy Chrome Store link';
+          copyBtn.style.borderColor = 'rgba(255,255,255,0.15)';
+          copyBtn.querySelector('i').style.color = '#9ca3af';
+        }, 2000);
+      });
+      if (window.TagScannerAnalytics) {
+        TagScannerAnalytics.track('Share:Copy Link', { pageName: 'TagScanner:Sidebar', c2: 'Sidebar' });
+      }
+    });
+  }
+
+  if (linkedinBtn) {
+    linkedinBtn.addEventListener('mouseenter', function () { linkedinBtn.style.background = 'rgba(255,255,255,0.08)'; });
+    linkedinBtn.addEventListener('mouseleave', function () { linkedinBtn.style.background = 'transparent'; });
+    linkedinBtn.addEventListener('click', function () {
+      chrome.tabs.create({ url: 'https://www.linkedin.com' });
+      if (window.TagScannerAnalytics) {
+        TagScannerAnalytics.track('Share:LinkedIn', { pageName: 'TagScanner:Sidebar', c2: 'Sidebar' });
+      }
+    });
+  }
+
+  var emailPicker  = document.getElementById('share-email-picker');
+  var emailChevron = document.getElementById('share-email-chevron');
+
+  function buildEmailLinks(client) {
+    var subject = 'Free Chrome extension for Adobe Tags — worth installing';
+    var body =
+      'Hey,\n\n' +
+      'Quick share — I\'ve been using TagScanner to inspect Adobe Tags (Launch) properties. ' +
+      'It gives you a full breakdown of every rule, data element, and extension in seconds — ' +
+      'no API keys or login needed.\n\n' +
+      'It also has AI-powered health scans, plain-English explanations of custom code, ' +
+      'and lets you export everything to Excel in one click.\n\n' +
+      'Install it here (free): ' + CHROME_STORE_URL + '\n\n' +
+      'Takes 30 seconds to set up. Would be super useful for Adobe Tags work.\n\nCheers';
+
+    var s = encodeURIComponent(subject);
+    var b = encodeURIComponent(body);
+
+    switch (client) {
+      case 'outlook365':
+        return 'https://outlook.office.com/mail/deeplink/compose?subject=' + s + '&body=' + b;
+      case 'outlooklive':
+        return 'https://outlook.live.com/mail/deeplink/compose?subject=' + s + '&body=' + b;
+      case 'gmail':
+        return 'https://mail.google.com/mail/?view=cm&fs=1&su=' + s + '&body=' + b;
+      default:
+        return 'mailto:?subject=' + s + '&body=' + b;
+    }
+  }
+
+  if (emailBtn && emailPicker) {
+    emailBtn.addEventListener('mouseenter', function () { emailBtn.style.background = 'rgba(255,255,255,0.08)'; });
+    emailBtn.addEventListener('mouseleave', function () { emailBtn.style.background = 'transparent'; });
+    emailBtn.addEventListener('click', function () {
+      var isOpen = emailPicker.style.display !== 'none';
+      emailPicker.style.display = isOpen ? 'none' : 'block';
+      if (emailChevron) emailChevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+      emailBtn.style.borderColor = isOpen ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.3)';
+    });
+  }
+
+  document.querySelectorAll('.share-client-btn').forEach(function (btn) {
+    btn.addEventListener('mouseenter', function () { btn.style.filter = 'brightness(1.3)'; });
+    btn.addEventListener('mouseleave', function () { btn.style.filter = ''; });
+    btn.addEventListener('click', function () {
+      var client = btn.getAttribute('data-client');
+      var url = buildEmailLinks(client);
+      if (client === 'mailto') {
+        window.location.href = url;
+      } else {
+        chrome.tabs.create({ url: url });
+      }
+      if (window.TagScannerAnalytics) {
+        TagScannerAnalytics.track('Share:Invite Email', {
+          pageName: 'TagScanner:Sidebar',
+          c2: 'Sidebar',
+          v9: 'Share:Invite:' + client
+        });
+      }
+    });
+  });
+
   // Navigation tracking
   var _navMap = [
     { id: 'home-menu-link',         section: 'Home' },

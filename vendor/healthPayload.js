@@ -83,7 +83,7 @@
       property: {
         name:        sessionStorage.getItem('launch_property_name') || 'Unknown',
         environment: sessionStorage.getItem('launch_property_environment') || 'Production',
-        url:         sessionStorage.getItem('launch_page_url') || '',
+        url:         (function(){ var h = sessionStorage.getItem('scan_hostname'); return h ? 'https://' + h : ''; }()),
         total_size_kb: round2(totalSz)
       },
       rules: {

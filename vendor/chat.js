@@ -129,7 +129,8 @@
   function buildChatContext() {
     var propName = sessionStorage.getItem('launch_property_name') || '';
     var propEnv  = sessionStorage.getItem('launch_property_environment') || 'Production';
-    var propUrl  = sessionStorage.getItem('launch_page_url') || '';
+    var propHostname = sessionStorage.getItem('scan_hostname') || '';
+    var propUrl  = propHostname ? 'https://' + propHostname : '';
 
     var rulesRaw, deRaw, extRaw;
     try { rulesRaw = JSON.parse(sessionStorage.getItem('_satellite._container.rules') || 'null'); } catch(e) { rulesRaw = null; }

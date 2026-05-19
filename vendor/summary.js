@@ -130,6 +130,29 @@ document.addEventListener('DOMContentLoaded', function () {
       return Number((size / 1000).toFixed(2)); // Size in KB
     };
 
+    // Returns true if a data element is implemented as custom code.
+    // Custom-code DEs may be called from page-level JS (_satellite.getVar) in
+    // contexts we cannot scan, so they should never be flagged as "unused".
+    function deHasCustomCode(de) {
+      if (!de) return false;
+      if (de.modulePath && de.modulePath.indexOf('custom-code') > -1) return true;
+      if (de.settings && (de.settings.source || de.settings.customCode)) return true;
+      return false;
+    }
+
+    // Returns true if any component (event/condition/action) in the rule
+    // contains custom code. Such rules may be triggered via _satellite.track()
+    // from outside the property, so they should not be flagged as "unused".
+    function ruleHasCustomCode(rule) {
+      if (!rule) return false;
+      var comps = [].concat(rule.events || [], rule.conditions || [], rule.actions || []);
+      return comps.some(function (comp) {
+        if (comp.modulePath && comp.modulePath.indexOf('custom-code') > -1) return true;
+        if (comp.settings && (comp.settings.customCode || comp.settings.source)) return true;
+        return false;
+      });
+    }
+
     // Initialize all extensions as unused and calculate their sizes
     let totalExtSize = 0;
     let unusedExtSize = 0;
@@ -157,6 +180,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       usageData.dataElements[deName] = {
         used: false,
+        hasCustomCode: deHasCustomCode(dataElements[deName]),
         usedInRules: [],
         usedInDataElements: [],
         size: size,
@@ -185,6 +209,7 @@ document.addEventListener('DOMContentLoaded', function () {
         name: rule.name || rule.id || 'Rule ' + (ruleIndex + 1),
         used: false,
         hasEvents: false,
+        hasCustomCode: ruleHasCustomCode(rule),
         size: size,
       };
 
@@ -328,9 +353,11 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
 
-    // Count unused components and their sizes
+    // Count unused components and their sizes.
+    // Exclude items that contain custom code — they may be called from page-level
+    // JavaScript (_satellite.getVar / _satellite.track) which we cannot scan.
     const unusedDataElements = Object.keys(usageData.dataElements).filter(
-      (deName) => !usageData.dataElements[deName].used
+      (deName) => !usageData.dataElements[deName].used && !usageData.dataElements[deName].hasCustomCode
     );
 
     unusedDataElements.forEach((deName) => {
@@ -338,7 +365,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     const unusedRules = Object.keys(usageData.rules).filter(
-      (ruleId) => !usageData.rules[ruleId].used
+      (ruleId) => !usageData.rules[ruleId].used && !usageData.rules[ruleId].hasCustomCode
     );
 
     unusedRules.forEach((ruleId) => {
@@ -491,6 +518,72 @@ document.addEventListener('DOMContentLoaded', function () {
           }).join('');
         }
       }
+
+      // ── Copy-table buttons ──────────────────────────────────────────────────
+      function makeTSV(headers, rows) {
+        return [headers.join('\t')]
+          .concat(rows.map(function(r) { return r.join('\t'); }))
+          .join('\n');
+      }
+
+      function attachCopyBtn(btnId, buildRows) {
+        var btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          var tsv = buildRows();
+          navigator.clipboard.writeText(tsv).then(function () {
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            btn.classList.add('copied');
+            setTimeout(function () {
+              btn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+              btn.classList.remove('copied');
+            }, 1800);
+          }).catch(function () {
+            // fallback for older contexts
+            var ta = document.createElement('textarea');
+            ta.value = tsv;
+            ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+            btn.classList.add('copied');
+            setTimeout(function () {
+              btn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+              btn.classList.remove('copied');
+            }, 1800);
+          });
+        });
+      }
+
+      attachCopyBtn('copyDeTableBtn', function () {
+        if (unusedDe === 0) return 'No unused data elements';
+        return makeTSV(['Data Element', 'Size (KB)'], unusedDataElements.map(function (deName) {
+          var size = usageData.dataElements[deName] ? usageData.dataElements[deName].size : '';
+          return [deName, size];
+        }));
+      });
+
+      attachCopyBtn('copyRuleTableBtn', function () {
+        if (unusedRl === 0) return 'No unused rules';
+        return makeTSV(['Rule', 'Size (KB)'], unusedRules.map(function (ruleId) {
+          var entry = usageData.rules[ruleId];
+          var name  = entry ? (entry.name || ruleId) : ruleId;
+          var size  = entry ? entry.size : '';
+          return [name, size];
+        }));
+      });
+
+      attachCopyBtn('copyExtTableBtn', function () {
+        if (unusedEx === 0) return 'No unused extensions';
+        return makeTSV(['Extension', 'Size (KB)'], unusedExtensions.map(function (extKey) {
+          var entry = usageData.extensions[extKey];
+          var name  = entry ? (entry.name || extKey) : extKey;
+          var size  = entry ? entry.size : '';
+          return [name, size];
+        }));
+      });
 
       section.style.display = '';
       if (divider) divider.style.display = '';

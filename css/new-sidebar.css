@@ -1,10 +1,9 @@
 /* Wrapper for the header */
 #wrapper .header {
   display: flex;
-  /* flex-direction: column; */
   align-items: center;
-  /* padding: 20px; */
-  background-color: #080808;
+  background-color: #111111;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Sidebar brand link */
@@ -55,13 +54,13 @@
 
 /* ── Sidebar group labels ─────────────────────────────── */
 .sidebar-group-label {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 1.4px;
+  letter-spacing: 1.8px;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35);
-  padding: 14px 6px 4px;
-  margin-bottom: 2px;
+  color: rgba(255, 255, 255, 0.22);
+  padding: 20px 6px 4px;
+  margin-bottom: 0;
   list-style: none;
 }
 /* Sidebar brand description */
@@ -77,11 +76,10 @@
 /* Sidebar container */
 .flex-shrink-0 {
   width: 250px;
-  background-color: #2f2d2d;
-  border-right: 1px solid #dee2e6;
+  background-color: #111111;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
   padding: 1rem;
-  /* left: -250px; Initially hidden */
-  transition: left 0.3s ease; /* Smooth transition */
+  transition: left 0.3s ease;
 }
 
 /* List styling */
@@ -92,7 +90,7 @@ ul.list-unstyled {
 
 /* List items */
 li.mb-1 {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.05rem;
 }
 
 /* Links */
@@ -110,8 +108,8 @@ a {
   transition: all 0.3s ease;
   overflow-x: hidden;
   overflow-y: auto;
-  background-color: #252525;
-  border-right: 1px solid #dee2e6;
+  background-color: #111111;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -238,11 +236,11 @@ a {
 /* Ensure proper spacing for expanded state */
 #sidebar-click.active .btn-toggle {
   justify-content: flex-start;
-  padding: 0.5rem 1rem;
+  padding: 0.75rem 1.25rem;
 }
 
 #sidebar-click.active .btn-toggle i {
-  margin-right: 0.5rem;
+  margin-right: 0.75rem;
 }
 
 #sidebar-click.active #sidebar-toggle-btn {
@@ -266,7 +264,7 @@ a {
 
 /* Adjust padding for sidebar items */
 .list-unstyled li {
-  padding: 0.25rem 0;
+  padding: 0;
 }
 
 /* Make icons slightly smaller */
@@ -302,21 +300,26 @@ a {
 
 /* Sidebar: light text on dark background */
 #sidebar-click .btn-toggle {
-  color: #e4e4e4;
+  color: #8a8f9c;
+  font-size: 14.5px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  border-left: 2px solid transparent;
 }
 #sidebar-click .btn-toggle:hover,
 #sidebar-click .btn-toggle:focus {
-  color: #fff;
-  background-color: rgba(255, 255, 255, 0.12);
+  color: #d1d5db;
+  background-color: rgba(255, 255, 255, 0.04);
   text-decoration: none;
 }
 
-/* Active/selected menu item */
+/* Active/selected menu item — teal text + accent, no background fill */
 #sidebar-click .btn-toggle.nav-active {
-  color: #fff;
-  background-color: rgba(255, 255, 255, 0.18);
-  border-left: 3px solid #4e73df;
-  padding-left: calc(1rem - 3px);
+  color: #1cc88a;
+  background-color: transparent;
+  border-left: 2px solid #1cc88a;
+  padding-left: calc(1.25rem - 2px);
+  font-weight: 500;
 }
 
 .btn.btn-toggle:hover,
@@ -412,17 +415,18 @@ a {
 #sidebar-toggle-btn {
   width: 100%;
   margin-bottom: 10px;
-  background: #252525;
-  color: white;
+  background: #111111;
+  color: rgba(255, 255, 255, 0.35);
   border: none;
-  font-size: 1.2em;
+  font-size: 1.1em;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  transition: background 0.2s;
+  transition: color 0.2s;
 }
 #sidebar-toggle-btn:hover {
-  background: #333;
+  background: #111111;
+  color: rgba(255, 255, 255, 0.7);
 }
 #sidebar-toggle-icon {
   margin-right: 8px;

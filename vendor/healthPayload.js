@@ -41,22 +41,29 @@
 
     // Rule signals
     var rulesCustomCode = 0, rulesNoConditions = 0, rulesHighActions = 0, totalActions = 0;
+    var rulesWithoutEvents = 0, rulesNoEventsCustomCode = 0;
     rl.forEach(function (rule) {
       var components = [].concat(rule.events || [], rule.conditions || [], rule.actions || []);
       var hasCode = components.some(function (c) {
         return c && c.settings && (c.settings.source || c.settings.customCode || c.settings.script);
       });
       if (hasCode) rulesCustomCode++;
+      var noEvents = !rule.events || rule.events.length === 0;
+      if (noEvents) {
+        rulesWithoutEvents++;
+        if (hasCode) rulesNoEventsCustomCode++;
+      }
       if (rule.events && rule.events.length > 0 && (!rule.conditions || rule.conditions.length === 0)) rulesNoConditions++;
       var ac = (rule.actions || []).length;
       totalActions += ac;
       if (ac > 5) rulesHighActions++;
     });
 
-    // DE custom code count
+    // DE custom code count (all DEs with custom code, including those excluded from unused)
     var deCustomCode = Object.keys(de).filter(function (n) {
       var d = de[n];
-      return d.settings && (d.settings.source || d.settings.customCode || d.settings.script);
+      return (d.modulePath && d.modulePath.indexOf('custom-code') > -1) ||
+             (d.settings && (d.settings.source || d.settings.customCode || d.settings.script));
     }).length;
 
     // Top unused by size
@@ -80,24 +87,33 @@
         total_size_kb: round2(totalSz)
       },
       rules: {
-        total:             rlCount,
-        without_events:    p.unusedRules.length,
-        with_custom_code:  rulesCustomCode,
-        no_conditions:     rulesNoConditions,
-        high_action_count: rulesHighActions,
-        avg_actions:       rlCount > 0 ? Math.round((totalActions / rlCount) * 10) / 10 : 0,
-        top_unused:        topUnused(p.unusedRules, ud.rules, 'name')
+        total:                  rlCount,
+        without_events:         rulesWithoutEvents,
+        unused:                 p.unusedRules.length,
+        custom_code_no_events:  rulesNoEventsCustomCode,
+        with_custom_code:       rulesCustomCode,
+        no_conditions:          rulesNoConditions,
+        high_action_count:      rulesHighActions,
+        avg_actions:            rlCount > 0 ? Math.round((totalActions / rlCount) * 10) / 10 : 0,
+        top_unused:             topUnused(p.unusedRules, ud.rules, 'name'),
+        analysis_note:          rulesNoEventsCustomCode > 0
+          ? rulesNoEventsCustomCode + ' rule(s) have no events but contain custom code — likely triggered via _satellite.track() and excluded from unused count.'
+          : null
       },
       data_elements: {
         total:                   deCount,
         unused:                  p.unusedDataElements.length,
         unused_pct:              deCount > 0 ? Math.round((p.unusedDataElements.length / deCount) * 100) : 0,
         with_custom_code:        deCustomCode,
+        custom_code_excluded_from_unused: deCustomCode,
         type_distribution:       typeDist,
         orphaned:                p.unusedDataElements.slice(0, 10),
         deep_dependency_chains:  deChains,
         most_referenced:         deRefs,
-        top_unused_by_size:      topUnused(p.unusedDataElements, ud.dataElements, 'name')
+        top_unused_by_size:      topUnused(p.unusedDataElements, ud.dataElements, 'name'),
+        analysis_note:           deCustomCode > 0
+          ? deCustomCode + ' data element(s) contain custom code and are excluded from the unused count — they may be called via _satellite.getVar() from page-level JavaScript outside the property.'
+          : null
       },
       extensions: {
         total:  extCount,

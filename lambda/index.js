@@ -6,7 +6,7 @@
  *
  * IAM role needs:
  *   bedrock:InvokeModel on *
- *   dynamodb:PutItem / GetItem / UpdateItem / Query / Scan on arn:aws:dynamodb:*:*:table/tagscanner_*
+ *   dynamodb:PutItem / GetItem / UpdateItem / Query / Scan / BatchWriteItem on arn:aws:dynamodb:*:*:table/tagscanner_*
  *
  * DynamoDB tables to create (all in same region as Lambda):
  *   tagscanner_users       — PK: userId (String)
@@ -40,7 +40,7 @@
 
 const { BedrockRuntimeClient, InvokeModelCommand } = require('@aws-sdk/client-bedrock-runtime');
 const { DynamoDBClient }                           = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, QueryCommand, ScanCommand, BatchWriteCommand } = require('@aws-sdk/lib-dynamodb');
 const { SNSClient, PublishCommand: SNSPublishCommand } = require('@aws-sdk/client-sns');
 const nodeCrypto = require('node:crypto');
 
@@ -1144,6 +1144,96 @@ async function handleSetConfig(body) {
   }
 }
 
+// ── Test-data purge (admin only) ──────────────────────────────────────────────
+//
+// Scans each table and batch-deletes every item.  DynamoDB BatchWrite accepts
+// up to 25 deletes per call, so we page through the full scan in chunks.
+//
+// Tables purged and why:
+//   tagscanner_scan_cache    — fingerprint-keyed results; testers' cached scan
+//                              would be served to real users of the same property
+//   tagscanner_explain_cache — code-hash-keyed; tester explanations served to
+//                              anyone explaining the same code snippet
+//   tagscanner_ratelimits    — daily API quota + beta chat counts accumulated
+//                              during testing; real users inherit tester counters
+//   tagscanner_queries       — property-scoped history GSI exposes tester queries
+//                              to other users scanning the same property (optional)
+
+async function batchDeleteAll(tableName, pkAttr, skAttr) {
+  let deleted = 0;
+  let lastKey;
+  const projAttrs = skAttr ? (pkAttr + ', ' + skAttr) : pkAttr;
+  do {
+    const scanResult = await ddb.send(new ScanCommand({
+      TableName:            tableName,
+      ProjectionExpression: projAttrs,
+      ExclusiveStartKey:    lastKey
+    }));
+    const items = scanResult.Items || [];
+    for (let i = 0; i < items.length; i += 25) {
+      const chunk = items.slice(i, i + 25);
+      await ddb.send(new BatchWriteCommand({
+        RequestItems: {
+          [tableName]: chunk.map(item => ({ DeleteRequest: { Key: item } }))
+        }
+      }));
+      deleted += chunk.length;
+    }
+    lastKey = scanResult.LastEvaluatedKey;
+  } while (lastKey);
+  return deleted;
+}
+
+async function handlePurgeTestData(body) {
+  const { sessionToken, tables } = body;
+  const session = await getSession(sessionToken);
+  if (!session) return resp(401, { error: 'Invalid or expired session.' });
+  if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
+  if (session.email.toLowerCase() !== ADMIN_EMAIL) return resp(403, { error: 'Admin access required.' });
+
+  // Default: purge all four tables.  Caller can pass tables:[] to pick a subset.
+  const ALL = ['scan_cache', 'explain_cache', 'rate_limits', 'queries'];
+  const scope = Array.isArray(tables) && tables.length ? tables : ALL;
+
+  const results = {};
+
+  if (scope.includes('scan_cache')) {
+    try {
+      results.scan_cache = await batchDeleteAll(SCAN_CACHE_TABLE, 'cache_key');
+    } catch (err) {
+      results.scan_cache = 'ERROR: ' + err.message;
+    }
+  }
+
+  if (scope.includes('explain_cache')) {
+    try {
+      results.explain_cache = await batchDeleteAll(EXPLAIN_CACHE_TABLE, 'code_hash');
+    } catch (err) {
+      results.explain_cache = 'ERROR: ' + err.message;
+    }
+  }
+
+  if (scope.includes('rate_limits')) {
+    try {
+      results.rate_limits = await batchDeleteAll(RATE_TABLE, 'pk');
+    } catch (err) {
+      results.rate_limits = 'ERROR: ' + err.message;
+    }
+  }
+
+  if (scope.includes('queries')) {
+    try {
+      results.queries = await batchDeleteAll(QUERIES_TABLE, 'userId', 'queryId');
+    } catch (err) {
+      results.queries = 'ERROR: ' + err.message;
+    }
+  }
+
+  const ts = new Date().toISOString();
+  console.log(JSON.stringify({ ts, event: 'purge_test_data', by: session.email, results }));
+  return resp(200, { ok: true, purgedAt: ts, deletedCounts: results });
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 exports.handler = async (event) => {
@@ -1180,8 +1270,9 @@ exports.handler = async (event) => {
     if (type === 'users') return await handleUsers(body);
 
     // ── AI config (admin) ────────────────────────────────────────────────────
-    if (type === 'config')    return handleConfig(body);
-    if (type === 'setConfig') return handleSetConfig(body);
+    if (type === 'config')        return handleConfig(body);
+    if (type === 'setConfig')     return handleSetConfig(body);
+    if (type === 'purgeTestData') return handlePurgeTestData(body);
 
     // ── Scan / Explain — require a valid session ─────────────────────────────
     const session = await getSession(sessionToken);

@@ -101,13 +101,30 @@
       .ts-header-teal   { background: #1cc88a; }
       .ts-header-orange { background: #e67e22; }
       .ts-count-badge {
-        margin-left: auto;
         background: rgba(255,255,255,0.22);
         padding: 1px 9px;
         border-radius: 10px;
         font-size: 11px;
         font-weight: 700;
       }
+      .ts-copy-table-btn {
+        margin-left: auto;
+        background: rgba(255,255,255,0.15);
+        border: 1px solid rgba(255,255,255,0.35);
+        color: #fff;
+        border-radius: 5px;
+        padding: 2px 8px;
+        font-size: 10.5px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+        transition: background 0.15s;
+      }
+      .ts-copy-table-btn:hover { background: rgba(255,255,255,0.28); }
+      .ts-copy-table-btn.copied { background: rgba(255,255,255,0.35); }
       .ts-unused-card-body {
         max-height: 190px;
         overflow-y: auto;
@@ -491,6 +508,9 @@
           <div class="ts-unused-card-header ts-header-blue">
             <i class="fas fa-database"></i> Unused Data Elements
             <span id="unusedDeCountBadge" class="ts-count-badge">0</span>
+            <button id="copyDeTableBtn" class="ts-copy-table-btn" title="Copy as table">
+              <i class="fas fa-copy"></i> Copy
+            </button>
           </div>
           <div id="unusedDeQuickList" class="ts-unused-card-body"></div>
         </div>
@@ -500,6 +520,9 @@
           <div class="ts-unused-card-header ts-header-teal">
             <i class="fas fa-wrench"></i> Unused Rules
             <span id="unusedRuleCountBadge" class="ts-count-badge">0</span>
+            <button id="copyRuleTableBtn" class="ts-copy-table-btn" title="Copy as table">
+              <i class="fas fa-copy"></i> Copy
+            </button>
           </div>
           <div id="unusedRuleQuickList" class="ts-unused-card-body"></div>
         </div>
@@ -509,6 +532,9 @@
           <div class="ts-unused-card-header ts-header-orange">
             <i class="fas fa-puzzle-piece"></i> Unused Extensions
             <span id="unusedExtCountBadge" class="ts-count-badge">0</span>
+            <button id="copyExtTableBtn" class="ts-copy-table-btn" title="Copy as table">
+              <i class="fas fa-copy"></i> Copy
+            </button>
           </div>
           <div id="unusedExtQuickList" class="ts-unused-card-body"></div>
         </div>

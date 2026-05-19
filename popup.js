@@ -21,6 +21,25 @@ chrome.runtime.onMessage.addListener(function (message) {
   }
 });
 
+// Show release notes once per version
+(function () {
+  var RELEASE_NOTES_KEY = 'ts_release_notes_shown_v2_5_5';
+  chrome.storage.local.get(RELEASE_NOTES_KEY, function (data) {
+    if (data[RELEASE_NOTES_KEY]) return;
+    var modal = document.getElementById('release-notes-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    function dismiss() {
+      modal.style.display = 'none';
+      chrome.storage.local.set({ [RELEASE_NOTES_KEY]: true });
+    }
+    document.getElementById('release-notes-close').addEventListener('click', dismiss);
+    var footerBtn = document.getElementById('release-notes-close-footer');
+    if (footerBtn) footerBtn.addEventListener('click', dismiss);
+    modal.addEventListener('click', function (e) { if (e.target === modal) dismiss(); });
+  });
+}());
+
 (async () => {
   // Read the tab ID stored by the service worker at click time — guaranteed to be
   // the tab the user clicked the extension icon on, regardless of open windows.

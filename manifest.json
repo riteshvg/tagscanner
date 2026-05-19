@@ -1,7 +1,7 @@
 {
   "name": "TagScanner",
   "description": "Scan your Adobe Tag property and export your library output with custom code.",
-  "version": "2.5.4",
+  "version": "2.5.5",
   "homepage_url": "https://github.com/riteshg-adobe/tagscanner",
   "manifest_version": 3,
   "permissions": ["activeTab", "storage", "scripting", "identity", "declarativeNetRequest"],

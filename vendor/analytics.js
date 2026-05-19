@@ -5,7 +5,7 @@
   var TRACKING_SERVER = 'adobeintriteshgupta.sc.omtrdc.net';
   // /0 = GET path for the Data Insertion API
   var ENDPOINT        = 'https://' + TRACKING_SERVER + '/b/ss/' + RSID + '/0';
-  var APP_VERSION     = '2.5.4';
+  var APP_VERSION     = '2.5.5';
   var ECID_KEY        = 'ts_ecid'; // replaces ts_analytics_vid
 
   var _ecid = null;
@@ -72,8 +72,9 @@
           // ── Required ──────────────────────────────────────────────────────
           mid: ecid,                       // 38-digit ECID — used by AA for unique visitor counting
           ce:  'UTF-8',                    // character encoding
-          g:   location.href,             // page URL
-          ts:  new Date().toISOString(),  // ISO 8601 timestamp (required if report suite is timestamp-enabled)
+          // chrome-extension:// URLs are filtered by AA; use a stable https URL instead
+          g:   'https://tagscanner.extension/' + APP_VERSION,
+          ts:  Math.floor(Date.now() / 1000).toString(), // Unix epoch seconds — AA DIA rejects ISO strings
           // ── Recommended ───────────────────────────────────────────────────
           ch:  'TagScanner',              // site section / channel
           r:   document.referrer || '',   // referrer URL

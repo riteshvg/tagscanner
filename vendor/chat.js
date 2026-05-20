@@ -361,6 +361,7 @@
         pageName: 'TagScanner:Ask AI',
         events:   'event2',
         v5:       'Ask AI',
+        v8:       question.slice(0, 255),
         c2:       'Ask AI'
       });
     }

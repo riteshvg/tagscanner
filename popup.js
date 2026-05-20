@@ -43,13 +43,21 @@ chrome.runtime.onMessage.addListener(function (message) {
 (async () => {
   // Read the tab ID stored by the service worker at click time — guaranteed to be
   // the tab the user clicked the extension icon on, regardless of open windows.
-  const stored = await new Promise(r => chrome.storage.local.get(['launch_tab_id', 'launch_tab_url'], r));
+  const stored = await new Promise(r => chrome.storage.local.get(['launch_tab_id', 'launch_tab_url', 'ts_device_id'], r));
   const tab = stored.launch_tab_id ? { id: stored.launch_tab_id } : null;
   var scanHostname = '';
   if (stored.launch_tab_url) {
     try { scanHostname = new URL(stored.launch_tab_url).hostname; } catch (e) {}
   }
   try { sessionStorage.setItem('scan_hostname', scanHostname); } catch (e) {}
+
+  // Persistent anonymous device ID — generated once, survives sign-out/sign-in cycles
+  var deviceId = stored.ts_device_id;
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    chrome.storage.local.set({ ts_device_id: deviceId });
+  }
+  try { sessionStorage.setItem('ts_device_id', deviceId); } catch (e) {}
 
   // const [tab] = await chrome.windows.create({
   //   url: 'popup.html', // URL of the page you want to open
@@ -338,6 +346,19 @@ chrome.runtime.onMessage.addListener(function (message) {
         ? stageRaw.charAt(0).toUpperCase() + stageRaw.slice(1)
         : 'Production';
       sessionStorage.setItem('launch_property_environment', envName);
+
+      // Anonymous session ping — records website + property for unauthenticated users
+      (function () {
+        var _devId = sessionStorage.getItem('ts_device_id');
+        if (!_devId) return;
+        try {
+          fetch('https://ihn2pz2dbcktbxvn36g6pfptda0jfnri.lambda-url.us-east-1.on.aws/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'session_ping', clientId: _devId, siteHostname: scanHostname, propertyName: propertyName, environment: envName })
+          }).catch(function () {});
+        } catch (_) {}
+      }());
 
       document.getElementById('property_name').textContent =
         'PROPERTY NAME: ' + propertyName;

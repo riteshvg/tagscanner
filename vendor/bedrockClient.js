@@ -294,6 +294,7 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
       const data = await callProxy(TS_PROXY_URL, {
         type:        'explain',
         sessionToken: config.sessionToken || null,
+        clientId:     config.clientId     || '',
         email:        config.email        || '',
         code:         code,
         metadata:     metadata            || {},
@@ -505,6 +506,7 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
       const data = await callProxy(TS_PROXY_URL, {
         type: 'scan',
         sessionToken: config.sessionToken || null,
+        clientId:     config.clientId     || '',
         email: config.email || '',
         payload: healthPayload,
         userContext: userContext || {},

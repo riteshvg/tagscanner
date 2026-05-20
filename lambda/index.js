@@ -436,6 +436,7 @@ async function invokeClaudeChat(messages, maxTokens) {
 
 async function handleChat(body, session, identity, aiConfig, todayCost) {
   const { question, propertyContext, conversationHistory } = body;
+  const clientId = body.clientId || '';
 
   if (!question || typeof question !== 'string' || !question.trim()) {
     return resp(400, { error: 'Missing question.' });
@@ -482,7 +483,7 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
         'Chat: ' + question.trim().slice(0, 120),
         { input: 0, output: 0 },
         { question: question.trim(), answer: cached.answer },
-        propertyKey, siteUrl);
+        propertyKey, siteUrl, clientId);
       return resp(200, { answer: cached.answer, tokens: { input: 0, output: 0 }, queryId: queryId || null, fromCache: true });
     }
   }
@@ -503,7 +504,7 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
       'Chat: ' + question.trim().slice(0, 120),
       { input: result.inputTokens, output: result.outputTokens },
       { question: question.trim(), answer: result.text },
-      propertyKey, siteUrl),
+      propertyKey, siteUrl, clientId),
     trackCost(result.inputTokens, result.outputTokens)
   ]);
 
@@ -604,7 +605,7 @@ async function getSession(sessionToken) {
   }
 }
 
-async function logQuery(userId, email, userName, type, requestSummary, tokens, resultJson, propertyKey, siteUrl) {
+async function logQuery(userId, email, userName, type, requestSummary, tokens, resultJson, propertyKey, siteUrl, clientId) {
   const queryId = new Date().toISOString() + '#' + randomId(8);
   let siteHostname = '';
   try { siteHostname = siteUrl ? new URL(siteUrl).hostname : ''; } catch (_) {}
@@ -617,6 +618,7 @@ async function logQuery(userId, email, userName, type, requestSummary, tokens, r
         type,
         email,
         userName:      userName    || '',
+        clientId:      clientId    || '',
         propertyKey:   propertyKey || '',
         siteUrl:       siteUrl     || '',
         siteHostname:  siteHostname,
@@ -1019,7 +1021,7 @@ async function handleUsers(body) {
       ddb.send(new ScanCommand({ TableName: USERS_TABLE })),
       ddb.send(new ScanCommand({
         TableName: QUERIES_TABLE,
-        ProjectionExpression: 'userId, #t, requestSummary, createdAt, tokens, siteHostname',
+        ProjectionExpression: 'userId, #t, requestSummary, createdAt, tokens, siteHostname, clientId, userName',
         ExpressionAttributeNames: { '#t': 'type' }
       }))
     ]);
@@ -1029,14 +1031,20 @@ async function handleUsers(body) {
     for (const q of (queriesResult.Items || [])) {
       if (!statsMap[q.userId]) {
         statsMap[q.userId] = {
-          totalQueries: 0, totalScans: 0, totalExplains: 0,
+          totalQueries: 0, totalScans: 0, totalExplains: 0, totalVisits: 0,
           properties: new Set(), sites: new Set(), lastActive: null,
-          totalInputTokens: 0, totalOutputTokens: 0
+          totalInputTokens: 0, totalOutputTokens: 0,
+          clientId: q.clientId || '', userName: q.userName || ''
         };
       }
       const s = statsMap[q.userId];
       s.totalQueries++;
-      if (q.type === 'scan') {
+      if (q.type === 'visit') {
+        s.totalVisits++;
+        if (q.siteHostname) s.sites.add(q.siteHostname);
+        const vMatch = (q.requestSummary || '').match(/^Visit:\s*(.+)$/);
+        if (vMatch) s.properties.add(vMatch[1].trim());
+      } else if (q.type === 'scan') {
         s.totalScans++;
         const match = (q.requestSummary || '').match(/^Property scan:\s*(.+)$/);
         if (match) s.properties.add(match[1].trim());
@@ -1044,12 +1052,13 @@ async function handleUsers(body) {
       } else if (q.type === 'explain') {
         s.totalExplains++;
       }
+      if (q.clientId) s.clientId = q.clientId;
       if (!s.lastActive || q.createdAt > s.lastActive) s.lastActive = q.createdAt;
       s.totalInputTokens  += (q.tokens && q.tokens.input)  || 0;
       s.totalOutputTokens += (q.tokens && q.tokens.output) || 0;
     }
 
-    // Merge stats into user records
+    // Merge stats into user records (authenticated users from users table)
     const users = (usersResult.Items || []).map(u => {
       const s = statsMap[u.userId];
       return Object.assign({}, u, {
@@ -1058,14 +1067,43 @@ async function handleUsers(body) {
           totalQueries:      s.totalQueries,
           totalScans:        s.totalScans,
           totalExplains:     s.totalExplains,
+          totalVisits:       s.totalVisits || 0,
           properties:        Array.from(s.properties),
           sites:             Array.from(s.sites),
           lastActive:        s.lastActive,
           totalInputTokens:  s.totalInputTokens,
-          totalOutputTokens: s.totalOutputTokens
+          totalOutputTokens: s.totalOutputTokens,
+          clientId:          s.clientId || ''
         } : null
       });
     });
+
+    // Add anonymous-only rows (anon#<clientId> keys, not in users table)
+    const knownUserIds = new Set((usersResult.Items || []).map(u => u.userId));
+    for (const [uid, s] of Object.entries(statsMap)) {
+      if (!uid.startsWith('anon#') || knownUserIds.has(uid)) continue;
+      users.push({
+        userId:      uid,
+        email:       '',
+        name:        'Anonymous',
+        picture:     '',
+        createdAt:   s.lastActive || '',
+        lastLoginAt: null,
+        emailHash:   '',
+        stats: {
+          totalQueries:      s.totalQueries,
+          totalScans:        s.totalScans,
+          totalExplains:     s.totalExplains,
+          totalVisits:       s.totalVisits || 0,
+          properties:        Array.from(s.properties),
+          sites:             Array.from(s.sites),
+          lastActive:        s.lastActive,
+          totalInputTokens:  s.totalInputTokens,
+          totalOutputTokens: s.totalOutputTokens,
+          clientId:          s.clientId || uid.slice(5)
+        }
+      });
+    }
 
     // Sort by last active (most recent first), fall back to lastLoginAt
     users.sort(function (a, b) {
@@ -1274,6 +1312,38 @@ exports.handler = async (event) => {
     if (type === 'setConfig')     return handleSetConfig(body);
     if (type === 'purgeTestData') return handlePurgeTestData(body);
 
+    // ── Anonymous session ping (no auth required) ────────────────────────────
+    if (type === 'session_ping') {
+      const { clientId, siteHostname, propertyName, environment } = body;
+      if (clientId && typeof clientId === 'string' && clientId.length <= 64) {
+        const pingId = new Date().toISOString() + '#' + randomId(8);
+        try {
+          await ddb.send(new PutCommand({
+            TableName: QUERIES_TABLE,
+            Item: {
+              userId:        'anon#' + clientId,
+              queryId:       pingId,
+              type:          'visit',
+              email:         '',
+              userName:      'Anonymous',
+              clientId:      clientId,
+              propertyKey:   (propertyName || '') + '#' + (environment || ''),
+              siteUrl:       siteHostname ? 'https://' + siteHostname : '',
+              siteHostname:  siteHostname || '',
+              requestSummary: 'Visit: ' + (propertyName || 'Unknown'),
+              tokens:        {},
+              resultJson:    null,
+              hasResult:     false,
+              feedback:      null,
+              feedbackText:  null,
+              createdAt:     new Date().toISOString()
+            }
+          }));
+        } catch (_) {}
+      }
+      return resp(200, { ok: true });
+    }
+
     // ── Scan / Explain — require a valid session ─────────────────────────────
     const session = await getSession(sessionToken);
     if (!session) {
@@ -1337,6 +1407,7 @@ exports.handler = async (event) => {
     // ── Scan ─────────────────────────────────────────────────────────────────
     if (type === 'scan') {
       const { payload, userContext, fingerprint } = body;
+      const clientId = body.clientId || '';
       if (!payload) return resp(400, { error: 'Missing payload for scan.' });
 
       const userMsg      = JSON.stringify({ user_context: userContext || {}, property_health: payload });
@@ -1349,7 +1420,7 @@ exports.handler = async (event) => {
 
       const [queryId, newDayCost] = await Promise.all([
         logQuery(identity.userId, identity.email, session.name, 'scan', 'Property scan: ' + propertyName,
-          { input: result.inputTokens, output: result.outputTokens }, report, propertyKey, siteUrl),
+          { input: result.inputTokens, output: result.outputTokens }, report, propertyKey, siteUrl, clientId),
         trackCost(result.inputTokens, result.outputTokens)
       ]);
 
@@ -1379,6 +1450,7 @@ exports.handler = async (event) => {
     // ── Explain ───────────────────────────────────────────────────────────────
     if (type === 'explain') {
       const { code, metadata, propertyKey } = body;
+      const clientId = body.clientId || '';
       if (!code) return resp(400, { error: 'Missing code for explain.' });
 
       const userMsg     = JSON.stringify({ code, metadata: metadata || {} });
@@ -1391,7 +1463,7 @@ exports.handler = async (event) => {
       const [queryId, newDayCost] = await Promise.all([
         logQuery(identity.userId, identity.email, session.name, 'explain',
           'Explain ' + (metadata && metadata.type || '') + ': ' + componentName,
-          { input: result.inputTokens, output: result.outputTokens }, explanation, propertyKey || ''),
+          { input: result.inputTokens, output: result.outputTokens }, explanation, propertyKey || '', undefined, clientId),
         trackCost(result.inputTokens, result.outputTokens)
       ]);
 

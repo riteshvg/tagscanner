@@ -1446,7 +1446,8 @@ async function runAIScan(user, config) {
   var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
   var effectiveConfig = Object.assign({}, config, {
     email:        user.email || '',
-    sessionToken: session ? session.sessionToken : null
+    sessionToken: session ? session.sessionToken : null,
+    clientId:     (function(){ try { return sessionStorage.getItem('ts_device_id') || ''; } catch(e){ return ''; } }())
   });
   try {
     // Compute composition fingerprint so Lambda can serve cached results

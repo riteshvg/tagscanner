@@ -374,6 +374,7 @@
     callLambda({
       type:                'chat',
       sessionToken:        session.sessionToken,
+      clientId:            (function(){ try { return sessionStorage.getItem('ts_device_id') || ''; } catch(e){ return ''; } }()),
       question:            question,
       propertyContext:     propertyContext,
       conversationHistory: conversationHistory

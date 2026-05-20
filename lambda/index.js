@@ -1312,35 +1312,48 @@ exports.handler = async (event) => {
     if (type === 'setConfig')     return handleSetConfig(body);
     if (type === 'purgeTestData') return handlePurgeTestData(body);
 
-    // ── Anonymous session ping (no auth required) ────────────────────────────
+    // ── Session ping (auth-optional — attributes to real user if signed in) ───
     if (type === 'session_ping') {
       const { clientId, siteHostname, propertyName, environment } = body;
-      if (clientId && typeof clientId === 'string' && clientId.length <= 64) {
-        const pingId = new Date().toISOString() + '#' + randomId(8);
-        try {
-          await ddb.send(new PutCommand({
-            TableName: QUERIES_TABLE,
-            Item: {
-              userId:        'anon#' + clientId,
-              queryId:       pingId,
-              type:          'visit',
-              email:         '',
-              userName:      'Anonymous',
-              clientId:      clientId,
-              propertyKey:   (propertyName || '') + '#' + (environment || ''),
-              siteUrl:       siteHostname ? 'https://' + siteHostname : '',
-              siteHostname:  siteHostname || '',
-              requestSummary: 'Visit: ' + (propertyName || 'Unknown'),
-              tokens:        {},
-              resultJson:    null,
-              hasResult:     false,
-              feedback:      null,
-              feedbackText:  null,
-              createdAt:     new Date().toISOString()
-            }
-          }));
-        } catch (_) {}
+      if (!clientId || typeof clientId !== 'string' || clientId.length > 64) {
+        return resp(200, { ok: true });
       }
+      // If a valid sessionToken is included, attribute this visit to the real user
+      let pingUserId   = 'anon#' + clientId;
+      let pingEmail    = '';
+      let pingUserName = 'Anonymous';
+      if (sessionToken) {
+        const pingSession = await getSession(sessionToken);
+        if (pingSession) {
+          pingUserId   = pingSession.userId;
+          pingEmail    = pingSession.email  || '';
+          pingUserName = pingSession.name   || '';
+        }
+      }
+      const pingId = new Date().toISOString() + '#' + randomId(8);
+      try {
+        await ddb.send(new PutCommand({
+          TableName: QUERIES_TABLE,
+          Item: {
+            userId:         pingUserId,
+            queryId:        pingId,
+            type:           'visit',
+            email:          pingEmail,
+            userName:       pingUserName,
+            clientId:       clientId,
+            propertyKey:    (propertyName || '') + '#' + (environment || ''),
+            siteUrl:        siteHostname ? 'https://' + siteHostname : '',
+            siteHostname:   siteHostname || '',
+            requestSummary: 'Visit: ' + (propertyName || 'Unknown'),
+            tokens:         {},
+            resultJson:     null,
+            hasResult:      false,
+            feedback:       null,
+            feedbackText:   null,
+            createdAt:      new Date().toISOString()
+          }
+        }));
+      } catch (_) {}
       return resp(200, { ok: true });
     }
 

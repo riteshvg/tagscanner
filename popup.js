@@ -347,15 +347,22 @@ chrome.runtime.onMessage.addListener(function (message) {
         : 'Production';
       sessionStorage.setItem('launch_property_environment', envName);
 
-      // Anonymous session ping — records website + property for unauthenticated users
+      // Session ping — records website + property; includes sessionToken if signed in
       (function () {
         var _devId = sessionStorage.getItem('ts_device_id');
         if (!_devId) return;
+        var _sessionToken = '';
+        try {
+          var _sess = JSON.parse(localStorage.getItem('tagscanner_session') || 'null');
+          if (_sess && _sess.sessionToken && _sess.expiresAt && new Date(_sess.expiresAt) > new Date()) {
+            _sessionToken = _sess.sessionToken;
+          }
+        } catch (_e) {}
         try {
           fetch('https://ihn2pz2dbcktbxvn36g6pfptda0jfnri.lambda-url.us-east-1.on.aws/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'session_ping', clientId: _devId, siteHostname: scanHostname, propertyName: propertyName, environment: envName })
+            body: JSON.stringify({ type: 'session_ping', clientId: _devId, sessionToken: _sessionToken || null, siteHostname: scanHostname, propertyName: propertyName, environment: envName })
           }).catch(function () {});
         } catch (_) {}
       }());

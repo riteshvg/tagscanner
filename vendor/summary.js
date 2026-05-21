@@ -1493,9 +1493,16 @@ async function runAIScan(user, config) {
   } catch (err) {
     console.error('AI scan failed:', err);
     showAIState('prompt');
-    setAIScanError('Scan failed: ' + (err.message || 'Unknown error'));
+    var _errMsg = err.message || 'Unknown error';
     var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
-    if (_tsA) _tsA.track('Summary:AI Scan:Error', { pageName: 'TagScanner:Summary', events: 'event8', v9: (err.message || 'Unknown').slice(0, 100), c2: 'AI Scan' });
+    if (_errMsg.indexOf('temporarily disabled') > -1) {
+      var el = document.getElementById('aiScanPromptMsg');
+      if (el) el.innerHTML = '<span style="color:#ef4444"><i class="fas fa-exclamation-circle" style="margin-right:6px"></i><strong>AI features are temporarily unavailable.</strong><br>Our AI service has been paused for the day. To report this or get help, email <a href="mailto:tagscannerfeedback@gmail.com" style="color:#ef4444;text-decoration:underline">tagscannerfeedback@gmail.com</a>.</span>';
+      if (_tsA) _tsA.track('Summary:AI Scan:Disabled', { pageName: 'TagScanner:Summary', events: 'event8', v9: 'AI Disabled', c2: 'AI Scan' });
+    } else {
+      setAIScanError('Scan failed: ' + _errMsg);
+      if (_tsA) _tsA.track('Summary:AI Scan:Error', { pageName: 'TagScanner:Summary', events: 'event8', v9: _errMsg.slice(0, 100), c2: 'AI Scan' });
+    }
   }
 }
 

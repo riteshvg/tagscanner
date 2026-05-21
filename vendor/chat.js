@@ -427,7 +427,7 @@
         appendBubble('assistant', '<span class="error-text">Daily AI limit reached. Try again tomorrow.</span>');
         if (_tsA_c) _tsA_c.track('Chat:Limit:Daily', { pageName: 'TagScanner:Ask AI', events: 'event14', v9: 'Daily Limit Reached', c2: 'Ask AI' });
       } else if (msg.indexOf('temporarily disabled') > -1) {
-        appendBubble('assistant', '<span class="error-text">AI features are temporarily unavailable.</span>');
+        appendBubble('assistant', '<span class="error-text"><strong>AI features are temporarily unavailable.</strong><br>Our AI service has been paused for the day. To report this or get help, email <a href="mailto:tagscannerfeedback@gmail.com" style="color:inherit;text-decoration:underline">tagscannerfeedback@gmail.com</a>.</span>');
         if (_tsA_c) _tsA_c.track('Chat:Error:Disabled', { pageName: 'TagScanner:Ask AI', events: 'event8', v9: 'AI Disabled', c2: 'Ask AI' });
       } else {
         appendBubble('assistant', '<span class="error-text">Error: ' + esc(msg) + '</span>');

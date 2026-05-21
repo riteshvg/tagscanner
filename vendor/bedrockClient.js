@@ -257,21 +257,20 @@ You will receive a JSON object with "code" (the custom code string) and "metadat
 
 Required structure:
 {
-  "purpose": "<1-2 sentence plain-English summary: what does this code do and why does it exist>",
+  "purpose": "<1 sentence: what this code does and why it exists>",
   "how_it_works": ["<step 1>", "<step 2>", ...],
   "data_sources": [
-    { "kind": "adobeDataLayer|digitalData|window|cookie|localStorage|sessionStorage|url|satellite|dom", "path": "<exact path accessed>", "description": "<what data this retrieves>" }
+    { "kind": "adobeDataLayer|digitalData|window|cookie|localStorage|sessionStorage|url|satellite|dom", "path": "<exact path accessed>", "description": "<brief: what data this retrieves>" }
   ],
   "return_type": "<string|number|boolean|object|array|void|conditional>",
-  "return_description": "<what is returned and under what conditions — include null/undefined cases>",
+  "return_description": "<1 sentence: what is returned and under what conditions>",
   "risks": [
-    { "severity": "low|medium|high", "issue": "<what can go wrong>", "fix": "<specific actionable fix>" }
+    { "severity": "low|medium|high", "issue": "<what can go wrong>", "fix": "<actionable fix>" }
   ],
-  "debug_commands": ["<exact copy-paste DevTools console command to inspect or validate this>"],
-  "tags_context": "<how this fits into Adobe Tags — what rules or events likely use this, what analytics variable it feeds>"
+  "tags_context": "<1 sentence: how this fits into Adobe Tags — what rule or variable it feeds>"
 }
 
-Be specific about paths. If code is minified or obfuscated add a medium risk noting that. Keep steps concise but precise.`;
+Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under 15 words. Be specific about paths. If code is minified, note it as a medium risk.`;
 
   // ── Proxy helper ─────────────────────────────────────────────────────────────
 
@@ -353,9 +352,9 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
     const parts = [];
-    const sec = (content) => '<div style="margin-top:16px;padding-top:14px;border-top:1px solid #eef0f5">' + content + '</div>';
+    const sec = (content) => '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #eef0f5">' + content + '</div>';
     const heading = (icon, label) =>
-      '<div class="de-analysis-heading" style="margin-bottom:8px"><i class="fas fa-' + icon + '"></i>' + label + '</div>';
+      '<div class="de-analysis-heading" style="margin-bottom:6px"><i class="fas fa-' + icon + '"></i>' + label + '</div>';
 
     // ── Purpose ───────────────────────────────────────────────────────────────
     if (json.purpose) {
@@ -363,8 +362,9 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
     }
     if (json.tags_context) {
       parts.push(
-        '<p class="de-analysis-prose" style="color:#6b7280;font-style:italic;margin-top:4px">' +
-          esc(json.tags_context) + '</p>',
+        '<div style="font-size:11.5px;color:#6b7280;margin-top:6px;padding:4px 8px;background:#f8f9fb;border-radius:4px;line-height:1.45">' +
+        '<i class="fas fa-tag" style="font-size:10px;margin-right:5px;color:#9ca3af"></i>' +
+        esc(json.tags_context) + '</div>',
       );
     }
 
@@ -373,10 +373,10 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
       const steps = json.how_it_works
         .map(
           (s, i) =>
-            '<li style="margin-bottom:7px;font-size:13px;color:#374151;display:flex;align-items:flex-start;gap:9px">' +
-            '<span style="color:#4e73df;font-weight:700;font-size:12px;min-width:18px;flex-shrink:0;padding-top:1px">' +
+            '<li style="margin-bottom:5px;font-size:12.5px;color:#374151;display:flex;align-items:flex-start;gap:8px">' +
+            '<span style="color:#4e73df;font-weight:700;font-size:11px;min-width:16px;flex-shrink:0;padding-top:2px">' +
             (i + 1) + '.</span>' +
-            '<span style="line-height:1.55">' + esc(s) + '</span>' +
+            '<span style="line-height:1.5">' + esc(s) + '</span>' +
             '</li>',
         )
         .join('');
@@ -436,34 +436,6 @@ Be specific about paths. If code is minified or obfuscated add a medium risk not
             '<div class="de-flow-arrow">&rarr;</div>' +
             '<div class="de-flow-col"><div class="de-flow-label">Returns</div>' + retItem + '</div>' +
           '</div>',
-        ),
-      );
-    }
-
-    // ── Debug commands ────────────────────────────────────────────────────────
-    const cmds = json.debug_commands || [];
-    if (cmds.length) {
-      const cmdItems = cmds
-        .map(
-          (cmd) =>
-            '<li class="de-debug-cmd">' +
-            '<div class="de-debug-code-wrap">' +
-            '<code class="de-debug-code">' + esc(cmd) + '</code>' +
-            '<button class="de-debug-copy" onclick="(function(){navigator.clipboard.writeText(' +
-            JSON.stringify(cmd) + ')})()">' +
-            'Copy</button>' +
-            '</div>' +
-            '</li>',
-        )
-        .join('');
-      parts.push(
-        sec(
-          heading('terminal', 'Run in DevTools console') +
-          '<div style="font-size:11.5px;color:#6b7280;margin-bottom:10px;line-height:1.55;background:#f0f7ff;border-left:3px solid #93c5fd;border-radius:0 4px 4px 0;padding:6px 10px">' +
-          '<i class="fas fa-info-circle" style="color:#60a5fa;margin-right:5px"></i>' +
-          'Run these on the <strong>target website</strong> — open DevTools there (not inside this extension). Navigate to the page being tracked, then paste into the Console tab.' +
-          '</div>' +
-          '<ul class="de-debug-list">' + cmdItems + '</ul>',
         ),
       );
     }

@@ -350,21 +350,20 @@ You will receive a JSON object with "code" (the custom code string) and "metadat
 
 Required structure:
 {
-  "purpose": "<1-2 sentence plain-English summary: what does this code do and why does it exist>",
+  "purpose": "<1 sentence: what this code does and why it exists>",
   "how_it_works": ["<step 1>", "<step 2>", ...],
   "data_sources": [
-    { "kind": "adobeDataLayer|digitalData|window|cookie|localStorage|sessionStorage|url|satellite|dom", "path": "<exact path accessed>", "description": "<what data this retrieves>" }
+    { "kind": "adobeDataLayer|digitalData|window|cookie|localStorage|sessionStorage|url|satellite|dom", "path": "<exact path accessed>", "description": "<brief: what data this retrieves>" }
   ],
   "return_type": "<string|number|boolean|object|array|void|conditional>",
-  "return_description": "<what is returned and under what conditions — include null/undefined cases>",
+  "return_description": "<1 sentence: what is returned and under what conditions>",
   "risks": [
-    { "severity": "low|medium|high", "issue": "<what can go wrong>", "fix": "<specific actionable fix>" }
+    { "severity": "low|medium|high", "issue": "<what can go wrong>", "fix": "<actionable fix>" }
   ],
-  "debug_commands": ["<exact copy-paste DevTools console command to inspect or validate this>"],
-  "tags_context": "<how this fits into Adobe Tags — what rules likely use this, what analytics variable it feeds>"
+  "tags_context": "<1 sentence: how this fits into Adobe Tags — what rule or variable it feeds>"
 }
 
-Be specific about paths. If code is minified, note it as a medium risk.`;
+Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under 15 words. Be specific about paths. If code is minified, note it as a medium risk.`;
 
 // ── Bedrock invocation ────────────────────────────────────────────────────────
 

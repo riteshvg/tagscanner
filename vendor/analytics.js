@@ -5,7 +5,7 @@
   var TRACKING_SERVER = 'adobeintriteshgupta.sc.omtrdc.net';
   // /0 = GET path for the Data Insertion API
   var ENDPOINT        = 'https://' + TRACKING_SERVER + '/b/ss/' + RSID + '/0';
-  var APP_VERSION     = '2.6.0';
+  var APP_VERSION     = '2.5.6';
   var ECID_KEY        = 'ts_ecid'; // replaces ts_analytics_vid
 
   var _ecid = null;

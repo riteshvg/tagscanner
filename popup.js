@@ -23,7 +23,7 @@ chrome.runtime.onMessage.addListener(function (message) {
 
 // Show release notes once per version
 (function () {
-  var RELEASE_NOTES_KEY = 'ts_release_notes_shown_v2_6_0';
+  var RELEASE_NOTES_KEY = 'ts_release_notes_shown_v2_5_6';
   chrome.storage.local.get(RELEASE_NOTES_KEY, function (data) {
     if (data[RELEASE_NOTES_KEY]) return;
     var modal = document.getElementById('release-notes-modal');
@@ -305,7 +305,7 @@ chrome.runtime.onMessage.addListener(function (message) {
 
         var wsAbout = XLSX.utils.aoa_to_sheet([
           ['TagScanner', 'Adobe Tags (Launch) Inspector'],
-          ['Version', '2.6.0'],
+          ['Version', '2.5.6'],
           ['', ''],
           ['Property', propertyName],
           ['Generated', new Date().toLocaleString()],

@@ -202,7 +202,6 @@ document.addEventListener('DOMContentLoaded', function () {
   var sharePanel = document.getElementById('share-panel');
   var copyBtn    = document.getElementById('share-copy-btn');
   var copyLabel  = document.getElementById('share-copy-label');
-  var linkedinBtn = document.getElementById('share-linkedin-btn');
   var emailBtn   = document.getElementById('share-email-btn');
 
   if (shareBtn && sharePanel) {
@@ -229,17 +228,6 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       if (window.TagScannerAnalytics) {
         TagScannerAnalytics.track('Share:Copy Link', { pageName: 'TagScanner:Sidebar', c2: 'Sidebar' });
-      }
-    });
-  }
-
-  if (linkedinBtn) {
-    linkedinBtn.addEventListener('mouseenter', function () { linkedinBtn.style.background = 'rgba(255,255,255,0.08)'; });
-    linkedinBtn.addEventListener('mouseleave', function () { linkedinBtn.style.background = 'transparent'; });
-    linkedinBtn.addEventListener('click', function () {
-      chrome.tabs.create({ url: 'https://www.linkedin.com' });
-      if (window.TagScannerAnalytics) {
-        TagScannerAnalytics.track('Share:LinkedIn', { pageName: 'TagScanner:Sidebar', c2: 'Sidebar' });
       }
     });
   }

@@ -93,7 +93,9 @@ function getSatellite() {
     // Capture raw count before any serialization so it reflects the true container count
     var rawDECount = Object.keys((container && container.dataElements) || {}).length;
 
-    console.log('in line 5 in pass_satellite ' + container);
+    // Nothing to send on pages without Adobe Tags
+    if (!window._satellite) return;
+
     main.satellite = cloneJsonSafe(container);
     main.dataElementsRawCount = rawDECount;
     try {
@@ -101,12 +103,10 @@ function getSatellite() {
       if (deSnapshot && Object.keys(deSnapshot).length > 0) {
         main.satellite.dataElements = deSnapshot;
       }
-    } catch (deErr) {
-      console.warn('Unable to enrich runtime data element custom code:', deErr);
-    }
+    } catch (deErr) {}
 
-    // After the data is ready, send the message
-    window.postMessage({ type: 'FROM_PAGE', essential: main });
+    // Namespaced type prevents collision with host-page postMessage listeners
+    window.postMessage({ type: 'TAGSCANNER_FROM_PAGE', essential: main });
   }, 3000); // Delay execution by 3 seconds
 }
 

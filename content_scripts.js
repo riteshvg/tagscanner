@@ -46,7 +46,7 @@ window.addEventListener(
   function (event) {
     if (event.source !== window) return;
 
-    if (event.data.type === 'FROM_PAGE') {
+    if (event.data.type === 'TAGSCANNER_FROM_PAGE') {
       satellite = event.data.essential?.satellite;
       if (event.data.essential?.dataElementsRawCount != null) {
         satellite._rawDECount = event.data.essential.dataElementsRawCount;

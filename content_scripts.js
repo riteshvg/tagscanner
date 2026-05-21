@@ -22,24 +22,11 @@ function myMain(evt) {
   }
 
   injectScript(chrome.runtime.getURL('pass_satellite.js'), 'body');
-  console.log(
-    'line 16 content_script',
-    chrome.runtime.getURL('pass_satellite.js')
-  );
 
-  //console.log('Script injected');
-
-  //Testing with passing scripts tag.
   let a = [...document.querySelectorAll('script')];
-  console.log('in line 22 content_script', a);
   a = a.filter((scpt) => scpt.src && scpt.src.includes('assets.adobedtm.com'));
-
   if (a.length > 0) {
-    console.log(a[0].src);
     scriptURL = a[0].src;
-    console.log('in mymain content_scripts', scriptURL);
-  } else {
-    console.error('No matching script found.');
   }
 }
 
@@ -64,7 +51,6 @@ window.addEventListener(
       if (event.data.essential?.dataElementsRawCount != null) {
         satellite._rawDECount = event.data.essential.dataElementsRawCount;
       }
-      console.log(satellite);
     }
   },
   false
@@ -73,18 +59,11 @@ window.addEventListener(
 // Check every 500ms until `satellite` is not empty
 const checkSatellite = setInterval(() => {
   if (satellite) {
-    console.log('Satellite received:', satellite);
-    clearInterval(checkSatellite); // Stop checking once data is available
+    clearInterval(checkSatellite);
   }
 }, 500);
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-  console.log('Message received in content script:', request);
-  console.log(
-    sender.tab
-      ? 'from a content script:' + sender.tab.url
-      : 'from the extension'
-  );
 
   try {
     if (
@@ -103,12 +82,8 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
       }
 
       if (satellite && Object.keys(satellite).length > 0) {
-        console.log('Sending satellite data back to popup');
         sendResponse({ satellite: satellite, scriptURL: scriptURL || '' });
       } else {
-        console.warn(
-          'Satellite or scriptURL is undefined - checking if they need more time to load'
-        );
 
         // Run pixel/container detection now so it's ready for the error response
         var pixelInfo = detectPixelImpl();
@@ -122,7 +97,6 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
             if (tags.length) scriptURL = tags[0].src;
           }
           if (satellite && Object.keys(satellite).length > 0) {
-            console.log('Satellite data available after delay');
             try {
               chrome.runtime.sendMessage({
                 satellite: satellite,
@@ -132,7 +106,6 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
               console.error('Error sending delayed response:', err);
             }
           } else {
-            console.error('Satellite data still not available after delay');
             try {
               chrome.runtime.sendMessage({
                 type: 'CONNECTION_ERROR',

@@ -1,184 +1,10 @@
-// TagScanner — AWS Bedrock Client
-// Handles SigV4 request signing and model invocation
-// Supports: Claude 3.5 Haiku (default), Claude 3.5 Sonnet v2, Amazon Nova Pro/Lite
+// TagScanner — AI Client
+// Routes all model calls through the TagScanner Lambda proxy.
 (function (global) {
   'use strict';
 
-  // ── TagScanner shared proxy — replace after deploying your Lambda ─────────────
-  // Users never see or configure this. Paste your Lambda Function URL here.
   const TS_PROXY_URL =
     'https://ihn2pz2dbcktbxvn36g6pfptda0jfnri.lambda-url.us-east-1.on.aws/';
-
-  // ── SigV4 Signing ───────────────────────────────────────────────────────────
-
-  async function sha256Hex(message) {
-    const data = new TextEncoder().encode(message);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hash))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  async function hmac(key, message) {
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw',
-      typeof key === 'string' ? new TextEncoder().encode(key) : key,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign'],
-    );
-    return crypto.subtle.sign(
-      'HMAC',
-      cryptoKey,
-      new TextEncoder().encode(message),
-    );
-  }
-
-  async function hmacHex(key, message) {
-    return Array.from(new Uint8Array(await hmac(key, message)))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  async function getSigningKey(secret, dateStamp, region, service) {
-    const kDate = await hmac('AWS4' + secret, dateStamp);
-    const kRegion = await hmac(kDate, region);
-    const kService = await hmac(kRegion, service);
-    return hmac(kService, 'aws4_request');
-  }
-
-  async function signedHeaders(
-    method,
-    url,
-    body,
-    accessKeyId,
-    secretAccessKey,
-    region,
-  ) {
-    const service = 'bedrock';
-    const now = new Date();
-    const amzDate = now
-      .toISOString()
-      .replace(/[-:]/g, '')
-      .replace(/\.\d{3}/, '');
-    const dateStamp = amzDate.slice(0, 8);
-
-    const { host, pathname } = new URL(url);
-    const payloadHash = await sha256Hex(body);
-
-    const headers = {
-      'content-type': 'application/json',
-      host: host,
-      'x-amz-content-sha256': payloadHash,
-      'x-amz-date': amzDate,
-    };
-    const sorted = Object.keys(headers).sort();
-    const canonicalHeaders =
-      sorted.map((k) => k + ':' + headers[k]).join('\n') + '\n';
-    const signedHdrs = sorted.join(';');
-
-    const canonicalRequest = [
-      method,
-      encodeURI(pathname),
-      '',
-      canonicalHeaders,
-      signedHdrs,
-      payloadHash,
-    ].join('\n');
-    const credScope = [dateStamp, region, service, 'aws4_request'].join('/');
-    const stringToSign = [
-      'AWS4-HMAC-SHA256',
-      amzDate,
-      credScope,
-      await sha256Hex(canonicalRequest),
-    ].join('\n');
-
-    const sigKey = await getSigningKey(
-      secretAccessKey,
-      dateStamp,
-      region,
-      service,
-    );
-    const sig = await hmacHex(sigKey, stringToSign);
-
-    return {
-      'Content-Type': 'application/json',
-      'X-Amz-Date': amzDate,
-      'X-Amz-Content-Sha256': payloadHash,
-      Authorization: `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credScope}, SignedHeaders=${signedHdrs}, Signature=${sig}`,
-    };
-  }
-
-  // ── Model Invocation ─────────────────────────────────────────────────────────
-
-  async function invokeModel(config, systemPrompt, userMessage) {
-    const { accessKeyId, secretAccessKey, region, modelId } = config;
-    const maxTokens = config.maxTokens || 1500;
-    const temperature = config.temperature != null ? config.temperature : 0.3;
-
-    const url = `https://bedrock-runtime.${region}.amazonaws.com/model/${encodeURIComponent(modelId)}/invoke`;
-
-    let body;
-    const isAnthropic =
-      modelId.startsWith('anthropic.') || modelId.startsWith('us.anthropic.');
-    if (isAnthropic) {
-      body = JSON.stringify({
-        anthropic_version: 'bedrock-2023-05-31',
-        max_tokens: maxTokens,
-        temperature,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userMessage }],
-      });
-    } else if (modelId.startsWith('amazon.nova')) {
-      body = JSON.stringify({
-        system: [{ text: systemPrompt }],
-        messages: [{ role: 'user', content: [{ text: userMessage }] }],
-        inferenceConfig: { max_new_tokens: maxTokens, temperature },
-      });
-    } else {
-      body = JSON.stringify({
-        inputText: systemPrompt + '\n\n' + userMessage,
-        textGenerationConfig: { maxTokenCount: maxTokens, temperature },
-      });
-    }
-
-    const hdrs = await signedHeaders(
-      'POST',
-      url,
-      body,
-      accessKeyId,
-      secretAccessKey,
-      region,
-    );
-    const res = await fetch(url, { method: 'POST', headers: hdrs, body });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error('Bedrock ' + res.status + ': ' + err);
-    }
-
-    const data = await res.json();
-
-    if (isAnthropic) {
-      return {
-        text: data.content?.[0]?.text || '',
-        inputTokens: data.usage?.input_tokens || 0,
-        outputTokens: data.usage?.output_tokens || 0,
-      };
-    }
-    if (modelId.startsWith('amazon.nova')) {
-      return {
-        text: data.output?.message?.content?.[0]?.text || '',
-        inputTokens: data.usage?.inputTokens || 0,
-        outputTokens: data.usage?.outputTokens || 0,
-      };
-    }
-    return {
-      text: data.results?.[0]?.outputText || '',
-      inputTokens: 0,
-      outputTokens: 0,
-    };
-  }
 
   // ── System Prompt ────────────────────────────────────────────────────────────
 
@@ -225,30 +51,6 @@ Scoring rubric:
 Factor in: unused component %, custom code prevalence, rules without conditions (fire-on-all), extension bloat, deep DE dependency chains, and property size.
 If user_context.concern is set, weight your analysis toward that concern.`;
 
-  // ── Cost Calculation ─────────────────────────────────────────────────────────
-
-  function estimateCost(modelId, inputTokens, outputTokens) {
-    // Rates per 1K tokens (approximate Bedrock pricing)
-    const rates = {
-      'anthropic.claude-3-5-haiku': { in: 0.0008, out: 0.004 },
-      'us.anthropic.claude-3-5-haiku': { in: 0.0008, out: 0.004 },
-      'anthropic.claude-3-5-sonnet': { in: 0.003, out: 0.015 },
-      'us.anthropic.claude-3-5-sonnet': { in: 0.003, out: 0.015 },
-      'anthropic.claude-3-haiku': { in: 0.00025, out: 0.00125 },
-      'amazon.nova-pro': { in: 0.0008, out: 0.0032 },
-      'amazon.nova-lite': { in: 0.00006, out: 0.00024 },
-    };
-    const key =
-      Object.keys(rates).find((k) => modelId.startsWith(k)) ||
-      'anthropic.claude-3-5-haiku';
-    const r = rates[key];
-    return (
-      Math.round(
-        ((inputTokens / 1000) * r.in + (outputTokens / 1000) * r.out) * 10000,
-      ) / 10000
-    );
-  }
-
   // ── Code Explain ─────────────────────────────────────────────────────────────
 
   const EXPLAIN_SYSTEM_PROMPT = `You are an Adobe Tags (Launch / Data Collection) implementation expert and senior JavaScript developer.
@@ -288,60 +90,24 @@ Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under
   }
 
   async function explainCode(code, metadata, config) {
-    // Proxy mode — use hardcoded URL, no client-side credentials
-    if (TS_PROXY_URL && !TS_PROXY_URL.includes('YOUR_LAMBDA')) {
-      const data = await callProxy(TS_PROXY_URL, {
-        type:        'explain',
-        sessionToken: config.sessionToken || null,
-        clientId:     config.clientId     || '',
-        email:        config.email        || '',
-        code:         code,
-        metadata:     metadata            || {},
-        propertyKey:  config.propertyKey  || null,
-      });
-      return {
-        explanation:  data.explanation,
-        inputTokens:  data.tokens?.input  || 0,
-        outputTokens: data.tokens?.output || 0,
-        queryId:      data.queryId        || null,
-        cached:       data.cached         || false,
-        cached_at:    data.cached_at      || null,
-        cached_by:    data.cached_by      || null,
-        model:        data.model          || 'Claude 3.5 Haiku',
-      };
-    }
-    // Direct Bedrock mode
-    const explainConfig = Object.assign({}, config, {
-      maxTokens: 1000,
-      temperature: 0.2,
+    const data = await callProxy(TS_PROXY_URL, {
+      type:        'explain',
+      sessionToken: config.sessionToken || null,
+      clientId:     config.clientId     || '',
+      email:        config.email        || '',
+      code:         code,
+      metadata:     metadata            || {},
+      propertyKey:  config.propertyKey  || null,
     });
-    const userMessage = JSON.stringify({
-      code: code,
-      metadata: metadata || {},
-    });
-    const result = await invokeModel(
-      explainConfig,
-      EXPLAIN_SYSTEM_PROMPT,
-      userMessage,
-    );
-    const cleaned = result.text
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/```\s*$/g, '')
-      .trim();
-    let explanation;
-    try {
-      explanation = JSON.parse(cleaned);
-    } catch (e) {
-      throw new Error(
-        'Could not parse explain response. Raw: ' + result.text.slice(0, 200),
-      );
-    }
     return {
-      explanation,
-      inputTokens: result.inputTokens,
-      outputTokens: result.outputTokens,
-      model: config.modelId,
+      explanation:  data.explanation,
+      inputTokens:  data.tokens?.input  || 0,
+      outputTokens: data.tokens?.output || 0,
+      queryId:      data.queryId        || null,
+      cached:       data.cached         || false,
+      cached_at:    data.cached_at      || null,
+      cached_by:    data.cached_by      || null,
+      model:        data.model          || 'Claude 3.5 Haiku',
     };
   }
 
@@ -473,59 +239,26 @@ Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under
   // ── Public API ───────────────────────────────────────────────────────────────
 
   async function analyzeProperty(healthPayload, userContext, config) {
-    // Proxy mode — use hardcoded URL, credentials stay on the server
-    if (TS_PROXY_URL && !TS_PROXY_URL.includes('YOUR_LAMBDA')) {
-      const data = await callProxy(TS_PROXY_URL, {
-        type: 'scan',
-        sessionToken: config.sessionToken || null,
-        clientId:     config.clientId     || '',
-        email: config.email || '',
-        payload: healthPayload,
-        userContext: userContext || {},
-        fingerprint: config.fingerprint || null,
-      });
-      if (!data.report) {
-        throw new Error('Proxy response missing report. Got: ' + JSON.stringify(data).slice(0, 300));
-      }
-      return {
-        report:     data.report,
-        tokens:     data.tokens || {},
-        cost_usd:   0,
-        queryId:    data.queryId || null,
-        cached:     data.cached     || false,
-        cached_at:  data.cached_at  || null,
-        cached_by:  data.cached_by  || null,
-      };
-    }
-    // Direct Bedrock mode
-    const userMessage = JSON.stringify(
-      { user_context: userContext, property_health: healthPayload },
-      null,
-      2,
-    );
-    const result = await invokeModel(config, SYSTEM_PROMPT, userMessage);
-    let report;
-    try {
-      const cleaned = result.text
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/```\s*$/g, '')
-        .trim();
-      report = JSON.parse(cleaned);
-    } catch (e) {
-      throw new Error(
-        'Could not parse model response as JSON. Raw: ' +
-          result.text.slice(0, 200),
-      );
+    const data = await callProxy(TS_PROXY_URL, {
+      type: 'scan',
+      sessionToken: config.sessionToken || null,
+      clientId:     config.clientId     || '',
+      email:        config.email        || '',
+      payload:      healthPayload,
+      userContext:  userContext         || {},
+      fingerprint:  config.fingerprint  || null,
+    });
+    if (!data.report) {
+      throw new Error('Proxy response missing report. Got: ' + JSON.stringify(data).slice(0, 300));
     }
     return {
-      report,
-      tokens: { input: result.inputTokens, output: result.outputTokens },
-      cost_usd: estimateCost(
-        config.modelId,
-        result.inputTokens,
-        result.outputTokens,
-      ),
+      report:    data.report,
+      tokens:    data.tokens   || {},
+      cost_usd:  0,
+      queryId:   data.queryId  || null,
+      cached:    data.cached   || false,
+      cached_at: data.cached_at || null,
+      cached_by: data.cached_by || null,
     };
   }
 

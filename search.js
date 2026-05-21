@@ -7,7 +7,7 @@ let value = params.search,
 dataele_count = 0;
 if (search_details_node && value) {
     
-    document.getElementById('h2_header').innerHTML = "Search Result Displayed for : "+value;
+    document.getElementById('h2_header').textContent = "Search Result Displayed for : "+value;
     var rule_value = sessionStorage.getItem("_satellite._container.rules");
     const obj = JSON.parse(rule_value);
     var de_rule_action_count = 0,de_rule_condition_count = 0,de_rule_event_count =0, de_rule_count=0;

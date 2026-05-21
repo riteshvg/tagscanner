@@ -386,6 +386,40 @@
     return src[0][0].toUpperCase();
   }
 
+  function buildLimitCell(u) {
+    var isUnlimited = u.chat_limit_override === -1;
+    var uid = esc(u.userId || '');
+    if (isUnlimited) {
+      return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#059669;font-weight:600">' +
+        '<i class="fas fa-infinity" style="font-size:10px"></i> Unlimited</span>' +
+        '<button class="limit-reset-btn" data-uid="' + uid + '" title="Reset to default (10)" ' +
+        'style="margin-left:6px;background:none;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px;font-size:10px;color:#6b7280;cursor:pointer;">Reset</button>';
+    }
+    return '<span style="font-size:11px;color:#6b7280">10 (default)</span>' +
+      '<button class="limit-override-btn" data-uid="' + uid + '" title="Remove limit for this user" ' +
+      'style="margin-left:6px;background:none;border:1px solid #e5e7eb;border-radius:4px;padding:1px 6px;font-size:10px;color:#4e73df;cursor:pointer;">Unlimited</button>';
+  }
+
+  function setUserChatLimit(targetUserId, limit, btn) {
+    var origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
+    callLambda({ type: 'setUserChatLimit', sessionToken: session && session.sessionToken, targetUserId: targetUserId, limit: limit })
+      .then(function (data) {
+        if (data.ok) {
+          var u = usersAllData.find(function (x) { return x.userId === targetUserId; });
+          if (u) { if (limit === null) { delete u.chat_limit_override; } else { u.chat_limit_override = limit; } }
+          renderUsersPage();
+        } else {
+          btn.innerHTML = origHtml;
+          btn.disabled = false;
+          alert('Error: ' + (data.error || 'Could not update limit.'));
+        }
+      })
+      .catch(function () { btn.innerHTML = origHtml; btn.disabled = false; });
+  }
+
   function renderUsersTable(users, wrap) {
     if (!users.length) {
       wrap.innerHTML = '<div class="users-table-loading">No users found. Sign out and back in to register.</div>';
@@ -445,6 +479,7 @@
         '<td style="font-size:11px;color:#374151;white-space:nowrap">' + lastActive + '</td>' +
         '<td>' + tokHtml + '</td>' +
         '<td style="font-size:11px;color:#6b7280;white-space:nowrap">' + joined + '</td>' +
+        '<td style="white-space:nowrap">' + buildLimitCell(u) + '</td>' +
         '</tr>';
     }).join('');
 
@@ -458,6 +493,7 @@
           '<th>Last Active</th>' +
           '<th>Tokens Used</th>' +
           '<th>Joined</th>' +
+          '<th>AI Limit</th>' +
         '</tr></thead>' +
         '<tbody>' + rows + '</tbody>' +
       '</table>';
@@ -469,6 +505,19 @@
           btn.innerHTML = '<i class="fas fa-check"></i>';
           setTimeout(function () { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 1500);
         }).catch(function () {});
+      });
+    });
+
+    wrap.querySelectorAll('.limit-override-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        setUserChatLimit(btn.getAttribute('data-uid'), -1, btn);
+      });
+    });
+    wrap.querySelectorAll('.limit-reset-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        setUserChatLimit(btn.getAttribute('data-uid'), null, btn);
       });
     });
   }

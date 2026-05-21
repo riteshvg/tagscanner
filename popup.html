@@ -349,40 +349,41 @@
         <img src="./images/tagscanner_32x32.png" style="width:36px;height:36px;border-radius:8px;flex-shrink:0;" />
         <div>
           <div style="color:#fff;font-size:17px;font-weight:700;line-height:1.2;">What's New</div>
-          <div style="color:#94a3b8;font-size:11px;margin-top:2px;">TagScanner <span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:1px 7px;font-weight:700;font-size:10px;">v2.5.5</span></div>
+          <div style="color:#94a3b8;font-size:11px;margin-top:2px;">TagScanner <span style="background:#0ea5e9;color:#fff;border-radius:4px;padding:1px 7px;font-weight:700;font-size:10px;">v2.6.0</span></div>
         </div>
         <button id="release-notes-close" style="margin-left:auto;background:none;border:none;color:#9ca3af;font-size:20px;cursor:pointer;line-height:1;padding:0;">&times;</button>
       </div>
       <!-- Body -->
-      <div style="padding:20px 24px;max-height:340px;overflow-y:auto;color:#cbd5e1;font-size:13px;line-height:1.6;">
+      <div style="padding:20px 24px;max-height:360px;overflow-y:auto;color:#cbd5e1;font-size:13px;line-height:1.6;">
         <div style="margin-bottom:14px;">
-          <div style="color:#38bdf8;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Ask AI (Beta)</div>
+          <div style="color:#f87171;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Bug Fixes</div>
           <ul style="margin:0;padding-left:18px;color:#e2e8f0;">
-            <li>AI Health Scan — score your property with a single click from the Summary page</li>
-            <li>Ask AI chat assistant — explain rules, data elements, and custom code in plain English</li>
-            <li>Supports Adobe Target &amp; Streaming responses</li>
+            <li>Fixed extension breaking sites without Adobe Tags (e.g. Redash) — no more <em>Uncaught TypeError: Cannot read properties of undefined</em> in the console</li>
+            <li>Removed debug console logs that were leaking into every page's DevTools</li>
+          </ul>
+        </div>
+        <div style="margin-bottom:14px;">
+          <div style="color:#38bdf8;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">AI Monitor (Beta)</div>
+          <ul style="margin:0;padding-left:18px;color:#e2e8f0;">
+            <li>New AI Property Monitor — detects changes to your property in real time and auto-triggers a health scan when a deploy is detected</li>
+            <li>Fingerprint-based change detection (rules, data elements, extensions)</li>
+            <li>Simulate Deploy mode for demo &amp; testing</li>
           </ul>
         </div>
         <div style="margin-bottom:14px;">
           <div style="color:#34d399;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Navigation &amp; Layout</div>
           <ul style="margin:0;padding-left:18px;color:#e2e8f0;">
-            <li>Reorganised sidebar into four labelled groups: Inspect, AI Tools, Tools, Miscellaneous</li>
-            <li>Flow Visualiser, Code Search, and Env Override added to sidebar navigation</li>
-            <li>Collapsible sidebar with icon-only mode</li>
-          </ul>
-        </div>
-        <div style="margin-bottom:14px;">
-          <div style="color:#fb923c;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Diagnostics</div>
-          <ul style="margin:0;padding-left:18px;color:#e2e8f0;">
-            <li>Unused Data Element detection highlighted in the Summary</li>
-            <li>Unused Rule detection with per-rule badge counts</li>
-            <li>History page to replay past property scans</li>
+            <li>Sidebar reorganised into three logical groups: Inspect, Analyse, AI</li>
+            <li>Scanned website hostname now shown in the topbar</li>
+            <li>Ask AI and Monitor marked as BETA</li>
           </ul>
         </div>
         <div>
-          <div style="color:#a78bfa;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Bug Fixes</div>
+          <div style="color:#a78bfa;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Under the Hood</div>
           <ul style="margin:0;padding-left:18px;color:#e2e8f0;">
-            <li>Various stability and accuracy improvements across the extension.</li>
+            <li>Persistent device ID bridges anonymous and signed-in sessions for better usage insights</li>
+            <li>Error tracking added across all vendor pages for improved diagnostics</li>
+            <li>Scanned website captured in Adobe Analytics (eVar12) and admin dashboard</li>
           </ul>
         </div>
       </div>
@@ -426,7 +427,7 @@
             <div class="sidebar-brand-icon">
               <img src="./images/tagscanner_32x32.png" />
             </div>
-            <div class="sidebar-brand-text">TagScanner | 2.5.5</div>
+            <div class="sidebar-brand-text">TagScanner | 2.6.0</div>
           </div>
           <!-- <p class="sidebar-brand-description"> A tool to understand the structure and components of your Adobe Tags
             property!</p> -->

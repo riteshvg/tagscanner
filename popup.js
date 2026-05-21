@@ -23,7 +23,7 @@ chrome.runtime.onMessage.addListener(function (message) {
 
 // Show release notes once per version
 (function () {
-  var RELEASE_NOTES_KEY = 'ts_release_notes_shown_v2_5_5';
+  var RELEASE_NOTES_KEY = 'ts_release_notes_shown_v2_6_0';
   chrome.storage.local.get(RELEASE_NOTES_KEY, function (data) {
     if (data[RELEASE_NOTES_KEY]) return;
     var modal = document.getElementById('release-notes-modal');

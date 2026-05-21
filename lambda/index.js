@@ -411,7 +411,10 @@ How to respond:
 5. If the property_context does not contain enough information to answer, say so clearly — do not guess or fabricate.
 6. Do NOT return JSON. Return plain text only.
 7. Tone: friendly and professional, like a senior consultant. Avoid filler phrases like "Great question!" or "Certainly!".
-8. End every response with a new paragraph containing exactly: "Was this helpful? Use the 👍 👎 buttons below to rate this response — your feedback helps improve TagScanner AI."`;
+8. End every response with a horizontal divider followed by the feedback line, formatted exactly as:
+
+---
+Was this helpful? Use the 👍 👎 buttons below to rate this response — your feedback helps improve TagScanner AI.`;
 
 // Multi-turn version of invokeClaude — takes a messages array instead of a single string
 async function invokeClaudeChat(messages, maxTokens) {

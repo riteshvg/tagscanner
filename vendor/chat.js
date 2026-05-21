@@ -214,7 +214,10 @@
     var inList = false;
     lines.forEach(function (line) {
       var trimmed = line.trim();
-      if (trimmed.match(/^[-*]\s+/)) {
+      if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+        if (inList) { html += '</ul>'; inList = false; }
+        html += '<hr style="border:none;border-top:1px solid rgba(0,0,0,0.1);margin:10px 0;">';
+      } else if (trimmed.match(/^[-*]\s+/)) {
         if (!inList) { html += '<ul>'; inList = true; }
         html += '<li>' + esc(trimmed.replace(/^[-*]\s+/, '')) + '</li>';
       } else {

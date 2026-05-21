@@ -140,6 +140,16 @@ async function incrementChatBetaCount(userId, propertyKey) {
   }
 }
 
+async function getUserChatLimitOverride(userId) {
+  try {
+    const result = await ddb.send(new GetCommand({ TableName: USERS_TABLE, Key: { userId } }));
+    if (!result.Item) return null;
+    return typeof result.Item.chat_limit_override === 'number' ? result.Item.chat_limit_override : null;
+  } catch (err) {
+    return null;
+  }
+}
+
 // ── AI kill-switch helpers ────────────────────────────────────────────────────
 
 async function getAIConfig() {
@@ -482,12 +492,14 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
   const propertyKey  = propertyName + (environment ? '#' + environment : '');
   const siteUrl      = (propertyContext.property && propertyContext.property.url) || '';
 
-  // Beta limit — skip for admin
+  // Beta limit — skip for admin or users with override
   const isAdminUser = ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL;
-  const betaCount = isAdminUser ? 0 : await getChatBetaCount(identity.userId, propertyKey);
-  if (!isAdminUser && betaCount >= BETA_CHAT_LIMIT) {
+  const limitOverride = isAdminUser ? -1 : await getUserChatLimitOverride(identity.userId);
+  const effectiveLimit = limitOverride === -1 ? Infinity : (limitOverride > 0 ? limitOverride : BETA_CHAT_LIMIT);
+  const betaCount = (effectiveLimit === Infinity) ? 0 : await getChatBetaCount(identity.userId, propertyKey);
+  if (effectiveLimit !== Infinity && betaCount >= effectiveLimit) {
     return resp(429, {
-      error: 'Beta question limit reached for this property (' + BETA_CHAT_LIMIT + '/' + BETA_CHAT_LIMIT + '). The limit resets when the beta period ends.',
+      error: 'Beta question limit reached for this property (' + effectiveLimit + '/' + effectiveLimit + '). The limit resets when the beta period ends.',
       betaLimitReached: true,
       chatCount: betaCount
     });
@@ -538,9 +550,9 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     putChatCache(chatCacheKey, result.text, { input: result.inputTokens, output: result.outputTokens }, propertyKey).catch(() => {});
   }
 
-  // Increment beta count (fire-and-forget for non-admin)
+  // Increment beta count (fire-and-forget for non-unlimited users)
   let newBetaCount = betaCount;
-  if (!isAdminUser) {
+  if (effectiveLimit !== Infinity) {
     newBetaCount = await incrementChatBetaCount(identity.userId, propertyKey);
   }
 
@@ -556,7 +568,7 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     answer:    result.text,
     tokens:    { input: result.inputTokens, output: result.outputTokens },
     queryId:   queryId || null,
-    chatCount: isAdminUser ? null : newBetaCount
+    chatCount: effectiveLimit === Infinity ? null : newBetaCount
   });
 }
 
@@ -1144,6 +1156,40 @@ async function handleUsers(body) {
   }
 }
 
+// ── Per-user chat limit override (admin only) ─────────────────────────────────
+
+async function handleSetUserChatLimit(body) {
+  const { sessionToken, targetUserId, limit } = body;
+  const session = await getSession(sessionToken);
+  if (!session) return resp(401, { error: 'Invalid or expired session.' });
+  if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
+  if (session.email.toLowerCase() !== ADMIN_EMAIL) return resp(403, { error: 'Admin access required.' });
+  if (!targetUserId || typeof targetUserId !== 'string') return resp(400, { error: 'targetUserId required.' });
+
+  try {
+    if (limit === null) {
+      // Remove override — restore default limit
+      await ddb.send(new UpdateCommand({
+        TableName: USERS_TABLE,
+        Key: { userId: targetUserId },
+        UpdateExpression: 'REMOVE chat_limit_override'
+      }));
+    } else {
+      // Set override (-1 = unlimited, or a positive integer)
+      await ddb.send(new UpdateCommand({
+        TableName: USERS_TABLE,
+        Key: { userId: targetUserId },
+        UpdateExpression: 'SET chat_limit_override = :v',
+        ExpressionAttributeValues: { ':v': limit }
+      }));
+    }
+    return resp(200, { ok: true });
+  } catch (err) {
+    console.error('handleSetUserChatLimit error:', err.message);
+    return resp(500, { error: err.message || 'Could not update limit.' });
+  }
+}
+
 // ── AI config read (admin only) ───────────────────────────────────────────────
 
 async function handleConfig(body) {
@@ -1331,6 +1377,7 @@ exports.handler = async (event) => {
 
     // ── Users (admin) ───────────────────────────────────────────────────────
     if (type === 'users') return await handleUsers(body);
+    if (type === 'setUserChatLimit') return await handleSetUserChatLimit(body);
 
     // ── AI config (admin) ────────────────────────────────────────────────────
     if (type === 'config')        return handleConfig(body);

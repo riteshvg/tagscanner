@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ── Share & Invite ───────────────────────────────────────────────────────
 
-  var CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/tagscanner/ajcohbbmajdcbppmmogdpkfhagjiedii';
+  var CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/tagscanner/mhejdbndckkddicchjjbaehfbmjjlmjn';
 
   var shareBtn   = document.getElementById('share-button-sidebar');
   var sharePanel = document.getElementById('share-panel');

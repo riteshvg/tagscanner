@@ -305,7 +305,7 @@ chrome.runtime.onMessage.addListener(function (message) {
 
         var wsAbout = XLSX.utils.aoa_to_sheet([
           ['TagScanner', 'Adobe Tags (Launch) Inspector'],
-          ['Version', '2.5.4'],
+          ['Version', '2.6.0'],
           ['', ''],
           ['Property', propertyName],
           ['Generated', new Date().toLocaleString()],

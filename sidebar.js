@@ -282,7 +282,9 @@ document.addEventListener('DOMContentLoaded', function () {
       if (client === 'mailto') {
         window.location.href = url;
       } else {
-        chrome.tabs.create({ url: url });
+        chrome.tabs.create({ url: url }, function (tab) {
+          chrome.windows.update(tab.windowId, { focused: true });
+        });
       }
       if (window.TagScannerAnalytics) {
         TagScannerAnalytics.track('Share:Invite Email', {

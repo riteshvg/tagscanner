@@ -503,7 +503,8 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     return resp(429, {
       error: 'Beta question limit reached for this property (' + effectiveLimit + '/' + effectiveLimit + '). The limit resets when the beta period ends.',
       betaLimitReached: true,
-      chatCount: betaCount
+      chatCount: betaCount,
+      chatLimit: effectiveLimit
     });
   }
 
@@ -570,7 +571,8 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     answer:    result.text,
     tokens:    { input: result.inputTokens, output: result.outputTokens },
     queryId:   queryId || null,
-    chatCount: effectiveLimit === Infinity ? null : newBetaCount
+    chatCount: effectiveLimit === Infinity ? null : newBetaCount,
+    chatLimit: effectiveLimit === Infinity ? null : effectiveLimit
   });
 }
 
@@ -1434,6 +1436,14 @@ exports.handler = async (event) => {
         }));
       } catch (_) {}
       return resp(200, { ok: true });
+    }
+
+    // ── Chat config (non-admin: returns current question limit for the UI) ────
+    if (type === 'chatConfig') {
+      const cfgSession = await getSession(sessionToken);
+      if (!cfgSession) return resp(401, { error: 'Sign in with Google to use TagScanner AI.' });
+      const aiCfg = await getAIConfig();
+      return resp(200, { chat_question_limit: aiCfg.chat_question_limit });
     }
 
     // ── Scan / Explain — require a valid session ─────────────────────────────

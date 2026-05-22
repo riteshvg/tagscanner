@@ -347,8 +347,11 @@ chrome.runtime.onMessage.addListener(function (message) {
         : 'Production';
       sessionStorage.setItem('launch_property_environment', envName);
 
-      // Start time-spent heartbeat now that property context is confirmed
-      if (window.TagScannerAnalytics) window.TagScannerAnalytics.startHeartbeat();
+      // Start engagement tracking now that property context is confirmed
+      if (window.TagScannerAnalytics) {
+        window.TagScannerAnalytics.startSessionTimer(); // event16 open + event17 on close
+        window.TagScannerAnalytics.startHeartbeat();    // event15 per-minute pulse
+      }
 
       // Session ping — records website + property; includes sessionToken if signed in
       (function () {

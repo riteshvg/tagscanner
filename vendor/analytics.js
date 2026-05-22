@@ -115,9 +115,9 @@
 
   var _suppressNextPageView = null;
 
-  // ── Time-spent heartbeat ──────────────────────────────────────────────────
-  // Fires event15 once per minute while a property is active.
-  // In AA: sum(event15) grouped by eVar1 = total minutes per property.
+  // ── Time-spent heartbeat (event15) ───────────────────────────────────────
+  // Fires once per minute while a property is active.
+  // AA: sum(event15) by eVar1 = total engagement minutes per property.
 
   var _heartbeatTimer = null;
 
@@ -137,6 +137,44 @@
     if (_heartbeatTimer) return; // already running
     _heartbeatTimer = setInterval(fireHeartbeat, 60000);
   }
+
+  // ── Session open / close timer (event16 / event17) ────────────────────────
+  // event16 fires when property is confirmed open (Session Start).
+  // event17 fires on pagehide (Session End); v15 carries duration in minutes.
+  // AA: avg(v15) when event17 fires = avg session length per property.
+  // keepalive:true on the underlying fetch ensures the close hit goes out
+  // even as the popup is being torn down.
+
+  var SESSION_START_KEY = 'ts_session_start_ms';
+
+  function startSessionTimer() {
+    if (sessionStorage.getItem(SESSION_START_KEY)) return; // guard against double-init
+    try { sessionStorage.setItem(SESSION_START_KEY, String(Date.now())); } catch (e) {}
+    send({
+      pageName: 'TagScanner:Session',
+      pe:       'lnk_o',
+      pev2:     'Session:Open',
+      v9:       'Session:Open',
+      events:   'event16'
+    });
+  }
+
+  window.addEventListener('pagehide', function () {
+    var p = getPropCtx();
+    if (!p.name || p.name === 'No Launch Code') return;
+    var startMs = parseInt(sessionStorage.getItem(SESSION_START_KEY) || '0', 10);
+    if (!startMs) return;
+    var durationMins = Math.max(1, Math.round((Date.now() - startMs) / 60000));
+    try { sessionStorage.removeItem(SESSION_START_KEY); } catch (e) {}
+    send({
+      pageName: 'TagScanner:Session',
+      pe:       'lnk_o',
+      pev2:     'Session:Close',
+      v9:       'Session:Close',
+      events:   'event17',
+      v15:      String(durationMins)   // eVar15: session duration in minutes
+    });
+  });
 
   window.TagScannerAnalytics = {
     page: function (pageName, extra) {
@@ -160,6 +198,7 @@
         pageName: 'TagScanner'
       }, extra || {}));
     },
-    startHeartbeat: startHeartbeat
+    startHeartbeat:    startHeartbeat,
+    startSessionTimer: startSessionTimer
   };
 })();

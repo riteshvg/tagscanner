@@ -61,14 +61,15 @@
 
 /* ── Sidebar group labels ─────────────────────────────── */
 .sidebar-group-label {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 1.8px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.22);
-  padding: 20px 6px 4px;
-  margin-bottom: 0;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 22px 6px 6px;
+  margin-bottom: 2px;
   list-style: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 /* Sidebar brand description */
 .sidebar-brand-description {
@@ -195,6 +196,11 @@ a {
   visibility: hidden;
   width: 0;
   overflow: hidden;
+}
+
+.sidebar-group-label:first-of-type {
+  border-top: none;
+  padding-top: 12px;
 }
 
 /* Hide group labels when collapsed — also remove their height so no gap remains */

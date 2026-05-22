@@ -155,15 +155,16 @@ async function getUserChatLimitOverride(userId) {
 async function getAIConfig() {
   try {
     const result = await ddb.send(new GetCommand({ TableName: CONFIG_TABLE, Key: { pk: 'global' } }));
-    if (!result.Item) return { ai_enabled: true, disabled_reason: '', cost_limit_usd: DEFAULT_COST_LIMIT };
+    if (!result.Item) return { ai_enabled: true, disabled_reason: '', cost_limit_usd: DEFAULT_COST_LIMIT, chat_question_limit: BETA_CHAT_LIMIT };
     return {
-      ai_enabled:      result.Item.ai_enabled !== false,
-      disabled_reason: result.Item.disabled_reason || '',
-      cost_limit_usd:  typeof result.Item.cost_limit_usd === 'number' ? result.Item.cost_limit_usd : DEFAULT_COST_LIMIT
+      ai_enabled:           result.Item.ai_enabled !== false,
+      disabled_reason:      result.Item.disabled_reason || '',
+      cost_limit_usd:       typeof result.Item.cost_limit_usd       === 'number' ? result.Item.cost_limit_usd       : DEFAULT_COST_LIMIT,
+      chat_question_limit:  typeof result.Item.chat_question_limit  === 'number' ? result.Item.chat_question_limit  : BETA_CHAT_LIMIT
     };
   } catch (err) {
     console.error('getAIConfig error:', err.message);
-    return { ai_enabled: true, disabled_reason: '', cost_limit_usd: 5.00 };
+    return { ai_enabled: true, disabled_reason: '', cost_limit_usd: 5.00, chat_question_limit: BETA_CHAT_LIMIT };
   }
 }
 
@@ -492,10 +493,11 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
   const propertyKey  = propertyName + (environment ? '#' + environment : '');
   const siteUrl      = (propertyContext.property && propertyContext.property.url) || '';
 
-  // Beta limit — skip for admin or users with override
+  // Beta limit — skip for admin; apply global config limit (or per-user override if set)
   const isAdminUser = ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL;
   const limitOverride = isAdminUser ? -1 : await getUserChatLimitOverride(identity.userId);
-  const effectiveLimit = limitOverride === -1 ? Infinity : (limitOverride > 0 ? limitOverride : BETA_CHAT_LIMIT);
+  const globalLimit = aiConfig.chat_question_limit || BETA_CHAT_LIMIT;
+  const effectiveLimit = limitOverride === -1 ? Infinity : (limitOverride > 0 ? limitOverride : globalLimit);
   const betaCount = (effectiveLimit === Infinity) ? 0 : await getChatBetaCount(identity.userId, propertyKey);
   if (effectiveLimit !== Infinity && betaCount >= effectiveLimit) {
     return resp(429, {
@@ -1201,17 +1203,18 @@ async function handleConfig(body) {
 
   const [aiConfig, todayCost] = await Promise.all([getAIConfig(), getTodayCost()]);
   return resp(200, {
-    ai_enabled:      aiConfig.ai_enabled,
-    disabled_reason: aiConfig.disabled_reason,
-    cost_limit_usd:  aiConfig.cost_limit_usd,
-    today_cost_usd:  todayCost
+    ai_enabled:          aiConfig.ai_enabled,
+    disabled_reason:     aiConfig.disabled_reason,
+    cost_limit_usd:      aiConfig.cost_limit_usd,
+    chat_question_limit: aiConfig.chat_question_limit,
+    today_cost_usd:      todayCost
   });
 }
 
 // ── AI config write (admin only) ──────────────────────────────────────────────
 
 async function handleSetConfig(body) {
-  const { sessionToken, ai_enabled, disabled_reason, cost_limit_usd } = body;
+  const { sessionToken, ai_enabled, disabled_reason, cost_limit_usd, chat_question_limit } = body;
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session.' });
   if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
@@ -1233,6 +1236,10 @@ async function handleSetConfig(body) {
   if (typeof cost_limit_usd === 'number' && cost_limit_usd >= 0.5) {
     setParts.push('cost_limit_usd = :cl');
     attrValues[':cl'] = cost_limit_usd;
+  }
+  if (typeof chat_question_limit === 'number' && Number.isInteger(chat_question_limit) && chat_question_limit >= 1) {
+    setParts.push('chat_question_limit = :ql');
+    attrValues[':ql'] = chat_question_limit;
   }
   if (!setParts.length) return resp(400, { error: 'Nothing to update.' });
 

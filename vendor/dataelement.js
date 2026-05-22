@@ -1969,7 +1969,7 @@ if (download_button[0]) {
     );
     var dePropName = sessionStorage.getItem('launch_property_name') || '';
     var brandingPrefix = [
-      '"Exported by TagScanner v2.5.4 \u2014 Adobe Tags (Launch) Inspector"',
+      '"Exported by TagScanner v2.5.6 \u2014 Adobe Tags (Launch) Inspector"',
       '"Property: ' + dePropName.replace(/"/g, '""') + ' | Generated: ' + new Date().toLocaleString() + '"',
       '"tagscannerfeedback@gmail.com \u2014 Provided as-is. No affiliation with Adobe."',
       '',

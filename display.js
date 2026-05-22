@@ -232,7 +232,7 @@ function exportFullXlsx() {
     var exportPropName = sessionStorage.getItem('launch_property_name') || '';
     var wsAbout = XLSX.utils.aoa_to_sheet([
       ['TagScanner', 'Adobe Tags (Launch) Inspector'],
-      ['Version', '2.5.4'],
+      ['Version', '2.5.6'],
       ['', ''],
       ['Property', exportPropName],
       ['Generated', new Date().toLocaleString()],

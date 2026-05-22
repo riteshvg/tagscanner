@@ -2759,7 +2759,7 @@ function exportMainRulesTableToCSV() {
   var csvLines = [headers.map(toCsvCell).join(',')].concat(rows.map(function (r) { return r.map(toCsvCell).join(','); }));
   var rulesPropName = sessionStorage.getItem('launch_property_name') || '';
   var brandingPrefix = [
-    '"Exported by TagScanner v2.5.4 \u2014 Adobe Tags (Launch) Inspector"',
+    '"Exported by TagScanner v2.5.6 \u2014 Adobe Tags (Launch) Inspector"',
     '"Property: ' + rulesPropName.replace(/"/g, '""') + ' | Generated: ' + new Date().toLocaleString() + '"',
     '"tagscannerfeedback@gmail.com \u2014 Provided as-is. No affiliation with Adobe."',
     '',

@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       // Create CSV content
       const ccPropName = sessionStorage.getItem('launch_property_name') || '';
-      let csvContent = '"Exported by TagScanner v2.5.4 — Adobe Tags (Launch) Inspector"\r\n' +
+      let csvContent = '"Exported by TagScanner v2.5.6 — Adobe Tags (Launch) Inspector"\r\n' +
         '"Property: ' + ccPropName.replace(/"/g, '""') + ' | Generated: ' + new Date().toLocaleString() + '"\r\n' +
         '"tagscannerfeedback@gmail.com — Provided as-is. No affiliation with Adobe."\r\n\r\n' +
         'Data Element Name,Type,Extension,Found Names,Code\n';

@@ -269,7 +269,7 @@ async function autoDisableAI(reason) {
 const AA_RSID            = 'ageo1xxsintagscanner';
 const AA_TRACKING_SERVER = 'adobeintriteshgupta.sc.omtrdc.net';
 const AA_ENDPOINT        = `https://${AA_TRACKING_SERVER}/b/ss/${AA_RSID}/0`;
-const AA_APP_VERSION     = '2.5.4';
+const AA_APP_VERSION     = '2.5.6';
 
 function hashEmailSync(email) {
   if (!email) return '';

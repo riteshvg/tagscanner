@@ -61,7 +61,7 @@
 
 /* ── Sidebar group labels ─────────────────────────────── */
 .sidebar-group-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -69,7 +69,6 @@
   padding: 22px 6px 6px;
   margin-bottom: 2px;
   list-style: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 /* Sidebar brand description */
 .sidebar-brand-description {
@@ -198,10 +197,6 @@ a {
   overflow: hidden;
 }
 
-.sidebar-group-label:first-of-type {
-  border-top: none;
-  padding-top: 12px;
-}
 
 /* Hide group labels when collapsed — also remove their height so no gap remains */
 #sidebar-click:not(.active) .sidebar-group-label {

@@ -115,6 +115,29 @@
 
   var _suppressNextPageView = null;
 
+  // ── Time-spent heartbeat ──────────────────────────────────────────────────
+  // Fires event15 once per minute while a property is active.
+  // In AA: sum(event15) grouped by eVar1 = total minutes per property.
+
+  var _heartbeatTimer = null;
+
+  function fireHeartbeat() {
+    var p = getPropCtx();
+    if (!p.name || p.name === 'No Launch Code') return;
+    send({
+      pageName: 'TagScanner:Session',
+      pe:       'lnk_o',
+      pev2:     'Session:Heartbeat',
+      v9:       'Session:Heartbeat',
+      events:   'event15'
+    });
+  }
+
+  function startHeartbeat() {
+    if (_heartbeatTimer) return; // already running
+    _heartbeatTimer = setInterval(fireHeartbeat, 60000);
+  }
+
   window.TagScannerAnalytics = {
     page: function (pageName, extra) {
       if (_suppressNextPageView === pageName) {
@@ -136,6 +159,7 @@
         v9:      linkName,  // eVar9: link name dimension (mirrors pev2 for reporting)
         pageName: 'TagScanner'
       }, extra || {}));
-    }
+    },
+    startHeartbeat: startHeartbeat
   };
 })();

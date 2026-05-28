@@ -3189,6 +3189,13 @@ function showCodeModal(title, code) {
       .replace(/^\/\/[^\n]*assets\.adobedtm\.com[^\n]*/gm, '')
       .replace(/^`[^\n`]*assets\.adobedtm\.com[^\n`]*`\s*\.\s*/gm, '')
       .trim();
+    // Strip function wrapper (e.g. "function(module, exports, require, turbine) { ... }")
+    // that results from cloneJsonSafe serialising live function objects to strings.
+    // Same pattern used by the data element viewer.
+    var fnWrapMatch = rawCode.match(/^function\s*\([^)]*\)\s*\{([\s\S]*)\}$/);
+    if (fnWrapMatch && fnWrapMatch[1]) {
+      rawCode = fnWrapMatch[1].trim();
+    }
     // Only extract from __registerScript wrapper when the ENTIRE rawCode is that call
     // (anchored ^ and $). Uses ((?:[^\\]|\\.)*?) to correctly skip over escaped quotes.
     var wrapperMatch = rawCode.match(/^_satellite\.__registerScript\s*\([^,]+,\s*(["'`])((?:[^\\]|\\.)*?)\1\s*,?\s*\)\s*;?\s*$/);

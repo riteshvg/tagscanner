@@ -242,54 +242,54 @@
         return wrap;
       }
 
-      // ── Rules section ──────────────────────────────────────────────────────
-      if (ruleNames.length > 0) {
-        var ruleLabel = document.createElement('div');
-        ruleLabel.className = 'ext-expanded-section-label';
-        ruleLabel.innerHTML = '<i class="fas fa-wrench"></i> Rules (' + ruleNames.length + ')';
-        wrap.appendChild(ruleLabel);
+      var columnsWrap = document.createElement('div');
+      columnsWrap.className = 'expanded-content-columns';
 
-        var scrollWrap = document.createElement('div');
-        scrollWrap.className = 'ext-expanded-table-scroll';
-
-        var tbl = document.createElement('table');
-        tbl.className = 'ext-expanded-table';
-        tbl.innerHTML = '<thead><tr><th>Rule Name</th><th>Events</th><th>Has Conditions</th></tr></thead><tbody></tbody>';
-        var tbody = tbl.querySelector('tbody');
-
-        ruleNames.forEach(function (ruleName) {
-          var r = v[ruleName];
-          var eventNames = Array.isArray(r.events) && r.events.length ? r.events.join(', ') : '—';
-          var row = document.createElement('tr');
-          row.innerHTML =
-            '<td>' + (ruleName || '—') + '</td>' +
-            '<td>' + eventNames + '</td>' +
-            '<td>' + (r.conditions ? 'Yes' : '—') + '</td>';
-          tbody.appendChild(row);
-        });
-
-        scrollWrap.appendChild(tbl);
-        wrap.appendChild(scrollWrap);
+      function addSection(title, iconClass, items) {
+        var section = document.createElement('div');
+        section.className = 'expanded-section expanded-section-column';
+        var h = document.createElement('h4');
+        var icon = document.createElement('i');
+        icon.className = 'section-icon fas ' + iconClass;
+        h.appendChild(icon);
+        h.appendChild(document.createTextNode(title));
+        section.appendChild(h);
+        var ul = document.createElement('ul');
+        ul.className = 'expanded-detail-list';
+        if (items.length === 0) {
+          var li = document.createElement('li');
+          var ic = document.createElement('i');
+          ic.className = 'item-icon fas fa-chevron-right';
+          li.appendChild(ic);
+          li.appendChild(document.createTextNode('None'));
+          ul.appendChild(li);
+        } else {
+          if (items.length > 10) {
+            ul.style.maxHeight = '264px';
+            ul.style.overflowY = 'auto';
+            ul.style.border = '1px solid #e3e6f0';
+            ul.style.borderRadius = '4px';
+            ul.style.paddingRight = '4px';
+          }
+          items.forEach(function (text) {
+            var li = document.createElement('li');
+            var ic = document.createElement('i');
+            ic.className = 'item-icon fas fa-chevron-right';
+            li.appendChild(ic);
+            li.appendChild(document.createTextNode(text));
+            ul.appendChild(li);
+          });
+        }
+        section.appendChild(ul);
+        columnsWrap.appendChild(section);
       }
 
-      // ── Data Elements section ───────────────────────────────────────────────
-      if (deList.length > 0) {
-        var deLabel = document.createElement('div');
-        deLabel.className = 'ext-expanded-section-label';
-        deLabel.innerHTML = '<i class="fas fa-database"></i> Data Elements (' + deList.length + ')';
-        wrap.appendChild(deLabel);
+      addSection('Rules (' + ruleNames.length + ')', 'fa-wrench', ruleNames);
+      addSection('Data Elements (' + deList.length + ')', 'fa-database', deList.map(function (item) {
+        return item.name || item.path || '—';
+      }));
 
-        var deChips = document.createElement('div');
-        deChips.className = 'ext-de-list';
-        deList.forEach(function (item) {
-          var chip = document.createElement('span');
-          chip.className = 'ext-de-chip';
-          chip.textContent = item.name || item.path || '—';
-          deChips.appendChild(chip);
-        });
-        wrap.appendChild(deChips);
-      }
-
+      wrap.appendChild(columnsWrap);
       return wrap;
     }
 

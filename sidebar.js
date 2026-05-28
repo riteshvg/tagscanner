@@ -112,9 +112,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     try {
       var raw = localStorage.getItem('tagscanner_session');
-      if (!raw) { infoEl.style.display = 'none'; if (dividerEl) dividerEl.style.display = 'none'; return; }
+      if (!raw) { infoEl.style.cssText = 'display:none!important'; if (dividerEl) dividerEl.style.cssText = 'display:none!important'; return; }
       var s = JSON.parse(raw);
-      if (!s || !s.sessionToken) { infoEl.style.display = 'none'; if (dividerEl) dividerEl.style.display = 'none'; return; }
+      if (!s || !s.sessionToken) { infoEl.style.cssText = 'display:none!important'; if (dividerEl) dividerEl.style.cssText = 'display:none!important'; return; }
 
       if (nameEl)    nameEl.textContent = s.name || s.email || '';
       if (avatarEl) {
@@ -129,8 +129,8 @@ document.addEventListener('DOMContentLoaded', function () {
       infoEl.style.cssText    = 'display:flex!important';
       if (dividerEl) dividerEl.style.cssText = 'display:block!important';
     } catch (e) {
-      infoEl.style.display = 'none';
-      if (dividerEl) dividerEl.style.display = 'none';
+      infoEl.style.cssText = 'display:none!important';
+      if (dividerEl) dividerEl.style.cssText = 'display:none!important';
     }
   }
 

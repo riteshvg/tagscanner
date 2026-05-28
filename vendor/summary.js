@@ -1303,7 +1303,8 @@ function getAICacheKey() {
 
 function loadCachedAIReport() {
   try {
-    var raw = localStorage.getItem(getAICacheKey());
+    // Try property-specific key first, fall back to the latest scan regardless of property
+    var raw = localStorage.getItem(getAICacheKey()) || localStorage.getItem('ts_health_latest');
     if (!raw) return null;
     var obj = JSON.parse(raw);
     return (obj && obj.v === AI_CACHE_VERSION) ? obj : null;
@@ -1312,14 +1313,16 @@ function loadCachedAIReport() {
 
 function saveCachedAIReport(report, tokens, costUsd, fingerprint) {
   try {
-    localStorage.setItem(getAICacheKey(), JSON.stringify({
+    var entry = JSON.stringify({
       v:           AI_CACHE_VERSION,
       ts:          Date.now(),
       report:      report,
       tokens:      tokens,
       costUsd:     costUsd,
       fingerprint: fingerprint || null
-    }));
+    });
+    localStorage.setItem(getAICacheKey(), entry);
+    localStorage.setItem('ts_health_latest', entry);
   } catch (e) {}
 }
 
@@ -1696,13 +1699,13 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
           '</div>';
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
-        document.getElementById('btnRescanConfirm').addEventListener('click', function () { overlay.remove(); localStorage.removeItem(getAICacheKey()); showAIState('prompt'); });
+        document.getElementById('btnRescanConfirm').addEventListener('click', function () { overlay.remove(); localStorage.removeItem(getAICacheKey()); localStorage.removeItem('ts_health_latest'); showAIState('prompt'); });
         document.getElementById('btnRescanCancel').addEventListener('click', function () { overlay.remove(); });
         overlay.addEventListener('click', function (e) { if (e.target === overlay) { overlay.remove(); } });
         return;
       }
 
-      localStorage.removeItem(getAICacheKey());
+      localStorage.removeItem(getAICacheKey()); localStorage.removeItem('ts_health_latest');
       showAIState('prompt');
     });
   }

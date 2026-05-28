@@ -142,25 +142,22 @@
         border: 1px solid #fff;
       }
 
-      /* Page header – same style as Rules / display landing */
       .de-page-header {
-        background-color: #4e73df;
+        background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
+        padding: 16px 20px;
       }
-      .de-page-header h5 {
-        color: white;
-        padding: 10px;
-        margin-bottom: 0;
-      }
-      .de-page-header h5 i {
-        margin-right: 8px;
-      }
+      .de-page-header .header-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 5px; }
+      .de-page-header .header-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0; }
+      .de-page-header .header-title span { color: #61dafb; }
+      .de-page-header .header-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; margin-bottom: 0; }
       .de-header-actions {
         display: flex;
         align-items: center;
         gap: 8px;
+        padding-top: 4px;
       }
       /* Disabled components in compiled library */
       #de_details tr.component-disabled {
@@ -560,6 +557,15 @@
         font-weight: 600;
       }
 
+      /* Explain feedback buttons */
+      .de-explain-feedback { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #e3e6f0; }
+      .de-explain-feedback-label { font-size: 11px; color: #9ca3af; }
+      .de-fb-btn { background: none; border: 1px solid #e3e6f0; border-radius: 4px; color: #9ca3af; cursor: pointer; font-size: 11px; padding: 3px 8px; transition: all 0.15s; line-height: 1.4; }
+      .de-fb-btn:hover { border-color: #4e73df; color: #4e73df; }
+      .de-fb-btn.voted-positive { border-color: #10b981; color: #065f46; background: #d1fae5; }
+      .de-fb-btn.voted-negative { border-color: #ef4444; color: #991b1b; background: #fee2e2; }
+      .de-fb-btn:disabled { opacity: 0.5; cursor: default; }
+
       /* Explain panel */
       .de-explain-panel {
         background: #f8f9fc;
@@ -735,18 +741,17 @@
 
     <div class="container-fluid">
       <div class="de-page-header">
-        <h5><i class="fas fa-database mr-2"></i> Data Elements</h5>
+        <div>
+          <div class="header-eyebrow">TagScanner</div>
+          <h1 class="header-title">Data <span>Elements</span></h1>
+          <p class="header-sub">All data elements defined in your Adobe Tags property. Sort the table by clicking on any column header.</p>
+        </div>
         <div class="de-header-actions">
-          <button id="start-tour" class="btn btn-light btn-sm" style="margin-right: 10px">
+          <button id="start-tour" class="btn btn-light btn-sm">
             <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
           </button>
           <div class="download-button"></div>
         </div>
-      </div>
-
-      <div class="description-text">
-        This page shows all data elements defined in your Adobe Tags property.
-        You can sort the table by clicking on any column header.
       </div>
       <div class="summary-card data-element-card">
         <div class="summary-card-body">

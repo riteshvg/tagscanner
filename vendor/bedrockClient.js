@@ -262,9 +262,19 @@ Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under
     };
   }
 
+  async function submitFeedback(queryId, rating, config) {
+    return callProxy(TS_PROXY_URL, {
+      type:         'feedback',
+      sessionToken: config.sessionToken || null,
+      queryId:      queryId,
+      rating:       rating,
+    });
+  }
+
   global.TagScannerBedrock = {
     analyzeProperty,
     explainCode,
     renderBedrockCodeExplanation,
+    submitFeedback,
   };
 })(typeof window !== 'undefined' ? window : this);

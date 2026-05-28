@@ -7,13 +7,18 @@
   <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet" />
   <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
   <style>
-    body { background:#f8f9fc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin:0; padding:20px; }
+    body { background:#f8f9fc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin:0; padding:0; }
 
     .page-header {
-      display:flex; align-items:center; justify-content:space-between;
-      margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid #e3e6f0;
+      background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
+      display:flex; align-items:flex-start; justify-content:space-between;
+      padding: 16px 20px; margin-bottom:0;
     }
-    .page-header h1 { font-size:16px; font-weight:700; color:#1a1a2e; margin:0; }
+    .page-header .header-eyebrow { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#61dafb; margin-bottom:5px; }
+    .page-header .header-title { font-size:18px; font-weight:800; color:#fff; margin:0; }
+    .page-header .header-title span { color:#61dafb; }
+    .page-header .header-sub { font-size:12px; color:#9ca3af; margin-top:4px; margin-bottom:0; }
+    .page-content { padding: 20px; }
 
     .card-panel {
       background:#fff; border:1px solid #e3e6f0; border-radius:8px; padding:20px;
@@ -97,8 +102,13 @@
 </head>
 <body>
   <div class="page-header">
-    <h1><i class="fas fa-exchange-alt" style="color:#4e73df;margin-right:8px"></i>Environment Override</h1>
+    <div>
+      <div class="header-eyebrow">TagScanner</div>
+      <h1 class="header-title">Environment <span>Override</span></h1>
+      <p class="header-sub">Inject a custom Adobe Tags script URL to test a different build without changing your site.</p>
+    </div>
   </div>
+  <div class="page-content">
 
   <div id="activeBanner" class="status-banner" style="display:none">
     <i class="fas fa-check-circle"></i>
@@ -142,6 +152,7 @@
     </div>
   </div>
 
+  </div><!-- /.page-content -->
   <script src="env-override.js"></script>
 </body>
 </html>

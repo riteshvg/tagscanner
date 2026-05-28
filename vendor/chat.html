@@ -27,21 +27,15 @@
     /* ── Header ─────────────────────────────────────────────── */
     #chat-header {
       display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      background: #fff;
-      border-bottom: 1px solid #e3e6f0;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 14px 18px;
+      background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
       flex-shrink: 0;
     }
-    #chat-header-icon {
-      width: 30px; height: 30px; border-radius: 8px;
-      background: linear-gradient(135deg, #4e73df, #7c3aed);
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-    #chat-header-icon i { color: #fff; font-size: 13px; }
-    #chat-header-title { font-weight: 700; font-size: 14px; color: #1a1d23; }
+    .chat-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 4px; }
+    #chat-header-title { font-weight: 800; font-size: 16px; color: #fff; margin: 0; }
+    #chat-header-title span { color: #61dafb; }
     .beta-badge {
       display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.4px;
       text-transform: uppercase; background: linear-gradient(135deg, #7c3aed, #4e73df);
@@ -49,7 +43,7 @@
       margin-left: 6px; position: relative; top: -1px;
     }
     #chat-header-title-wrap { display: flex; align-items: center; flex: 1; }
-    #chat-header-prop  { font-size: 11px; color: #6b7280; margin-top: 1px; }
+    #chat-header-prop  { font-size: 11px; color: #9ca3af; margin-top: 3px; }
 
     /* ── Auth gate ──────────────────────────────────────────── */
     #auth-gate {
@@ -226,11 +220,10 @@
 
   <!-- Header -->
   <div id="chat-header">
-    <div id="chat-header-icon"><i class="fas fa-comment-dots"></i></div>
     <div style="flex:1">
+      <div class="chat-eyebrow">TagScanner <span class="beta-badge">Beta</span></div>
       <div id="chat-header-title-wrap">
-        <span id="chat-header-title">Ask AI</span>
-        <span class="beta-badge">Beta</span>
+        <span id="chat-header-title">Ask <span>AI</span></span>
       </div>
       <div id="chat-header-prop">Loading property…</div>
     </div>

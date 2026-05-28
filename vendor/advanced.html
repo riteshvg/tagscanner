@@ -9,28 +9,28 @@
     <link href="../css/styles.css" rel="stylesheet" />
     <style>
       .advanced-page-header {
-        background-color: #4e73df;
+        background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
+        padding: 16px 20px;
         flex-wrap: wrap;
         gap: 10px;
       }
-      .advanced-page-header h5 {
-        color: white;
-        padding: 10px;
-        margin-bottom: 0;
-      }
+      .advanced-page-header .header-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 5px; }
+      .advanced-page-header .header-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0; }
+      .advanced-page-header .header-title span { color: #61dafb; }
+      .advanced-page-header .header-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; margin-bottom: 0; }
       .advanced-page-header .btn-back {
-        margin-right: 10px;
-        background: rgba(255,255,255,0.2);
+        margin-top: 4px;
+        background: rgba(255,255,255,0.15);
         color: white;
-        border: 1px solid rgba(255,255,255,0.5);
+        border: 1px solid rgba(255,255,255,0.4);
       }
       .advanced-page-header .btn-back:hover {
-        background: rgba(255,255,255,0.3);
+        background: rgba(255,255,255,0.25);
         color: white;
-        border-color: white;
+        border-color: rgba(255,255,255,0.7);
       }
       .advanced-badge {
         display: inline-block;
@@ -87,16 +87,14 @@
     <div class="container-fluid">
       <div class="advanced-page-header">
         <div>
-          <h5><i class="fas fa-cog mr-2"></i> Advanced Mode <span class="advanced-badge">Reactor API</span></h5>
+          <div class="header-eyebrow">TagScanner <span class="advanced-badge">Reactor API</span></div>
+          <h1 class="header-title">Advanced <span>Mode</span></h1>
+          <p class="header-sub">Use Reactor API credentials to access property-level data not in the compiled library — total rules, disabled rules, libraries.</p>
         </div>
         <a id="back-to-simple" href="../display.html" target="iframe2" class="btn btn-sm btn-back">
           <i class="fas fa-arrow-left mr-1"></i> Back to Simple mode
         </a>
       </div>
-
-      <p class="description-text">
-        Use your Adobe Reactor API credentials to see property-level data that is not in the compiled library (e.g. total rules, disabled rules, libraries). Same look and feel as Simple mode; credentials are only used in this session.
-      </p>
 
       <!-- Step 1: Credentials (Client ID + Client Secret + Org ID → generate access token) -->
       <div class="summary-card credentials-card">

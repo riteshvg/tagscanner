@@ -29,24 +29,25 @@
 
     /* ── Header ─────────────────────────────────────────────────── */
     .mon-header {
-      padding: 14px 18px 10px;
-      border-bottom: 1px solid #21262d;
+      background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
+      padding: 14px 18px;
       display: flex;
-      align-items: center;
-      gap: 10px;
+      align-items: flex-start;
+      justify-content: space-between;
       flex-shrink: 0;
     }
+    .mon-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 4px; }
     .mon-header-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #e6edf3;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+      margin: 0;
     }
+    .mon-header-title span { color: #61dafb; }
     .mon-header-sub {
       font-size: 11px;
-      color: #7d8590;
-      margin-top: 1px;
+      color: #9ca3af;
+      margin-top: 3px;
     }
     .pulse-dot {
       width: 9px; height: 9px;
@@ -459,11 +460,12 @@
 
   <!-- Header -->
   <div class="mon-header">
-    <div class="pulse-dot" id="pulse-dot"></div>
     <div>
-      <div class="mon-header-title">AI Property Monitor</div>
+      <div class="mon-eyebrow">TagScanner</div>
+      <div class="mon-header-title">AI Property <span>Monitor</span></div>
       <div class="mon-header-sub" id="monitor-status-label">Not monitoring</div>
     </div>
+    <div class="pulse-dot" id="pulse-dot" style="margin-top:6px"></div>
   </div>
 
   <!-- No property screen -->

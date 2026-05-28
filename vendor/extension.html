@@ -49,14 +49,17 @@
       .download-section { margin-top: 30px; margin-bottom: 40px; text-align: center; }
       .description-text { margin-top: 10px; margin-bottom: 15px; }
       .ext-page-header {
-        background-color: #4e73df;
+        background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        align-items: flex-start;
+        padding: 16px 20px;
       }
-      .ext-page-header h5 { color: white; padding: 10px; margin-bottom: 0; }
-      .ext-page-header h5 i { margin-right: 8px; }
-      .ext-header-actions { display: flex; align-items: center; gap: 8px; padding-right: 14px; }
+      .ext-page-header .header-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 5px; }
+      .ext-page-header .header-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0; }
+      .ext-page-header .header-title span { color: #61dafb; }
+      .ext-page-header .header-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; margin-bottom: 0; }
+      .ext-header-actions { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
       .ext-name-cell {
         color: #46a8f7;
         font-weight: 500;
@@ -218,16 +221,17 @@
 
     <div class="container-fluid" id="ext-main" style="display: none;">
       <div class="ext-page-header">
-        <h5><i class="fas fa-plug mr-2"></i> Extensions</h5>
+        <div>
+          <div class="header-eyebrow">TagScanner</div>
+          <h1 class="header-title">Property <span>Extensions</span></h1>
+          <p class="header-sub">All extensions configured in your Adobe Tags property, with rule and data element usage. Sort by clicking column headers.</p>
+        </div>
         <div class="ext-header-actions">
-          <button id="start-tour" class="btn btn-light btn-sm" style="margin-right: 10px">
+          <button id="start-tour" class="btn btn-light btn-sm">
             <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
           </button>
           <div class="download-button"></div>
         </div>
-      </div>
-      <div class="description-text">
-        This page shows all extensions configured in your Adobe Tags property and how each is used in rules and data elements. You can sort by clicking column headers and search by extension name.
       </div>
 
       <div class="search-container" style="margin-bottom: 20px">
@@ -253,7 +257,10 @@
 
     <div id="no-data-alert" class="container-fluid" style="display: none;">
       <div class="ext-page-header">
-        <h5><i class="fas fa-plug mr-2"></i> Extensions</h5>
+        <div>
+          <div class="header-eyebrow">TagScanner</div>
+          <h1 class="header-title">Property <span>Extensions</span></h1>
+        </div>
       </div>
       <div class="alert alert-warning mt-4">
         No extension data found. Please scan a site with the TagScanner extension and load Rules or Data Elements first, then return here.

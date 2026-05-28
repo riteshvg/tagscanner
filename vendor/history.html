@@ -9,13 +9,20 @@
   <script src="intro.js"></script>
   <link href="intro.css" rel="stylesheet" />
   <style>
-    body { background:#f8f9fc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin:0; padding:20px; }
+    body { background:#f8f9fc; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin:0; padding:0; }
 
     .page-header {
-      display:flex; align-items:center; justify-content:space-between;
-      margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid #e3e6f0;
+      background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
+      display:flex; align-items:flex-start; justify-content:space-between;
+      padding: 16px 20px;
+      margin-bottom: 0;
     }
-    .page-header h1 { font-size:16px; font-weight:700; color:#1a1a2e; margin:0; }
+    .page-header .header-eyebrow { font-size:10px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#61dafb; margin-bottom:5px; }
+    .page-header .header-title { font-size:18px; font-weight:800; color:#fff; margin:0; }
+    .page-header .header-title span { color:#61dafb; }
+    .page-header .header-sub { font-size:12px; color:#9ca3af; margin-top:4px; margin-bottom:0; }
+    .page-header-actions { display:flex; align-items:center; gap:8px; padding-top:4px; }
+    .page-content { padding: 20px; }
     .user-chip {
       display:flex; align-items:center; gap:7px;
       background:#fff; border:1px solid #e3e6f0; border-radius:20px;
@@ -133,8 +140,12 @@
 </head>
 <body>
   <div class="page-header">
-    <h1><i class="fas fa-history" style="color:#4e73df;margin-right:8px"></i>Property AI History</h1>
-    <div style="display:flex;align-items:center;gap:8px">
+    <div>
+      <div class="header-eyebrow">TagScanner</div>
+      <h1 class="header-title">AI Property <span>History</span></h1>
+      <p class="header-sub">Your past scans, explains, and AI chat sessions for this property.</p>
+    </div>
+    <div class="page-header-actions">
       <button id="start-tour" class="btn btn-light btn-sm" style="font-size:12px">
         <i class="fas fa-map-marked-alt mr-1"></i> Take a Tour
       </button>
@@ -142,6 +153,7 @@
     </div>
   </div>
 
+  <div class="page-content">
   <div class="filter-bar">
     <button class="filter-btn active" data-filter="all">All</button>
     <button class="filter-btn" data-filter="scan">Scans</button>
@@ -168,6 +180,7 @@
   </div>
 
   <button id="loadMoreBtn" class="load-more-btn" style="display:none">Load more</button>
+  </div><!-- /.page-content -->
 
   <script src="jspdf.umd.min.js"></script>
   <script src="jspdf.plugin.autotable.min.js"></script>

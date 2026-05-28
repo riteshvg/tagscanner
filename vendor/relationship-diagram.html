@@ -12,15 +12,17 @@
       }
 
       .header-section {
-        background-color: #4e73df;
-        padding: 10px;
+        background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
+        padding: 16px 20px;
         margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
       }
-
-      .header-section h5 {
-        color: white;
-        margin: 0;
-      }
+      .header-section .header-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 5px; }
+      .header-section .header-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0; }
+      .header-section .header-title span { color: #61dafb; }
+      .header-section .header-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; margin-bottom: 0; }
 
       .relationship-container {
         display: flex;
@@ -175,9 +177,13 @@
           <img style="height: 24px" src="../img/left-arrow.png" />
         </a>
       </div>
-      <div class="header-section" style="display: flex; justify-content: space-between; align-items: center;">
-        <h5 style="margin: 0;">Rule & Data Element Relationships</h5>
-        <button id="start-tour" class="btn btn-light btn-sm" style="margin-left: 10px;">
+      <div class="header-section">
+        <div>
+          <div class="header-eyebrow">TagScanner</div>
+          <h1 class="header-title">Rule & Data Element <span>Relationships</span></h1>
+          <p class="header-sub">Visualize how rules and data elements connect across your Adobe Tags property.</p>
+        </div>
+        <button id="start-tour" class="btn btn-light btn-sm" style="margin-top: 4px;">
           <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
         </button>
       </div>

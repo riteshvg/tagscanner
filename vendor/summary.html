@@ -16,20 +16,16 @@
 
       /* ── Page header ──────────────────────────────────────────── */
       .ts-page-header {
-        background: #4e73df;
+        background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        padding: 10px 16px;
+        align-items: flex-start;
+        padding: 16px 20px;
       }
-      .ts-page-header-title {
-        color: #fff;
-        font-size: 15px;
-        font-weight: 700;
-        letter-spacing: 0.2px;
-        margin: 0;
-      }
-      .ts-page-header-title i { margin-right: 7px; opacity: 0.85; }
+      .ts-page-header .header-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 5px; }
+      .ts-page-header .header-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0; }
+      .ts-page-header .header-title span { color: #61dafb; }
+      .ts-page-header .header-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; margin-bottom: 0; }
 
       /* ── Section label ────────────────────────────────────────── */
       .ts-section-label {
@@ -436,7 +432,11 @@
     <!-- ── Page header ─────────────────────────────────────────── -->
     <div class="container-fluid" style="padding:0">
       <div class="ts-page-header">
-        <h5 class="ts-page-header-title"><i class="fas fa-chart-pie"></i> Summary</h5>
+        <div>
+          <div class="header-eyebrow">TagScanner</div>
+          <h1 class="header-title">Property <span>Summary</span></h1>
+          <p class="header-sub">Health overview of your Adobe Tags property — usage, unused components, and optimization opportunities.</p>
+        </div>
       </div>
 
       <!-- Legacy hidden cards — JS selects these by class and appends children here -->

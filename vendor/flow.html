@@ -12,23 +12,16 @@
     <style>
       body { background: #f0f2f5; }
       .flow-page-header {
-        background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+        background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        align-items: flex-start;
+        padding: 16px 20px;
       }
-      .flow-page-header h5 {
-        color: white;
-        padding: 12px 16px;
-        margin-bottom: 0;
-        font-weight: 600;
-        letter-spacing: 0.02em;
-      }
-      .flow-page-header h5 i {
-        margin-right: 10px;
-        opacity: 0.95;
-      }
+      .flow-page-header .header-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 5px; }
+      .flow-page-header .header-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0; }
+      .flow-page-header .header-title span { color: #61dafb; }
+      .flow-page-header .header-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; margin-bottom: 0; }
       .flow-config-bar {
         display: flex;
         align-items: center;
@@ -219,8 +212,12 @@
 
     <div class="container-fluid">
       <div class="flow-page-header">
-        <h5><i class="fas fa-project-diagram mr-2"></i> Flow</h5>
-        <button id="start-tour" class="btn btn-light btn-sm" style="font-size:12px;margin-right:12px">
+        <div>
+          <div class="header-eyebrow">TagScanner</div>
+          <h1 class="header-title">Property <span>Flow</span></h1>
+          <p class="header-sub">Visualize how data elements, rules, and extensions connect in your Adobe Tags property.</p>
+        </div>
+        <button id="start-tour" class="btn btn-light btn-sm" style="font-size:12px;margin-top:4px">
           <i class="fas fa-map-marked-alt mr-1"></i> Take a Tour
         </button>
       </div>

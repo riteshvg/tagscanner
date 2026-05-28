@@ -95,15 +95,21 @@
     }
 
     .rule-page-header {
+      background: linear-gradient(135deg, #1a1d23 0%, #2d3748 60%, #1e3a5f 100%);
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      background-color: #4e73df;
+      align-items: flex-start;
+      padding: 16px 20px;
     }
+    .rule-page-header .header-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #61dafb; margin-bottom: 5px; }
+    .rule-page-header .header-title { font-size: 18px; font-weight: 800; color: #fff; margin: 0; }
+    .rule-page-header .header-title span { color: #61dafb; }
+    .rule-page-header .header-sub { font-size: 12px; color: #9ca3af; margin-top: 4px; margin-bottom: 0; }
     .rule-header-actions {
       display: flex;
       align-items: center;
       gap: 8px;
+      padding-top: 4px;
     }
 
     .download-section {
@@ -1032,18 +1038,17 @@
 
   <div class="container-fluid">
     <div class="rule-page-header">
-      <h5 style="color: white; padding: 10px; margin-bottom: 0"><i class="fas fa-wrench mr-2"></i> Rules</h5>
+      <div>
+        <div class="header-eyebrow">TagScanner</div>
+        <h1 class="header-title">Property <span>Rules</span></h1>
+        <p class="header-sub">All rules defined in your Adobe Tags property. Sort the table by clicking on any column header.</p>
+      </div>
       <div class="rule-header-actions">
-        <button id="start-tour" class="btn btn-light btn-sm" style="margin-right: 10px">
+        <button id="start-tour" class="btn btn-light btn-sm">
           <i class="fas fa-map-marked-alt mr-2"></i> Take a Tour
         </button>
         <div class="download-button"></div>
       </div>
-    </div>
-
-    <div class="description-text">
-      This page shows all rules defined in your Adobe Tags property. You can
-      sort the table by clicking on any column header.
     </div>
 
     <div class="summary-card rule-card">

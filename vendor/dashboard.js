@@ -473,6 +473,66 @@
     });
   }
 
+  // ── Feedback Capture Widget ──────────────────────────────────────────────
+
+  (function () {
+    var selectedRating = '';
+    var ratingBtns = document.querySelectorAll('#fbCaptureRating .fb-rating-btn');
+    var submitBtn  = document.getElementById('fbCaptureSubmit');
+    var msgEl      = document.getElementById('fbCaptureMsg');
+    var statusEl   = document.getElementById('fbCaptureStatus');
+
+    ratingBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        selectedRating = btn.getAttribute('data-rating');
+        ratingBtns.forEach(function (b) { b.classList.toggle('selected', b === btn); });
+      });
+    });
+
+    if (submitBtn) {
+      submitBtn.addEventListener('click', async function () {
+        var auth = window.TagScannerAuth;
+        var session = auth ? auth.getSession() : null;
+        var message = msgEl ? msgEl.value.trim() : '';
+        if (!selectedRating && !message) {
+          statusEl.textContent = 'Please select a rating or add a comment.';
+          statusEl.className = 'fb-capture-status err';
+          statusEl.style.display = 'block';
+          return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:5px"></i>Sending…';
+        statusEl.style.display = 'none';
+        try {
+          await callLambda({
+            type:     'generalFeedback',
+            name:     session ? (session.name  || '') : '',
+            email:    session ? (session.email || '') : '',
+            rating:   selectedRating,
+            category: 'Dashboard',
+            message:  message,
+          });
+          statusEl.textContent = '✓ Feedback sent — thank you!';
+          statusEl.className = 'fb-capture-status ok';
+          statusEl.style.display = 'block';
+          submitBtn.innerHTML = '<i class="fas fa-paper-plane" style="margin-right:5px"></i>Send';
+          submitBtn.disabled = false;
+          if (msgEl) msgEl.value = '';
+          selectedRating = '';
+          ratingBtns.forEach(function (b) { b.classList.remove('selected'); });
+          // Refresh the feedback list
+          if (session) fetchAndRenderFeedback(session);
+        } catch (err) {
+          statusEl.textContent = 'Failed to send. Please try again.';
+          statusEl.className = 'fb-capture-status err';
+          statusEl.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-paper-plane" style="margin-right:5px"></i>Send';
+        }
+      });
+    }
+  })();
+
   // ── Customer Feedback ────────────────────────────────────────────────────
 
   var RATING_CSS = {

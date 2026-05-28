@@ -259,7 +259,7 @@
         if (items.length === 0) {
           var li = document.createElement('li');
           var ic = document.createElement('i');
-          ic.className = 'item-icon fas fa-chevron-right';
+          ic.className = 'item-icon fas fa-circle';
           li.appendChild(ic);
           li.appendChild(document.createTextNode('None'));
           ul.appendChild(li);
@@ -274,7 +274,7 @@
           items.forEach(function (text) {
             var li = document.createElement('li');
             var ic = document.createElement('i');
-            ic.className = 'item-icon fas fa-chevron-right';
+            ic.className = 'item-icon fas fa-circle';
             li.appendChild(ic);
             li.appendChild(document.createTextNode(text));
             ul.appendChild(li);

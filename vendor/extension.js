@@ -507,32 +507,32 @@
     function toCsvCell(val) {
       return '"' + String(val == null ? '' : val).replace(/"/g, '""') + '"';
     }
-    var headers = ['#', 'Extension Key', 'Display Name', 'Has Custom Settings', 'Settings Summary', 'Rules Used In', 'Rule Count', 'Data Elements Used In', 'Data Element Count', 'Size (KB)'];
+    var headers = ['#', 'Extension Name', 'Actions (count)', 'Action Rules', 'Events (count)', 'Event Types', 'Conditions (count)', 'Condition Rules', 'Data Elements (count)', 'Data Element Names', 'Size (KB)'];
     var keys = Object.keys(extObj).sort();
     var csvLines = [headers.map(toCsvCell).join(',')];
     keys.forEach(function (key, index) {
       var ext = extObj[key] || {};
       var displayName = ext.displayName || key;
       var sizeKb = getSizeKb(ext);
-      var hasSettings = (ext.settings && Object.keys(ext.settings).length > 0) ? 'true' : 'false';
-      var settingsSummary = '';
-      try {
-        if (ext.settings && typeof ext.settings === 'object') {
-          var sj = JSON.stringify(ext.settings);
-          settingsSummary = sj.length > 1000 ? sj.slice(0, 1000) + '\u2026[truncated]' : sj;
-        }
-      } catch (e) {}
       var v = value_obj[key] || {};
-      var ruleNames = [];
+      var eventTypes = [], actionRules = [], conditionRules = [];
       Object.keys(v).forEach(function (k) {
         if (k === 'dataelement') return;
-        ruleNames.push(k);
+        var r = v[k];
+        if (!r || typeof r !== 'object') return;
+        if (Array.isArray(r.events)) {
+          r.events.forEach(function (et) { if (et && eventTypes.indexOf(et) === -1) eventTypes.push(et); });
+        }
+        if (r.rule) actionRules.push(k);
+        if (r.conditions) conditionRules.push(k);
       });
       var deNames = (v.dataelement && Array.isArray(v.dataelement)) ? v.dataelement.map(function (d) { return d.name || ''; }).filter(Boolean) : [];
       csvLines.push([
-        index + 1, key, displayName, hasSettings, settingsSummary,
-        ruleNames.join('; '), ruleNames.length,
-        deNames.join('; '), deNames.length,
+        index + 1, displayName,
+        actionRules.length, actionRules.join('; '),
+        eventTypes.length, eventTypes.join('; '),
+        conditionRules.length, conditionRules.join('; '),
+        deNames.length, deNames.join('; '),
         sizeKb.toFixed(2)
       ].map(toCsvCell).join(','));
     });

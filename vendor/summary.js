@@ -24,6 +24,18 @@ document.addEventListener('DOMContentLoaded', function () {
   );
 
   if (!de_value || !rule_value) {
+    // On the scan page, skip the no-data error and try to show a cached report instead
+    if (document.getElementById('aiSectionBody')) {
+      document.getElementById('set_display').style.display = 'none';
+      var _cached = loadCachedAIReport();
+      if (_cached && _cached.report) {
+        renderHealthReport(_cached.report, _cached.tokens, _cached.costUsd, true, _cached.ts, null);
+        showAIState('report');
+      } else {
+        showAIState('prompt');
+      }
+      return;
+    }
     document.getElementById('set_display').style.display = 'none';
     document.querySelector('.container-fluid').innerHTML =
       '<div class="alert alert-danger mt-4">No data found. Please refresh the website and reload the extension.</div>';

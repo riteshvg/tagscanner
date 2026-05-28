@@ -1479,8 +1479,9 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
   var container = document.getElementById('aiReportContainer');
   container.innerHTML = '';
 
-  var grade = report.health_grade || '?';
   var score = (typeof report.health_score === 'number') ? report.health_score : 0;
+  // Validate that grade matches score — correct client-side if AI is inconsistent
+  var grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
 
   if (fromCache && cachedBy) {
     var cachedAtStr = ts ? new Date(ts).toLocaleString() : 'unknown time';
@@ -1518,31 +1519,6 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
   scoreRow.appendChild(sumDiv);
   container.appendChild(scoreRow);
 
-  var reasonBox = document.createElement('div');
-  reasonBox.className = 'ai-reasoning-box';
-  var critTitles = (report.critical_issues || []).slice(0, 2).map(function(i) { return i.title; }).join(' · ');
-  reasonBox.innerHTML =
-    '<strong>How this score is calculated:</strong> The AI evaluated four dimensions of your Adobe Tags property — ' +
-    'rule structure (conditions, custom code, action counts), data element health (unused ratio, type spread, DE-to-DE chains), ' +
-    'extension bloat, and overall payload performance. Each dimension contributes to the category scores below.' +
-    (critTitles ? ' <strong>Primary issues identified:</strong> ' + escAIHtml(critTitles) + '.' : '');
-  var factors = [
-    { icon: 'fas fa-wrench',         label: 'Rule complexity' },
-    { icon: 'fas fa-database',       label: 'Unused component ratio' },
-    { icon: 'fas fa-code',           label: 'Custom code prevalence' },
-    { icon: 'fas fa-puzzle-piece',   label: 'Extension usage' },
-    { icon: 'fas fa-tachometer-alt', label: 'Payload size' }
-  ];
-  var factorsRow = document.createElement('div');
-  factorsRow.className = 'ai-reasoning-factors';
-  factors.forEach(function(f) {
-    var chip = document.createElement('div');
-    chip.className = 'ai-reasoning-factor';
-    chip.innerHTML = '<i class="' + f.icon + '"></i>' + escAIHtml(f.label);
-    factorsRow.appendChild(chip);
-  });
-  reasonBox.appendChild(factorsRow);
-  container.appendChild(reasonBox);
 
   var catScores = report.category_scores || {};
   var cats = [
@@ -1577,6 +1553,7 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
       card.innerHTML =
         '<div class="ai-issue-title">' + escAIHtml(issue.title || '') + '</div>' +
         '<div class="ai-issue-body">' + escAIHtml(issue.description || '') + '</div>' +
+        (issue.impact ? '<div class="ai-issue-fix" style="color:#92400e;background:rgba(245,158,11,0.08);border-radius:4px"><i class="fas fa-exclamation-circle" style="margin-right:4px;color:#f59e0b"></i>' + escAIHtml(issue.impact) + '</div>' : '') +
         (issue.fix ? '<div class="ai-issue-fix"><i class="fas fa-wrench"></i> ' + escAIHtml(issue.fix) + '</div>' : '');
       grid.appendChild(card);
     });
@@ -1641,15 +1618,25 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
     container.appendChild(recsDiv);
   }
 
-  var impact = report.cleanup_impact || {};
-  if (impact.total_kb) {
+  // Use TagScanner's precisely computed sizes rather than AI-estimated values
+  var realSizes = _aiHealthData && _aiHealthData.sizes;
+  var realUnusedDe  = realSizes ? Math.round(realSizes.unusedDeSize  * 100) / 100 : null;
+  var realUnusedRl  = realSizes ? Math.round(realSizes.unusedRuleSize * 100) / 100 : null;
+  var realUnusedExt = realSizes ? Math.round(realSizes.unusedExtSize  * 100) / 100 : null;
+  var realTotal     = realSizes ? Math.round((realSizes.unusedDeSize + realSizes.unusedRuleSize + realSizes.unusedExtSize) * 100) / 100 : null;
+  var realTotalAll  = realSizes ? Math.round((realSizes.totalDeSize  + realSizes.totalRuleSize  + realSizes.totalExtSize)  * 100) / 100 : null;
+  var realPct       = (realTotal !== null && realTotalAll > 0) ? Math.round((realTotal / realTotalAll) * 100) : null;
+
+  if (realTotal !== null && realTotal > 0) {
     addAISubHeading(container, 'fas fa-tachometer-alt', 'Estimated Cleanup Impact');
     var impactDiv = document.createElement('div');
     impactDiv.style.cssText = 'background:#f8f9fc;border:1px solid #e3e6f0;border-radius:8px;padding:12px 16px;font-size:13px;color:#374151;';
     impactDiv.innerHTML =
-      'Removing unused components could free <strong>' + impact.total_kb + ' KB</strong> ' +
-      '(' + (impact.total_pct || 0) + '% of total). ' +
-      'Rules: ' + (impact.rules_kb || 0) + ' KB · Data Elements: ' + (impact.data_elements_kb || 0) + ' KB.';
+      'Removing unused components could free <strong>' + realTotal + ' KB</strong>' +
+      (realPct !== null ? ' (' + realPct + '% of total)' : '') + '. ' +
+      'Rules: <strong>' + realUnusedRl + ' KB</strong>' +
+      ' &nbsp;·&nbsp; Data Elements: <strong>' + realUnusedDe + ' KB</strong>' +
+      (realUnusedExt > 0 ? ' &nbsp;·&nbsp; Extensions: <strong>' + realUnusedExt + ' KB</strong>' : '') + '.';
     container.appendChild(impactDiv);
   }
 

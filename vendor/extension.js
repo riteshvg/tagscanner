@@ -284,7 +284,25 @@
         columnsWrap.appendChild(section);
       }
 
-      addSection('Rules (' + ruleNames.length + ')', 'fa-wrench', ruleNames);
+      // Derive per-category lists from the per-rule data
+      var eventTypes = [];
+      var actionRules = [];
+      var conditionRules = [];
+      ruleNames.forEach(function (ruleName) {
+        var r = v[ruleName];
+        if (!r || typeof r !== 'object') return;
+        if (Array.isArray(r.events)) {
+          r.events.forEach(function (et) {
+            if (et && eventTypes.indexOf(et) === -1) eventTypes.push(et);
+          });
+        }
+        if (r.rule) actionRules.push(ruleName);
+        if (r.conditions) conditionRules.push(ruleName);
+      });
+
+      addSection('Events (' + eventTypes.length + ')', 'fa-bolt', eventTypes);
+      addSection('Actions (' + actionRules.length + ')', 'fa-cogs', actionRules);
+      addSection('Conditions (' + conditionRules.length + ')', 'fa-filter', conditionRules);
       addSection('Data Elements (' + deList.length + ')', 'fa-database', deList.map(function (item) {
         return item.name || item.path || '—';
       }));

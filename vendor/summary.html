@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Usage Summary</title>
     <script src="html2canvas.min.js"></script>
+    <script src="jspdf.umd.min.js"></script>
     <script src="intro.js"></script>
     <link href="../vendor/fontawesome-free/css/all.min.css" rel="stylesheet" type="text/css" />
     <link href="../css/sb-admin-2.min.css" rel="stylesheet" />
@@ -403,7 +404,8 @@
       .ts-btn-primary { background: linear-gradient(135deg, #27c5c1, #1a56a0); color: #fff; border: none; border-radius: 6px; padding: 7px 20px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
       .ts-btn-primary:hover { opacity: 0.9; }
       .ts-btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; border-radius: 6px; padding: 7px 14px; font-size: 12.5px; cursor: pointer; }
-      .ts-btn-secondary:hover { background: #e5e7eb; }
+      .ts-btn-secondary:hover:not(:disabled) { background: #e5e7eb; }
+      .ts-btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
       .ts-credentials-warning { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 9px 11px; font-size: 11px; color: #78350f; margin-bottom: 14px; }
       .ts-credentials-warning i { margin-right: 4px; }
 
@@ -549,7 +551,7 @@
 
       <!-- Export button -->
       <div style="text-align:right; padding: 8px 16px 12px">
-        <button id="download-pdf" class="ts-btn-secondary">
+        <button id="download-pdf" class="ts-btn-secondary" disabled title="Run the AI scan first to enable PDF export">
           <i class="fas fa-file-pdf" style="color:#e53e3e;margin-right:5px"></i> Export PDF
         </button>
       </div>
@@ -570,7 +572,7 @@
       <div class="ai-section">
         <div class="ai-section-header">
           <h5>
-            <i class="fas fa-brain"></i> Summary. Powered by AI
+            <i class="fas fa-brain"></i> Scan. Powered by AI.
             <span style="font-size:9px;font-weight:700;background:#f59e0b;color:#fff;padding:2px 7px;border-radius:8px;letter-spacing:0.3px;vertical-align:middle;margin-left:6px">LIMITED PREVIEW</span>
           </h5>
         </div>

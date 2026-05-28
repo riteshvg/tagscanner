@@ -1169,13 +1169,57 @@ document.addEventListener('DOMContentLoaded', function () {
       'Please test the recommendations extensively in lower environment before pushing to Production. TagScanner cannot be held liable for any issues or bugs in your implementation.';
     recommendationsList.appendChild(rec5);
 
-    // Set up PDF download using print functionality
+    // Set up PDF download using jsPDF + html2canvas
     var downloadBtn = document.getElementById('download-pdf');
     if (downloadBtn) {
-      downloadBtn.addEventListener('click', function () {
+      downloadBtn.addEventListener('click', async function () {
         var _tsA2 = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
         if (_tsA2) _tsA2.track('Export:PDF', { pageName: 'TagScanner:Summary', events: 'event4', v5: 'PDF', c2: 'Export' });
-        window.print();
+
+        var origLabel = downloadBtn.innerHTML;
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:5px"></i> Generating…';
+
+        try {
+          var target = document.getElementById('aiReportContainer');
+          var canvas = await html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+          var imgData = canvas.toDataURL('image/png');
+          var { jsPDF } = window.jspdf;
+          var pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+          var pageW = pdf.internal.pageSize.getWidth();
+          var pageH = pdf.internal.pageSize.getHeight();
+          var margin = 32;
+          var imgW = pageW - margin * 2;
+          var imgH = (canvas.height * imgW) / canvas.width;
+          var propName = sessionStorage.getItem('launch_property_name') || 'Property';
+          pdf.setFontSize(10);
+          pdf.setTextColor(150);
+          pdf.text('TagScanner • Scan. Powered by AI. • ' + propName, margin, 20);
+          var y = 32;
+          var remaining = imgH;
+          var srcY = 0;
+          while (remaining > 0) {
+            var sliceH = Math.min(remaining, pageH - y - margin);
+            var sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = canvas.width;
+            sliceCanvas.height = (sliceH / imgH) * canvas.height;
+            var ctx = sliceCanvas.getContext('2d');
+            ctx.drawImage(canvas, 0, srcY * canvas.height / imgH, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+            pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, y, imgW, sliceH);
+            remaining -= sliceH;
+            srcY += sliceH;
+            y = margin;
+            if (remaining > 0) pdf.addPage();
+          }
+          var fileName = (propName + '_scan.pdf').replace(/[^a-z0-9_.\-]/gi, '_');
+          pdf.save(fileName);
+        } catch (e) {
+          console.error('PDF export failed:', e);
+          alert('PDF export failed. Please try again.');
+        }
+
+        downloadBtn.disabled = false;
+        downloadBtn.innerHTML = origLabel;
       });
     }
 
@@ -1348,9 +1392,14 @@ function hideAIModal(id) {
 
 function showAIState(state) {
   // state: 'prompt' | 'scanning' | 'report'
-  document.getElementById('aiScanPrompt').style.display     = (state === 'prompt')   ? '' : 'none';
-  document.getElementById('aiScanning').style.display       = (state === 'scanning') ? '' : 'none';
+  document.getElementById('aiScanPrompt').style.display      = (state === 'prompt')   ? '' : 'none';
+  document.getElementById('aiScanning').style.display        = (state === 'scanning') ? '' : 'none';
   document.getElementById('aiReportContainer').style.display = (state === 'report')   ? '' : 'none';
+  var pdfBtn = document.getElementById('download-pdf');
+  if (pdfBtn) {
+    pdfBtn.disabled = (state !== 'report');
+    pdfBtn.title    = (state === 'report') ? 'Export scan results as PDF' : 'Run the AI scan first to enable PDF export';
+  }
 }
 
 function setAIScanError(msg) {

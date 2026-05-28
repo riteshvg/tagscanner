@@ -987,7 +987,8 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }, 100);
 
-    // Set up print-friendly section for PDF generation
+    // Set up print-friendly section for PDF generation (summary.html only)
+    if (document.getElementById('print-title')) {
     const today = new Date();
     const dateStr = today.toLocaleDateString();
     const timeStr = today.toLocaleTimeString();
@@ -1180,6 +1181,7 @@ document.addEventListener('DOMContentLoaded', function () {
     rec5.textContent =
       'Please test the recommendations extensively in lower environment before pushing to Production. TagScanner cannot be held liable for any issues or bugs in your implementation.';
     recommendationsList.appendChild(rec5);
+    } // end print-title guard
 
     // Set up PDF download using print functionality
     var downloadBtn = document.getElementById('download-pdf');

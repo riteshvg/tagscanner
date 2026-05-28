@@ -777,7 +777,7 @@ if (de_details_node) {
       codeBtn.title = 'View custom code';
       codeBtn.style.color = '#27c5c1';
       codeBtn.style.cursor = 'pointer';
-      codeBtn.onclick = function (deName, ci, btnRef) {
+      codeBtn.onclick = function (deName, ci, btnRef, extLabel) {
         return function () {
           if (!ci || !ci.hasCode) return;
           if (ci.kind === 'url') {
@@ -786,13 +786,14 @@ if (de_details_node) {
             if (iconEl) iconEl.className = 'fas fa-spinner fa-spin';
             fetchHostedCode(ci.text)
               .then(function (txt) {
-                showDECodeModal('Custom code: ' + deName, txt, null);
+                showDECodeModal('Custom code: ' + deName, txt, null, extLabel);
               })
               .catch(function (e) {
                 showDECodeModal(
                   'Hosted custom code URL: ' + deName,
                   'Failed to fetch hosted script.\nURL: ' + ci.text + '\n\nError: ' + ((e && e.message) || String(e)),
-                  null
+                  null,
+                  extLabel
                 );
               })
               .then(function () {
@@ -801,9 +802,9 @@ if (de_details_node) {
               });
             return;
           }
-          showDECodeModal('Custom code: ' + deName, ci.text, null);
+          showDECodeModal('Custom code: ' + deName, ci.text, null, extLabel);
         };
-      }(row.name, codeInfo, codeBtn);
+      }(row.name, codeInfo, codeBtn, row.extensionLabel);
     }
     tdCode.appendChild(codeBtn);
     tr.appendChild(tdCode);
@@ -1277,7 +1278,8 @@ if (de_details_node) {
     document.getElementById('ruleUsageModal').classList.add('show');
   }
 
-  function showDECodeModal(title, code, deNameForHighlight) {
+  function showDECodeModal(title, code, deNameForHighlight, extension) {
+    var _deExtension = extension || '';
     var modal = document.getElementById('deCodeModal');
     var titleEl = document.getElementById('deCodeModalTitle');
     var contentEl = document.getElementById('deCodeModalContent');
@@ -1382,7 +1384,7 @@ if (de_details_node) {
                 var dePropKey = (sessionStorage.getItem('launch_property_name') || '') + '#' +
                                 (sessionStorage.getItem('launch_property_environment') || 'Production');
                 var brResult = await window.TagScannerBedrock.explainCode(
-                  rawCode, { name: title || '', type: 'dataElement' },
+                  rawCode, { name: title || '', type: 'dataElement', extension: _deExtension || '' },
                   { email: session.email, sessionToken: session.sessionToken, propertyKey: dePropKey }
                 );
                 explainBox.innerHTML = window.TagScannerBedrock.renderBedrockCodeExplanation(brResult.explanation);

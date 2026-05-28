@@ -3174,7 +3174,8 @@ function analyzeCodeWithoutAI(code) {
 }
 
 // Modal functions for displaying custom code
-function showCodeModal(title, code) {
+function showCodeModal(title, code, extension) {
+  var _ruleExtension = extension || '';
   const modal = document.getElementById('codeModal');
   const modalTitle = document.getElementById('modalTitle');
   const codeContent = document.getElementById('codeContent');
@@ -3408,7 +3409,7 @@ function showCodeModal(title, code) {
               var propKey = (sessionStorage.getItem('launch_property_name') || '') + '#' +
                             (sessionStorage.getItem('launch_property_environment') || 'Production');
               var brResult = await window.TagScannerBedrock.explainCode(
-                rawCode, { name: title || '', type: 'rule' },
+                rawCode, { name: title || '', type: 'rule', extension: _ruleExtension },
                 { email: session.email, sessionToken: session.sessionToken, propertyKey: propKey }
               );
               explainBox.innerHTML = window.TagScannerBedrock.renderBedrockCodeExplanation(brResult.explanation);
@@ -3787,7 +3788,7 @@ function showRuleModal(rule) {
           extKey(comp),
           code,
           i + 1,
-          code ? function (c, lbl) { return function () { showCodeModal(lbl, c); }; }(code, s.labelFn(comp)) : null
+          code ? function (c, lbl, ext) { return function () { showCodeModal(lbl, c, ext); }; }(code, s.labelFn(comp), extKey(comp)) : null
         ));
       });
       body.appendChild(sec);
@@ -4011,7 +4012,8 @@ function toggleExpand(icon, rowIndex) {
             var code = typeof codeObj === 'string' ? codeObj : (codeObj.code || '');
             if (code && code.trim()) {
               var btnTitle = 'View condition code' + (customCodeConds.length > 1 ? ' ' + (customCodeIdx + 1) : '');
-              buttons.push({ className: 'btn-code', title: btnTitle, ariaLabel: btnTitle, iconClass: 'fa-code', onclick: (function (c, t) { return function () { showCodeModal(t, c); }; })(code, btnTitle) });
+              var condExt = (cond.modulePath || '').split('/')[0];
+              buttons.push({ className: 'btn-code', title: btnTitle, ariaLabel: btnTitle, iconClass: 'fa-code', onclick: (function (c, t, e) { return function () { showCodeModal(t, c, e); }; })(code, btnTitle, condExt) });
               customCodeIdx++;
             }
           } else if (cond.settings && Object.keys(cond.settings).length > 0) {
@@ -4051,7 +4053,8 @@ function toggleExpand(icon, rowIndex) {
             var code = typeof codeObj === 'string' ? codeObj : (codeObj.code || '');
             if (code && code.trim()) {
               var btnTitle = 'View action code' + (customCodeActions.length > 1 ? ' ' + (customActionIdx + 1) : '');
-              buttons.push({ className: 'btn-code', title: btnTitle, ariaLabel: btnTitle, iconClass: 'fa-code', onclick: (function (c, t) { return function () { showCodeModal(t, c); }; })(code, btnTitle) });
+              var actionExt = (action.modulePath || '').split('/')[0];
+              buttons.push({ className: 'btn-code', title: btnTitle, ariaLabel: btnTitle, iconClass: 'fa-code', onclick: (function (c, t, e) { return function () { showCodeModal(t, c, e); }; })(code, btnTitle, actionExt) });
               customActionIdx++;
             }
           } else if (isSendEvent && action.settings && (action.settings.xdm || action.settings.data)) {

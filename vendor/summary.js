@@ -1169,78 +1169,36 @@ document.addEventListener('DOMContentLoaded', function () {
       'Please test the recommendations extensively in lower environment before pushing to Production. TagScanner cannot be held liable for any issues or bugs in your implementation.';
     recommendationsList.appendChild(rec5);
 
-    // Set up PDF download using jsPDF + html2canvas
+    // Set up PDF download using print functionality
     var downloadBtn = document.getElementById('download-pdf');
     if (downloadBtn) {
-      downloadBtn.addEventListener('click', async function () {
+      downloadBtn.addEventListener('click', function () {
         var _tsA2 = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
         if (_tsA2) _tsA2.track('Export:PDF', { pageName: 'TagScanner:Summary', events: 'event4', v5: 'PDF', c2: 'Export' });
-
-        var origLabel = downloadBtn.innerHTML;
-        downloadBtn.disabled = true;
-        downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:5px"></i> Generating…';
-
-        try {
-          var target = document.getElementById('aiReportContainer');
-          var canvas = await html2canvas(target, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-          var imgData = canvas.toDataURL('image/png');
-          var { jsPDF } = window.jspdf;
-          var pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-          var pageW = pdf.internal.pageSize.getWidth();
-          var pageH = pdf.internal.pageSize.getHeight();
-          var margin = 32;
-          var imgW = pageW - margin * 2;
-          var imgH = (canvas.height * imgW) / canvas.width;
-          var propName = sessionStorage.getItem('launch_property_name') || 'Property';
-          pdf.setFontSize(10);
-          pdf.setTextColor(150);
-          pdf.text('TagScanner • Scan. Powered by AI. • ' + propName, margin, 20);
-          var y = 32;
-          var remaining = imgH;
-          var srcY = 0;
-          while (remaining > 0) {
-            var sliceH = Math.min(remaining, pageH - y - margin);
-            var sliceCanvas = document.createElement('canvas');
-            sliceCanvas.width = canvas.width;
-            sliceCanvas.height = (sliceH / imgH) * canvas.height;
-            var ctx = sliceCanvas.getContext('2d');
-            ctx.drawImage(canvas, 0, srcY * canvas.height / imgH, canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
-            pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, y, imgW, sliceH);
-            remaining -= sliceH;
-            srcY += sliceH;
-            y = margin;
-            if (remaining > 0) pdf.addPage();
-          }
-          var fileName = (propName + '_scan.pdf').replace(/[^a-z0-9_.\-]/gi, '_');
-          pdf.save(fileName);
-        } catch (e) {
-          console.error('PDF export failed:', e);
-          alert('PDF export failed. Please try again.');
-        }
-
-        downloadBtn.disabled = false;
-        downloadBtn.innerHTML = origLabel;
+        window.print();
       });
     }
 
-    // ── AI Health Analysis ─────────────────────────────────────────
-    initAIScanSection({
-      dataElements:       dataElements,
-      rules:              rules,
-      extensions:         extensions,
-      usageData:          usageData,
-      unusedDataElements: unusedDataElements,
-      unusedRules:        unusedRules,
-      unusedExtensions:   unusedExtensions,
-      sizes: {
-        totalDeSize:    totalDeSize,
-        totalRuleSize:  totalRuleSize,
-        totalExtSize:   totalExtSize,
-        unusedDeSize:   unusedDeSize,
-        unusedRuleSize: unusedRuleSize,
-        unusedExtSize:  unusedExtSize
-      }
-    });
+    // Initialize AI scan section only on scan.html (where #aiSectionBody exists)
+    if (document.getElementById('aiSectionBody')) {
+      initAIScanSection({
+        dataElements:       dataElements,
+        rules:              rules,
+        extensions:         extensions,
+        usageData:          usageData,
+        unusedDataElements: unusedDataElements,
+        unusedRules:        unusedRules,
+        unusedExtensions:   unusedExtensions,
+        sizes: {
+          totalDeSize:    totalDeSize,
+          totalRuleSize:  totalRuleSize,
+          totalExtSize:   totalExtSize,
+          unusedDeSize:   unusedDeSize,
+          unusedRuleSize: unusedRuleSize,
+          unusedExtSize:  unusedExtSize
+        }
+      });
+    }
 
     // Hide loading spinner
     document.getElementById('set_display').style.display = 'none';
@@ -1335,7 +1293,7 @@ function copyTableToClipboard(table, componentType) {
 // ── AI Health Analysis ──────────────────────────────────────────────────────
 
 var AI_CACHE_VERSION = 1;
-var _aiHealthData = null; // set by initAIScanSection so rescan can re-use it
+var _aiHealthData = null;
 
 function getAICacheKey() {
   var p = sessionStorage.getItem('launch_property_name') || 'Unknown';
@@ -1366,18 +1324,14 @@ function saveCachedAIReport(report, tokens, costUsd, fingerprint) {
 }
 
 function getUserInfo() {
-  // Prefer OAuth session
   if (window.TagScannerAuth && window.TagScannerAuth.isSignedIn()) {
     return window.TagScannerAuth.getSession();
   }
-  // Legacy fallback
   try {
     var raw = localStorage.getItem('tagscanner_user');
     return raw ? JSON.parse(raw) : null;
   } catch (e) { return null; }
 }
-
-// ── Modal helpers ─────────────────────────────────────────────────────────
 
 function showAIModal(id) {
   var el = document.getElementById(id);
@@ -1388,18 +1342,10 @@ function hideAIModal(id) {
   if (el) el.classList.remove('show');
 }
 
-// ── State helpers ─────────────────────────────────────────────────────────
-
 function showAIState(state) {
-  // state: 'prompt' | 'scanning' | 'report'
   document.getElementById('aiScanPrompt').style.display      = (state === 'prompt')   ? '' : 'none';
   document.getElementById('aiScanning').style.display        = (state === 'scanning') ? '' : 'none';
   document.getElementById('aiReportContainer').style.display = (state === 'report')   ? '' : 'none';
-  var pdfBtn = document.getElementById('download-pdf');
-  if (pdfBtn) {
-    pdfBtn.disabled = (state !== 'report');
-    pdfBtn.title    = (state === 'report') ? 'Export scan results as PDF' : 'Run the AI scan first to enable PDF export';
-  }
 }
 
 function setAIScanError(msg) {
@@ -1411,27 +1357,17 @@ function escAIHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ── Entry point ───────────────────────────────────────────────────────────
-
 function initAIScanSection(healthData) {
   _aiHealthData = healthData;
 
-  // Clear legacy email-only auth if no OAuth session exists
   if (window.TagScannerAuth && !window.TagScannerAuth.isSignedIn()) {
     try { localStorage.removeItem('tagscanner_user'); } catch (e) {}
   }
 
-  // Google Sign-In modal
   document.getElementById('googleSignInClose').addEventListener('click', function() { hideAIModal('googleSignInModal'); });
   document.getElementById('btnGoogleSignIn').addEventListener('click', handleGoogleSignIn);
-
-  // Scan button
   document.getElementById('btnRunAIScan').addEventListener('click', handleScanClick);
 
-  // Render user badge if already signed in
-  renderUserBadge();
-
-  // Auto-load a prior result from localStorage so the user doesn't have to click again
   var cached = loadCachedAIReport();
   if (cached && cached.report) {
     renderHealthReport(cached.report, cached.tokens, cached.costUsd, true, cached.ts, null);
@@ -1441,12 +1377,6 @@ function initAIScanSection(healthData) {
   }
 }
 
-function renderUserBadge() {
-  // User info is now shown in the popup topbar; nothing to render here.
-}
-
-// ── Scan click handler ────────────────────────────────────────────────────
-
 async function handleScanClick() {
   if (window.TagScannerAuth && window.TagScannerAuth.requireExplainConsent) {
     var consented = await window.TagScannerAuth.requireExplainConsent();
@@ -1454,7 +1384,6 @@ async function handleScanClick() {
   }
   var _tsA = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
   if (_tsA) _tsA.track('Summary:AI Scan', { pageName: 'TagScanner:Summary', events: 'event5', v5: 'Summary', c2: 'AI Scan' });
-  // Always require a Google OAuth session — ignore legacy localStorage email
   var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
   if (!session) {
     showAIModal('googleSignInModal');
@@ -1475,8 +1404,6 @@ async function handleGoogleSignIn() {
   try {
     var session = await window.TagScannerAuth.signInWithGoogle();
     hideAIModal('googleSignInModal');
-    renderUserBadge();
-    // Proceed directly to scan
     runAIScan(session, {});
   } catch (err) {
     if (errEl) {
@@ -1484,11 +1411,9 @@ async function handleGoogleSignIn() {
       errEl.style.display = 'block';
     }
     btn.disabled = false;
-    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M47.53 24.56c0-1.6-.14-3.14-.4-4.62H24v8.73h13.2c-.57 3.03-2.3 5.59-4.9 7.32v6.08h7.93c4.64-4.28 7.3-10.58 7.3-17.51z"/><path fill="#34A853" d="M24 48c6.66 0 12.24-2.21 16.32-5.98l-7.93-6.08c-2.2 1.47-5.01 2.34-8.39 2.34-6.45 0-11.91-4.35-13.86-10.21H2.08v6.28C6.14 42.62 14.43 48 24 48z"/><path fill="#FBBC05" d="M10.14 28.07A14.42 14.42 0 0 1 9.6 24c0-1.41.24-2.78.54-4.07v-6.28H2.08A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.08 10.35l8.06-6.28z"/><path fill="#EA4335" d="M24 9.52c3.63 0 6.88 1.25 9.44 3.7l7.08-7.08C36.23 2.19 30.65 0 24 0 14.43 0 6.14 5.38 2.08 13.65l8.06 6.28C12.09 13.87 17.55 9.52 24 9.52z"/></svg> Continue with Google';
+    btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 48 48"><path fill="#4285F4" d="M47.53 24.56c0-1.6-.14-3.14-.4-4.62H24v8.73h13.2c-.57 3.03-2.3 5.59-4.9 7.32v6.08h7.93c4.64-4.28 7.3-10.58 7.3-17.51z"/><path fill="#34A853" d="M24 48c6.66 0 12.24-2.21 16.32-5.98l-7.93-6.08c-2.2 1.47-5.01 2.34-8.39 2.34-6.45 0-11.91-4.35-13.86-10.21H2.08v6.28C6.14 42.62 14.43 48 24 48z"/><path fill="#FBBC05" d="M10.14 28.07A14.42 14.42 0 0 1 9.6 24c0-1.41.24-2.78.54-4.07v-6.28H2.08A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.08 10.35l8.06-6.28z"/><path fill="#EA4335" d="M24 9.52c3.63 0 6.88 1.25 9.44 3.7l7.08-7.08C36.23 2.19 30.65 0 24 0 14.43 0 6.14 5.38 2.08 13.65l8.06 6.28C12.09 13.87 17.55 9.52 24 9.52z"/></svg> Continue with Google';
   }
 }
-
-// ── Core scan execution ───────────────────────────────────────────────────
 
 async function runAIScan(user, config) {
   showAIState('scanning');
@@ -1499,7 +1424,6 @@ async function runAIScan(user, config) {
     clientId:     (function(){ try { return sessionStorage.getItem('ts_device_id') || ''; } catch(e){ return ''; } }())
   });
   try {
-    // Compute composition fingerprint so Lambda can serve cached results
     if (window.TagScannerHealthPayload.computeFingerprint) {
       try {
         effectiveConfig.fingerprint = await window.TagScannerHealthPayload.computeFingerprint({
@@ -1520,11 +1444,7 @@ async function runAIScan(user, config) {
       unusedExtensions:   _aiHealthData.unusedExtensions,
       sizes:              _aiHealthData.sizes
     });
-    var userContext = {
-      email:   user.email,
-      role:    user.role || '',
-      concern: user.concern || ''
-    };
+    var userContext = { email: user.email, role: user.role || '', concern: user.concern || '' };
     var result = await window.TagScannerBedrock.analyzeProperty(payload, userContext, effectiveConfig);
     if (result.queryId) {
       try { localStorage.setItem('tagscanner_last_query_id', result.queryId); } catch(e) {}
@@ -1555,8 +1475,6 @@ async function runAIScan(user, config) {
   }
 }
 
-// ── Report renderer ───────────────────────────────────────────────────────
-
 function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
   var container = document.getElementById('aiReportContainer');
   container.innerHTML = '';
@@ -1564,7 +1482,6 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
   var grade = report.health_grade || '?';
   var score = (typeof report.health_score === 'number') ? report.health_score : 0;
 
-  // Cached-by notice banner (server cache only — when another user triggered the analysis)
   if (fromCache && cachedBy) {
     var cachedAtStr = ts ? new Date(ts).toLocaleString() : 'unknown time';
     var byStr = cachedBy.name
@@ -1574,44 +1491,33 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
     notice.className = 'ai-cache-notice';
     notice.innerHTML =
       '<i class="fas fa-info-circle"></i>' +
-      '<div>' +
-        '<strong>Cached Analysis</strong>' +
-        '<span>This report was originally generated on <strong>' + cachedAtStr + '</strong> by ' + byStr + '. ' +
-        'The property composition has not changed since then — no new AI call was needed.</span>' +
-      '</div>';
+      '<div><strong>Cached Analysis</strong><span>This report was originally generated on <strong>' + cachedAtStr + '</strong> by ' + byStr + '. ' +
+      'The property composition has not changed since then — no new AI call was needed.</span></div>';
     container.appendChild(notice);
   }
 
-  // Meta row
   var meta = document.createElement('div');
   meta.className = 'ai-report-meta';
-  var leftMeta;
-  if (fromCache && cachedBy) {
-    leftMeta = 'Served from cache &middot; generated ' + (ts ? new Date(ts).toLocaleString() : '');
-  } else if (fromCache) {
-    leftMeta = 'Cached &middot; analyzed ' + (ts ? new Date(ts).toLocaleString() : '');
-  } else {
-    leftMeta = 'Just analyzed';
-  }
+  var leftMeta = fromCache && cachedBy
+    ? 'Served from cache · generated ' + (ts ? new Date(ts).toLocaleString() : '')
+    : fromCache
+      ? 'Cached · analyzed ' + (ts ? new Date(ts).toLocaleString() : '')
+      : 'Just analyzed';
   meta.innerHTML = '<span>' + leftMeta + '</span>';
   container.appendChild(meta);
 
-  // Score + executive summary
   var scoreRow = document.createElement('div');
   scoreRow.className = 'ai-score-row';
-
   var circle = document.createElement('div');
   circle.className = 'ai-score-circle ai-score-' + grade;
   circle.innerHTML = '<span class="ai-score-number">' + score + '</span><span class="ai-score-grade">Grade ' + escAIHtml(grade) + '</span>';
   scoreRow.appendChild(circle);
-
   var sumDiv = document.createElement('div');
   sumDiv.className = 'ai-executive-summary';
   sumDiv.textContent = report.executive_summary || '';
   scoreRow.appendChild(sumDiv);
   container.appendChild(scoreRow);
 
-  // Reasoning box — explains what drove the score
   var reasonBox = document.createElement('div');
   reasonBox.className = 'ai-reasoning-box';
   var critTitles = (report.critical_issues || []).slice(0, 2).map(function(i) { return i.title; }).join(' · ');
@@ -1621,10 +1527,10 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
     'extension bloat, and overall payload performance. Each dimension contributes to the category scores below.' +
     (critTitles ? ' <strong>Primary issues identified:</strong> ' + escAIHtml(critTitles) + '.' : '');
   var factors = [
-    { icon: 'fas fa-wrench',       label: 'Rule complexity' },
-    { icon: 'fas fa-database',     label: 'Unused component ratio' },
-    { icon: 'fas fa-code',         label: 'Custom code prevalence' },
-    { icon: 'fas fa-puzzle-piece', label: 'Extension usage' },
+    { icon: 'fas fa-wrench',         label: 'Rule complexity' },
+    { icon: 'fas fa-database',       label: 'Unused component ratio' },
+    { icon: 'fas fa-code',           label: 'Custom code prevalence' },
+    { icon: 'fas fa-puzzle-piece',   label: 'Extension usage' },
     { icon: 'fas fa-tachometer-alt', label: 'Payload size' }
   ];
   var factorsRow = document.createElement('div');
@@ -1638,7 +1544,6 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
   reasonBox.appendChild(factorsRow);
   container.appendChild(reasonBox);
 
-  // Category scores
   var catScores = report.category_scores || {};
   var cats = [
     { key: 'rules',         label: 'Rules' },
@@ -1661,7 +1566,6 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
   });
   container.appendChild(catGrid);
 
-  // Critical issues
   var critical = report.critical_issues || [];
   if (critical.length) {
     addAISubHeading(container, 'fas fa-exclamation-circle', 'Critical Issues');
@@ -1679,7 +1583,6 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
     container.appendChild(grid);
   }
 
-  // Warnings
   var warnings = report.warnings || [];
   if (warnings.length) {
     addAISubHeading(container, 'fas fa-exclamation-triangle', 'Warnings');
@@ -1697,7 +1600,6 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
     container.appendChild(wgrid);
   }
 
-  // Quick wins
   var wins = report.quick_wins || [];
   if (wins.length) {
     addAISubHeading(container, 'fas fa-bolt', 'Quick Wins');
@@ -1715,7 +1617,6 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
     container.appendChild(wingrid);
   }
 
-  // Top recommendations — styled priority cards
   var recs = report.top_recommendations || [];
   if (recs.length) {
     addAISubHeading(container, 'fas fa-list-ol', 'Top Recommendations');
@@ -1723,26 +1624,23 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
     recs.forEach(function(rec, idx) {
       var card = document.createElement('div');
       card.className = 'ai-rec-card';
-
       var num = document.createElement('div');
       num.className = 'ai-rec-num';
       num.textContent = idx + 1;
       card.appendChild(num);
-
-      var meta = inferRecMeta(rec);
+      var meta2 = inferRecMeta(rec);
       var body = document.createElement('div');
       body.className = 'ai-rec-body';
       body.innerHTML =
-        '<i class="' + meta.icon + '" style="margin-right:6px;color:' + meta.color + '"></i>' +
+        '<i class="' + meta2.icon + '" style="margin-right:6px;color:' + meta2.color + '"></i>' +
         escAIHtml(rec) +
-        '<br><span class="ai-rec-tag" style="background:' + meta.tagBg + ';color:' + meta.tagColor + '">' + meta.label + '</span>';
+        '<br><span class="ai-rec-tag" style="background:' + meta2.tagBg + ';color:' + meta2.tagColor + '">' + meta2.label + '</span>';
       card.appendChild(body);
       recsDiv.appendChild(card);
     });
     container.appendChild(recsDiv);
   }
 
-  // Cleanup impact
   var impact = report.cleanup_impact || {};
   if (impact.total_kb) {
     addAISubHeading(container, 'fas fa-tachometer-alt', 'Estimated Cleanup Impact');
@@ -1751,11 +1649,10 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
     impactDiv.innerHTML =
       'Removing unused components could free <strong>' + impact.total_kb + ' KB</strong> ' +
       '(' + (impact.total_pct || 0) + '% of total). ' +
-      'Rules: ' + (impact.rules_kb || 0) + ' KB &middot; Data Elements: ' + (impact.data_elements_kb || 0) + ' KB.';
+      'Rules: ' + (impact.rules_kb || 0) + ' KB · Data Elements: ' + (impact.data_elements_kb || 0) + ' KB.';
     container.appendChild(impactDiv);
   }
 
-  // Footer: re-analyze link only for local-cache hits (server cache = composition unchanged = no point re-running)
   if (fromCache && !cachedBy) {
     var footerRow = document.createElement('div');
     footerRow.style.cssText = 'text-align:right;margin-top:14px;padding-top:10px;border-top:1px solid #f3f4f6;font-size:11.5px;color:#9ca3af;';
@@ -1781,66 +1678,43 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
       var compositionChanged   = currentFingerprint && storedFingerprint && currentFingerprint !== storedFingerprint;
 
       if (compositionUnchanged) {
-        // Definitely unchanged — show warning with Cancel only
         var existing = document.getElementById('rescan-unchanged-notice');
         if (existing) { existing.remove(); return; }
-
-        var notice = document.createElement('div');
-        notice.id = 'rescan-unchanged-notice';
-        notice.style.cssText = 'margin-top:10px;padding:10px 12px;background:#fefce8;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:6px;font-size:12px;color:#92400e;text-align:left;';
-        notice.innerHTML =
+        var noticeEl = document.createElement('div');
+        noticeEl.id = 'rescan-unchanged-notice';
+        noticeEl.style.cssText = 'margin-top:10px;padding:10px 12px;background:#fefce8;border:1px solid #fde68a;border-left:4px solid #f59e0b;border-radius:6px;font-size:12px;color:#92400e;text-align:left;';
+        noticeEl.innerHTML =
           '<strong><i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>Property unchanged</strong>' +
-          '<div style="margin-top:4px;">The data elements, rules, and extensions in this property have not changed since this report was generated. Re-analyzing will produce an identical result.</div>' +
-          '<div style="margin-top:8px;display:flex;gap:8px;">' +
-            '<button id="btnRescanCancel" style="padding:4px 12px;font-size:12px;background:none;border:1px solid #fde68a;border-radius:4px;cursor:pointer;color:#92400e;">Cancel</button>' +
-          '</div>';
-        footerRow.appendChild(notice);
-
-        document.getElementById('btnRescanCancel').addEventListener('click', function () {
-          notice.remove();
-        });
+          '<div style="margin-top:4px;">The data elements, rules, and extensions in this property have not changed since this report was generated.</div>' +
+          '<div style="margin-top:8px;"><button id="btnRescanCancel" style="padding:4px 12px;font-size:12px;background:none;border:1px solid #fde68a;border-radius:4px;cursor:pointer;color:#92400e;">Cancel</button></div>';
+        footerRow.appendChild(noticeEl);
+        document.getElementById('btnRescanCancel').addEventListener('click', function () { noticeEl.remove(); });
         return;
       }
 
       if (compositionChanged) {
-        // Definitely changed — show centered modal confirmation
         var existingOverlay = document.getElementById('rescan-changed-overlay');
         if (existingOverlay) { existingOverlay.remove(); }
-
         var overlay = document.createElement('div');
         overlay.id = 'rescan-changed-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;';
-
         var modal = document.createElement('div');
         modal.style.cssText = 'background:#fff;border-radius:10px;padding:24px 28px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.18);font-size:13px;color:#1e293b;text-align:left;';
         modal.innerHTML =
-          '<div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:#1d4ed8;margin-bottom:10px;">' +
-            '<i class="fas fa-sync-alt"></i>Property has changed' +
-          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:#1d4ed8;margin-bottom:10px;"><i class="fas fa-sync-alt"></i>Property has changed</div>' +
           '<div style="color:#374151;line-height:1.5;">The property composition has changed since this report was generated. Re-analyzing will reflect the latest state.</div>' +
           '<div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">' +
             '<button id="btnRescanCancel" style="padding:6px 16px;font-size:12px;background:none;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;color:#64748b;">Cancel</button>' +
             '<button id="btnRescanConfirm" style="padding:6px 16px;font-size:12px;background:#3b82f6;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:500;">Re-analyze</button>' +
           '</div>';
-
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
-
-        document.getElementById('btnRescanConfirm').addEventListener('click', function () {
-          overlay.remove();
-          localStorage.removeItem(getAICacheKey());
-          showAIState('prompt');
-        });
-        document.getElementById('btnRescanCancel').addEventListener('click', function () {
-          overlay.remove();
-        });
-        overlay.addEventListener('click', function (e) {
-          if (e.target === overlay) { overlay.remove(); }
-        });
+        document.getElementById('btnRescanConfirm').addEventListener('click', function () { overlay.remove(); localStorage.removeItem(getAICacheKey()); showAIState('prompt'); });
+        document.getElementById('btnRescanCancel').addEventListener('click', function () { overlay.remove(); });
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) { overlay.remove(); } });
         return;
       }
 
-      // Can't compare fingerprints (no stored fingerprint or computation failed) — proceed directly
       localStorage.removeItem(getAICacheKey());
       showAIState('prompt');
     });
@@ -1850,20 +1724,20 @@ function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
 function inferRecMeta(text) {
   var t = (text || '').toLowerCase();
   if (t.indexOf('unused') > -1 || t.indexOf('remov') > -1 || t.indexOf('clean') > -1 || t.indexOf('delet') > -1)
-    return { icon: 'fas fa-trash-alt',      color: '#10b981', label: 'Cleanup',     tagBg: '#d1fae5', tagColor: '#065f46' };
+    return { icon: 'fas fa-trash-alt',       color: '#10b981', label: 'Cleanup',      tagBg: '#d1fae5', tagColor: '#065f46' };
   if (t.indexOf('custom code') > -1 || t.indexOf('hardcod') > -1 || t.indexOf('script') > -1)
-    return { icon: 'fas fa-code',           color: '#8b5cf6', label: 'Custom Code', tagBg: '#ede9fe', tagColor: '#5b21b6' };
+    return { icon: 'fas fa-code',            color: '#8b5cf6', label: 'Custom Code',  tagBg: '#ede9fe', tagColor: '#5b21b6' };
   if (t.indexOf('condition') > -1 || t.indexOf('rule') > -1 || t.indexOf('event') > -1)
-    return { icon: 'fas fa-wrench',         color: '#f59e0b', label: 'Rules',       tagBg: '#fef3c7', tagColor: '#92400e' };
+    return { icon: 'fas fa-wrench',          color: '#f59e0b', label: 'Rules',        tagBg: '#fef3c7', tagColor: '#92400e' };
   if (t.indexOf('extension') > -1)
-    return { icon: 'fas fa-puzzle-piece',   color: '#4e73df', label: 'Extensions',  tagBg: '#dbeafe', tagColor: '#1e40af' };
+    return { icon: 'fas fa-puzzle-piece',    color: '#4e73df', label: 'Extensions',   tagBg: '#dbeafe', tagColor: '#1e40af' };
   if (t.indexOf('performance') > -1 || t.indexOf('size') > -1 || t.indexOf('kb') > -1 || t.indexOf('load') > -1)
-    return { icon: 'fas fa-tachometer-alt', color: '#f97316', label: 'Performance', tagBg: '#ffedd5', tagColor: '#9a3412' };
+    return { icon: 'fas fa-tachometer-alt',  color: '#f97316', label: 'Performance',  tagBg: '#ffedd5', tagColor: '#9a3412' };
   if (t.indexOf('data element') > -1 || t.indexOf('variable') > -1)
-    return { icon: 'fas fa-database',       color: '#27c5c1', label: 'Data Layer',  tagBg: '#ccfbf1', tagColor: '#065f46' };
+    return { icon: 'fas fa-database',        color: '#27c5c1', label: 'Data Layer',   tagBg: '#ccfbf1', tagColor: '#065f46' };
   if (t.indexOf('audit') > -1 || t.indexOf('review') > -1 || t.indexOf('document') > -1)
-    return { icon: 'fas fa-clipboard-check',color: '#6b7280', label: 'Governance',  tagBg: '#f3f4f6', tagColor: '#374151' };
-  return   { icon: 'fas fa-lightbulb',      color: '#4e73df', label: 'Best Practice', tagBg: '#eff6ff', tagColor: '#1e40af' };
+    return { icon: 'fas fa-clipboard-check', color: '#6b7280', label: 'Governance',   tagBg: '#f3f4f6', tagColor: '#374151' };
+  return   { icon: 'fas fa-lightbulb',       color: '#4e73df', label: 'Best Practice',tagBg: '#eff6ff', tagColor: '#1e40af' };
 }
 
 function addAISubHeading(container, iconClass, label) {
@@ -1873,55 +1747,3 @@ function addAISubHeading(container, iconClass, label) {
   container.appendChild(h);
 }
 
-// ── Function to copy card content to clipboard
-function copyCardToClipboard(cardBody, cardType) {
-  // Show processing message
-  const message = document.createElement('div');
-  message.textContent = 'Processing...';
-  message.style.color = '#666';
-  message.style.marginTop = '5px';
-  message.style.marginBottom = '8px';
-  message.style.fontSize = '12px';
-  message.style.textAlign = 'center';
-  cardBody.insertBefore(message, cardBody.firstChild);
-
-  // Take screenshot of card body
-  html2canvas(cardBody).then((canvas) => {
-    // Try to copy to clipboard
-    canvas.toBlob((blob) => {
-      try {
-        // For modern browsers
-        navigator.clipboard
-          .write([new ClipboardItem({ 'image/png': blob })])
-          .then(() => {
-            message.textContent = `✓ ${cardType} copied to clipboard!`;
-            message.style.color = 'green';
-            setTimeout(() => message.remove(), 3000);
-          })
-          .catch((err) => {
-            // Fallback for clipboard API failure
-            message.textContent =
-              '× Error: Please right-click the image below and copy it';
-            message.style.color = 'red';
-
-            // Show the canvas as fallback
-            canvas.style.maxWidth = '100%';
-            canvas.style.border = '1px solid #ddd';
-            canvas.style.marginTop = '10px';
-            cardBody.insertBefore(canvas, message.nextSibling);
-          });
-      } catch (e) {
-        // Fallback for browsers without clipboard API
-        message.textContent =
-          '× Please right-click the image below and copy it';
-        message.style.color = 'red';
-
-        // Show the canvas as fallback
-        canvas.style.maxWidth = '100%';
-        canvas.style.border = '1px solid #ddd';
-        canvas.style.marginTop = '10px';
-        cardBody.insertBefore(canvas, message.nextSibling);
-      }
-    });
-  });
-}

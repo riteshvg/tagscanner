@@ -347,11 +347,8 @@
       tdName.appendChild(expandIcon);
       var nameSpan = document.createElement('span');
       nameSpan.textContent = displayName || key;
-      nameSpan.title = 'Click to view full composition';
+      nameSpan.title = 'Click to expand details';
       nameSpan.style.cursor = 'pointer';
-      nameSpan.addEventListener('click', (function (k, vv, extData) {
-        return function (e) { e.stopPropagation(); showExtModal(k, vv, extData); };
-      })(key, v, ext));
       tdName.appendChild(nameSpan);
       if (isComponentDisabled(ext)) {
         var disabledBadge = document.createElement('span');

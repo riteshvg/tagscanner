@@ -1187,6 +1187,10 @@ document.addEventListener('DOMContentLoaded', function () {
       downloadBtn.addEventListener('click', function () {
         var _tsA2 = (window.parent && window.parent.TagScannerAnalytics) || window.TagScannerAnalytics;
         if (_tsA2) _tsA2.track('Export:PDF', { pageName: 'TagScanner:Summary', events: 'event4', v5: 'PDF', c2: 'Export' });
+        // On scan page, copy the AI report content into the print section before printing
+        var printAI = document.getElementById('print-ai-report');
+        var reportSrc = document.getElementById('aiReportContainer');
+        if (printAI && reportSrc) printAI.innerHTML = reportSrc.innerHTML;
         window.print();
       });
     }
@@ -1361,6 +1365,8 @@ function showAIState(state) {
   document.getElementById('aiScanPrompt').style.display      = (state === 'prompt')   ? '' : 'none';
   document.getElementById('aiScanning').style.display        = (state === 'scanning') ? '' : 'none';
   document.getElementById('aiReportContainer').style.display = (state === 'report')   ? '' : 'none';
+  var pdfBtn = document.getElementById('download-pdf');
+  if (pdfBtn) pdfBtn.style.display = (state === 'report') ? '' : 'none';
 }
 
 function setAIScanError(msg) {
@@ -1464,9 +1470,8 @@ async function runAIScan(user, config) {
     if (result.queryId) {
       try { localStorage.setItem('tagscanner_last_query_id', result.queryId); } catch(e) {}
     }
-    if (!result.cached) {
-      saveCachedAIReport(result.report, result.tokens, result.cost_usd, effectiveConfig.fingerprint || null);
-    }
+    // Always save locally so the report persists across sidebar navigation
+    saveCachedAIReport(result.report, result.tokens, result.cost_usd, effectiveConfig.fingerprint || null);
     renderHealthReport(
       result.report, result.tokens, result.cost_usd,
       result.cached || false,

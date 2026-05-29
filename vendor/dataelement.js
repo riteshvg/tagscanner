@@ -1336,11 +1336,11 @@ if (de_details_node) {
 
       if (explainBtn) {
         explainBtn.onclick = async function () {
-          if (!explainBox) return;
           if (window.TagScannerAuth && window.TagScannerAuth.requireExplainConsent) {
             var consented = await window.TagScannerAuth.requireExplainConsent();
             if (!consented) return;
           }
+          if (!explainBox) return;
           explainBtn.disabled = true;
           var originalHtml = explainBtn.innerHTML;
           explainBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Explaining...';

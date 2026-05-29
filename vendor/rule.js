@@ -32,7 +32,7 @@ if (rule_details_node) {
   var headerRow = document.createElement('tr');
   headers.forEach((header, index) => {
     var th = document.createElement('th');
-    th.innerHTML = `${header.text} &nbsp;<i class="fa fa-info-circle" style="font-size: 16px" title="${header.tooltip}"></i>`;
+    th.textContent = header.text;
     th.classList.add('sortable');
     if (index === 0) th.classList.add('rule-col-id');
     // Add click handler for sorting

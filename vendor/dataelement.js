@@ -643,7 +643,6 @@ if (de_details_node) {
   headers.forEach(function (h) {
     var th = document.createElement('th');
     th.textContent = h.text;
-    th.title = h.tooltip || '';
     if (h.colClass) th.classList.add(h.colClass);
     th.classList.add('sortable');
     headerRow.appendChild(th);

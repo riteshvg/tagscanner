@@ -207,7 +207,7 @@
     headers.forEach(function (h, idx) {
       var th = document.createElement('th');
       th.className = h.className || '';
-      th.innerHTML = h.text + ' &nbsp;<i class="fa fa-info-circle" style="font-size: 14px" title="' + (h.tooltip || '') + '"></i>';
+      th.textContent = h.text;
       if (idx > 0) th.classList.add('sortable');
       th.setAttribute('data-col', String(idx));
       headerRow.appendChild(th);

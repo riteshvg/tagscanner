@@ -29,7 +29,13 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('set_display').style.display = 'none';
       var _cached = loadCachedAIReport();
       if (_cached && _cached.report) {
-        renderHealthReport(_cached.report, _cached.tokens, _cached.costUsd, true, _cached.ts, null);
+        renderHealthReport(_cached.report, _cached.tokens, _cached.costUsd, true, _cached.ts, null, {
+          name:      _cached.propertyName,
+          env:       _cached.propertyEnv,
+          deCount:   _cached.deCount,
+          ruleCount: _cached.ruleCount,
+          extCount:  _cached.extCount
+        });
         showAIState('report');
       } else {
         showAIState('prompt');
@@ -1321,9 +1327,19 @@ function getAICacheKey() {
 
 function loadCachedAIReport() {
   try {
-    // Try property-specific key first, fall back to the latest scan regardless of property
-    var raw = localStorage.getItem(getAICacheKey()) || localStorage.getItem('ts_health_latest');
-    if (!raw) return null;
+    var raw = localStorage.getItem(getAICacheKey());
+    if (!raw) {
+      // Fall back to latest scan only if it belongs to the same property
+      raw = localStorage.getItem('ts_health_latest');
+      if (raw) {
+        var latest = JSON.parse(raw);
+        var curName = sessionStorage.getItem('launch_property_name') || 'Unknown';
+        var curEnv  = sessionStorage.getItem('launch_property_environment') || 'Production';
+        if (latest.propertyName !== curName || latest.propertyEnv !== curEnv) return null;
+        return (latest && latest.v === AI_CACHE_VERSION) ? latest : null;
+      }
+      return null;
+    }
     var obj = JSON.parse(raw);
     return (obj && obj.v === AI_CACHE_VERSION) ? obj : null;
   } catch (e) { return null; }
@@ -1332,12 +1348,17 @@ function loadCachedAIReport() {
 function saveCachedAIReport(report, tokens, costUsd, fingerprint) {
   try {
     var entry = JSON.stringify({
-      v:           AI_CACHE_VERSION,
-      ts:          Date.now(),
-      report:      report,
-      tokens:      tokens,
-      costUsd:     costUsd,
-      fingerprint: fingerprint || null
+      v:            AI_CACHE_VERSION,
+      ts:           Date.now(),
+      report:       report,
+      tokens:       tokens,
+      costUsd:      costUsd,
+      fingerprint:  fingerprint || null,
+      propertyName: sessionStorage.getItem('launch_property_name') || 'Unknown',
+      propertyEnv:  sessionStorage.getItem('launch_property_environment') || 'Production',
+      deCount:      _aiHealthData ? Object.keys(_aiHealthData.dataElements).length : 0,
+      ruleCount:    _aiHealthData ? _aiHealthData.rules.length : 0,
+      extCount:     _aiHealthData ? Object.keys(_aiHealthData.extensions).length : 0
     });
     localStorage.setItem(getAICacheKey(), entry);
     localStorage.setItem('ts_health_latest', entry);
@@ -1393,7 +1414,13 @@ function initAIScanSection(healthData) {
 
   var cached = loadCachedAIReport();
   if (cached && cached.report) {
-    renderHealthReport(cached.report, cached.tokens, cached.costUsd, true, cached.ts, null);
+    renderHealthReport(cached.report, cached.tokens, cached.costUsd, true, cached.ts, null, {
+      name:      cached.propertyName,
+      env:       cached.propertyEnv,
+      deCount:   cached.deCount,
+      ruleCount: cached.ruleCount,
+      extCount:  cached.extCount
+    });
     showAIState('report');
   } else {
     showAIState('prompt');
@@ -1478,7 +1505,15 @@ async function runAIScan(user, config) {
       result.report, result.tokens, result.cost_usd,
       result.cached || false,
       result.cached_at ? new Date(result.cached_at).getTime() : Date.now(),
-      result.cached_by || null
+      result.cached_by || null,
+      {
+        name:            sessionStorage.getItem('launch_property_name') || 'Unknown',
+        env:             sessionStorage.getItem('launch_property_environment') || 'Production',
+        deCount:         _aiHealthData ? Object.keys(_aiHealthData.dataElements).length : 0,
+        ruleCount:       _aiHealthData ? _aiHealthData.rules.length : 0,
+        extCount:        _aiHealthData ? Object.keys(_aiHealthData.extensions).length : 0,
+        secretsRedacted: result.secretsRedacted || 0
+      }
     );
     showAIState('report');
   } catch (err) {
@@ -1497,13 +1532,71 @@ async function runAIScan(user, config) {
   }
 }
 
-function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy) {
+function renderHealthReport(report, tokens, costUsd, fromCache, ts, cachedBy, propInfo) {
   var container = document.getElementById('aiReportContainer');
   container.innerHTML = '';
 
   var score = (typeof report.health_score === 'number') ? report.health_score : 0;
   // Validate that grade matches score — correct client-side if AI is inconsistent
   var grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+
+  // ── Property info bar ────────────────────────────────────────────────────
+  if (propInfo && propInfo.name && propInfo.name !== 'Unknown') {
+    var propBar = document.createElement('div');
+    propBar.style.cssText =
+      'display:flex;align-items:center;flex-wrap:wrap;gap:8px;' +
+      'background:#f0f4ff;border:1px solid #c7d7fd;border-radius:8px;' +
+      'padding:10px 14px;margin-bottom:16px;font-size:12px;color:#374151;';
+    var envBadge =
+      '<span style="display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;' +
+      'letter-spacing:0.4px;padding:1px 8px;border-radius:10px;background:#dbeafe;color:#1e40af;margin-left:6px;">' +
+      escAIHtml(propInfo.env || 'Production') + '</span>';
+    var counts = [];
+    if (propInfo.ruleCount != null) counts.push('<strong>' + propInfo.ruleCount + '</strong> Rules');
+    if (propInfo.deCount   != null) counts.push('<strong>' + propInfo.deCount   + '</strong> Data Elements');
+    if (propInfo.extCount  != null) counts.push('<strong>' + propInfo.extCount  + '</strong> Extensions');
+    propBar.innerHTML =
+      '<i class="fas fa-tag" style="color:#4e73df;font-size:13px;flex-shrink:0"></i>' +
+      '<span style="font-weight:700;color:#1e40af;">' + escAIHtml(propInfo.name) + '</span>' +
+      envBadge +
+      (counts.length ? '<span style="color:#9ca3af;margin:0 2px">·</span>' + counts.join('<span style="color:#d1d5db;margin:0 5px">·</span>') : '') +
+      '<span style="margin-left:auto;display:flex;align-items:center;gap:10px;">' +
+      (ts ? '<span style="color:#9ca3af;font-size:11px">Scanned ' + new Date(ts).toLocaleString() + '</span>' : '') +
+      '<button id="btnReanalyze" style="font-size:11px;font-weight:600;color:#4e73df;background:#fff;' +
+      'border:1px solid #c7d7fd;border-radius:5px;padding:3px 10px;cursor:pointer;white-space:nowrap;">' +
+      '<i class="fas fa-sync-alt" style="margin-right:4px;font-size:10px;"></i>Re-analyze</button>' +
+      '</span>';
+    container.appendChild(propBar);
+    if (propInfo.secretsRedacted > 0) {
+      var redactBanner = document.createElement('div');
+      redactBanner.style.cssText =
+        'display:flex;align-items:flex-start;gap:8px;background:#fefce8;border:1px solid #fde68a;' +
+        'border-left:3px solid #f59e0b;border-radius:5px;padding:8px 12px;margin-bottom:14px;font-size:11.5px;color:#92400e;';
+      redactBanner.innerHTML =
+        '<i class="fas fa-shield-alt" style="font-size:12px;margin-top:1px;flex-shrink:0;color:#d97706"></i>' +
+        '<span><strong>' + propInfo.secretsRedacted + ' potential secret' + (propInfo.secretsRedacted > 1 ? 's' : '') + ' redacted</strong> — values matching common secret patterns (API keys, tokens, passwords) were removed from custom code before sending to AI.</span>';
+      container.appendChild(redactBanner);
+    }
+    document.getElementById('btnReanalyze').addEventListener('click', async function () {
+      var cachedEntry = loadCachedAIReport();
+      var storedFp = cachedEntry && cachedEntry.fingerprint;
+      var currentFp;
+      if (storedFp && window.TagScannerHealthPayload && window.TagScannerHealthPayload.computeFingerprint && _aiHealthData) {
+        try { currentFp = await window.TagScannerHealthPayload.computeFingerprint({ dataElements: _aiHealthData.dataElements, rules: _aiHealthData.rules, extensions: _aiHealthData.extensions }); } catch(e) {}
+      }
+      if (currentFp && storedFp && currentFp === storedFp) {
+        var n = document.createElement('div');
+        n.style.cssText = 'margin-top:8px;padding:8px 12px;background:#fefce8;border:1px solid #fde68a;border-left:3px solid #f59e0b;border-radius:5px;font-size:11.5px;color:#92400e;';
+        n.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:5px"></i><strong>Property unchanged</strong> — the composition has not changed since this report was generated. <button id="btnReanalyzeForce" style="margin-left:8px;font-size:11px;color:#1d4ed8;background:none;border:none;cursor:pointer;text-decoration:underline;padding:0;">Run anyway</button>';
+        propBar.after(n);
+        document.getElementById('btnReanalyzeForce').addEventListener('click', function () { n.remove(); localStorage.removeItem(getAICacheKey()); localStorage.removeItem('ts_health_latest'); showAIState('prompt'); });
+        return;
+      }
+      localStorage.removeItem(getAICacheKey());
+      localStorage.removeItem('ts_health_latest');
+      showAIState('prompt');
+    });
+  }
 
   if (fromCache && cachedBy) {
     var cachedAtStr = ts ? new Date(ts).toLocaleString() : 'unknown time';

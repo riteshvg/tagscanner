@@ -206,33 +206,15 @@ document.addEventListener('DOMContentLoaded', function () {
           var session = window.TagScannerAuth && window.TagScannerAuth.getSession();
           if (window.TagScannerBedrock && window.TagScannerBedrock.explainCode) {
             if (!session) {
-              explanationDiv.innerHTML =
-                '<div style="padding:14px;text-align:center;background:#f8f9fc;border-radius:8px;border:1px solid #e3e6f0">' +
-                '<div style="font-size:13px;font-weight:600;color:#374151;margin-bottom:4px">Sign in to use AI Explain</div>' +
-                '<div style="font-size:12px;color:#6b7280;margin-bottom:14px">AI-powered code explanation requires a Google account.</div>' +
-                '<button class="cc-explain-signin-btn" style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:#fff;border:1px solid #d1d3e2;border-radius:6px;font-size:13px;font-weight:500;color:#374151;cursor:pointer">' +
-                '<svg width="16" height="16" viewBox="0 0 48 48"><path fill="#4285F4" d="M47.53 24.56c0-1.6-.14-3.14-.4-4.62H24v8.73h13.2c-.57 3.03-2.3 5.59-4.9 7.32v6.08h7.93c4.64-4.28 7.3-10.58 7.3-17.51z"/><path fill="#34A853" d="M24 48c6.66 0 12.24-2.21 16.32-5.98l-7.93-6.08c-2.2 1.47-5.01 2.34-8.39 2.34-6.45 0-11.91-4.35-13.86-10.21H2.08v6.28C6.14 42.62 14.43 48 24 48z"/><path fill="#FBBC05" d="M10.14 28.07A14.42 14.42 0 0 1 9.6 24c0-1.41.24-2.78.54-4.07v-6.28H2.08A23.98 23.98 0 0 0 0 24c0 3.88.93 7.55 2.08 10.35l8.06-6.28z"/><path fill="#EA4335" d="M24 9.52c3.63 0 6.88 1.25 9.44 3.7l7.08-7.08C36.23 2.19 30.65 0 24 0 14.43 0 6.14 5.38 2.08 13.65l8.06 6.28C12.09 13.87 17.55 9.52 24 9.52z"/></svg>' +
-                'Continue with Google</button>' +
-                '<div class="cc-explain-signin-err" style="display:none;margin-top:8px;font-size:11px;color:#ef4444"></div>' +
-                '</div>';
+              explanationDiv.innerHTML = window.TagScannerAuth.renderSignInBox(
+                'Sign in to use AI Explain',
+                'AI-powered code explanation requires a Google account.'
+              );
               explanationDiv.style.display = 'block';
-              var signinBtn = explanationDiv.querySelector('.cc-explain-signin-btn');
-              var signinErr = explanationDiv.querySelector('.cc-explain-signin-err');
-              signinBtn.addEventListener('click', async function () {
-                signinBtn.disabled = true;
-                signinBtn.textContent = 'Signing in…';
-                signinErr.style.display = 'none';
-                try {
-                  session = await window.TagScannerAuth.signInWithGoogle();
-                  explanationDiv.innerHTML = '';
-                  explanationDiv.style.display = 'none';
-                  explainButton.click();
-                } catch (authErr) {
-                  signinErr.textContent = authErr.message || 'Sign-in failed. Please try again.';
-                  signinErr.style.display = 'block';
-                  signinBtn.disabled = false;
-                  signinBtn.textContent = 'Try again';
-                }
+              window.TagScannerAuth.attachSignInBox(explanationDiv, function () {
+                explanationDiv.innerHTML = '';
+                explanationDiv.style.display = 'none';
+                explainButton.click();
               });
               return;
             }
@@ -252,6 +234,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 notice.style.cssText = 'display:flex;align-items:flex-start;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;border-left:4px solid #3b82f6;border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:12px;color:#1e40af';
                 notice.innerHTML = '<i class="fas fa-info-circle" style="font-size:13px;margin-top:1px;flex-shrink:0"></i><div><strong style="display:block;margin-bottom:2px">Cached Explanation</strong><span style="color:#374151">Generated on ' + cachedAt + ' by ' + byStr + '. Same code — no new AI call needed.</span></div>';
                 explanationDiv.insertBefore(notice, explanationDiv.firstChild);
+              }
+              if (brResult.secretsRedacted > 0) {
+                var redactNotice = document.createElement('div');
+                redactNotice.style.cssText = 'display:flex;align-items:flex-start;gap:7px;background:#fefce8;border:1px solid #fde68a;border-left:3px solid #f59e0b;border-radius:5px;padding:7px 10px;margin-bottom:10px;font-size:11.5px;color:#92400e';
+                redactNotice.innerHTML =
+                  '<i class="fas fa-shield-alt" style="font-size:12px;margin-top:1px;flex-shrink:0;color:#d97706"></i>' +
+                  '<span><strong>' + brResult.secretsRedacted + ' potential secret' + (brResult.secretsRedacted > 1 ? 's' : '') + ' redacted</strong> — values matching common secret patterns (API keys, tokens, passwords) were removed before sending to AI.</span>';
+                explanationDiv.insertBefore(redactNotice, explanationDiv.firstChild);
               }
               var modelNote = document.createElement('div');
               modelNote.style.cssText = 'margin-top:14px;padding-top:8px;border-top:1px solid #f3f4f6;font-size:11px;color:#9ca3af;display:flex;align-items:center;gap:5px';

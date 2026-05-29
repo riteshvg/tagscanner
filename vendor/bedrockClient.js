@@ -74,6 +74,44 @@ Required structure:
 
 Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under 15 words. Be specific about paths. If code is minified, note it as a medium risk.`;
 
+  // ── Secret redaction (runs client-side before any data leaves the browser) ──
+
+  function _redactStr(str) {
+    if (!str || typeof str !== 'string') return { out: str, n: 0 };
+    var n = 0, out = str;
+    function rep(re, fn) {
+      out = out.replace(re, function() { n++; return fn.apply(null, arguments); });
+    }
+    rep(/\bBearer\s+[A-Za-z0-9\-._~+\/]{16,}={0,2}/g,
+        function() { return 'Bearer [REDACTED]'; });
+    rep(/(Authorization\s*[:=]\s*["'`])[^"'`\n]{8,}(["'`])/gi,
+        function(_, a, b) { return a + '[REDACTED]' + b; });
+    rep(/(api[_-]?key|x-api-key|apiKey)\s*[:=]\s*(["'`])[^"'`\n]{6,}["'`]/gi,
+        function(m, k, q) { return k + ': ' + q + '[REDACTED]' + q; });
+    rep(/((?:password|passwd|secret|client_?secret|access_?token|auth_?token)\s*[:=]\s*)(["'`])[^"'`\n]{6,}["'`]/gi,
+        function(m, k, q) { return k + q + '[REDACTED]' + q; });
+    rep(/\bAKIA[0-9A-Z]{16}\b/g,
+        function() { return '[AWS-KEY-REDACTED]'; });
+    rep(/-----BEGIN\s[\w ]+KEY-----[\s\S]*?-----END\s[\w ]+KEY-----/g,
+        function() { return '[PEM-KEY-REDACTED]'; });
+    return { out: out, n: n };
+  }
+
+  function _redactObject(obj) {
+    var total = 0;
+    function walk(v) {
+      if (typeof v === 'string') { var r = _redactStr(v); total += r.n; return r.out; }
+      if (Array.isArray(v)) return v.map(walk);
+      if (v && typeof v === 'object') {
+        var o = {};
+        Object.keys(v).forEach(function(k) { o[k] = walk(v[k]); });
+        return o;
+      }
+      return v;
+    }
+    return { obj: walk(obj), count: total };
+  }
+
   // ── Proxy helper ─────────────────────────────────────────────────────────────
 
   async function callProxy(proxyUrl, body) {
@@ -90,24 +128,26 @@ Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under
   }
 
   async function explainCode(code, metadata, config) {
+    var sanitized = _redactStr(code);
     const data = await callProxy(TS_PROXY_URL, {
       type:        'explain',
       sessionToken: config.sessionToken || null,
       clientId:     config.clientId     || '',
       email:        config.email        || '',
-      code:         code,
+      code:         sanitized.out,
       metadata:     metadata            || {},
       propertyKey:  config.propertyKey  || null,
     });
     return {
-      explanation:  data.explanation,
-      inputTokens:  data.tokens?.input  || 0,
-      outputTokens: data.tokens?.output || 0,
-      queryId:      data.queryId        || null,
-      cached:       data.cached         || false,
-      cached_at:    data.cached_at      || null,
-      cached_by:    data.cached_by      || null,
-      model:        data.model          || 'Claude 3.5 Haiku',
+      explanation:     data.explanation,
+      inputTokens:     data.tokens?.input  || 0,
+      outputTokens:    data.tokens?.output || 0,
+      queryId:         data.queryId        || null,
+      cached:          data.cached         || false,
+      cached_at:       data.cached_at      || null,
+      cached_by:       data.cached_by      || null,
+      model:           data.model          || 'Claude 3.5 Haiku',
+      secretsRedacted: sanitized.n,
     };
   }
 
@@ -239,12 +279,13 @@ Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under
   // ── Public API ───────────────────────────────────────────────────────────────
 
   async function analyzeProperty(healthPayload, userContext, config) {
+    var sanitized = _redactObject(healthPayload);
     const data = await callProxy(TS_PROXY_URL, {
       type: 'scan',
       sessionToken: config.sessionToken || null,
       clientId:     config.clientId     || '',
       email:        config.email        || '',
-      payload:      healthPayload,
+      payload:      sanitized.obj,
       userContext:  userContext         || {},
       fingerprint:  config.fingerprint  || null,
     });
@@ -252,13 +293,14 @@ Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under
       throw new Error('Proxy response missing report. Got: ' + JSON.stringify(data).slice(0, 300));
     }
     return {
-      report:    data.report,
-      tokens:    data.tokens   || {},
-      cost_usd:  0,
-      queryId:   data.queryId  || null,
-      cached:    data.cached   || false,
-      cached_at: data.cached_at || null,
-      cached_by: data.cached_by || null,
+      report:          data.report,
+      tokens:          data.tokens   || {},
+      cost_usd:        0,
+      queryId:         data.queryId  || null,
+      cached:          data.cached   || false,
+      cached_at:       data.cached_at || null,
+      cached_by:       data.cached_by || null,
+      secretsRedacted: sanitized.count,
     };
   }
 

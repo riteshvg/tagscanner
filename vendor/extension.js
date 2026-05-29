@@ -487,8 +487,8 @@
       return isAsc ? (textA || '').localeCompare(textB || '') : (textB || '').localeCompare(textA || '');
     });
     rows.forEach(function (row) {
-      tbody.appendChild(row);
       var next = row.nextElementSibling;
+      tbody.appendChild(row);
       if (next && next.classList.contains('expandable-row')) tbody.appendChild(next);
     });
     currentPage = 1;

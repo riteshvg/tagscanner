@@ -78,6 +78,10 @@
       padding: 16px;
       position: relative;
       transition: box-shadow 0.15s;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      box-sizing: border-box;
     }
     .feature-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
     .feature-card.ai-card {
@@ -85,7 +89,7 @@
       background: linear-gradient(135deg, #fafbff, #eff4ff);
     }
     a.feature-card-link {
-      display: block; text-decoration: none; color: inherit;
+      display: block; text-decoration: none; color: inherit; height: 100%;
     }
     a.feature-card-link .feature-card {
       cursor: pointer;
@@ -95,7 +99,7 @@
       border-color: #93c5fd;
     }
     .feature-card .cta-arrow {
-      display: inline-block; margin-top: 10px;
+      display: inline-block; margin-top: auto; padding-top: 10px;
       font-size: 11px; font-weight: 700; color: #4e73df;
       letter-spacing: 0.2px;
     }
@@ -130,7 +134,7 @@
       flex-shrink: 0;
     }
     .feature-desc {
-      font-size: 11.5px; color: #6b7280; line-height: 1.5; margin: 0;
+      font-size: 11.5px; color: #6b7280; line-height: 1.5; margin: 0; flex: 1;
     }
 
     /* ── Queries section ──────────────────────── */

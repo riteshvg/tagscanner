@@ -82,9 +82,9 @@
   }
 
   function renderItems() {
-    var filtered = currentFilter === 'all'
-      ? allItems
-      : allItems.filter(function (q) { return q.type === currentFilter; });
+    var aiTypes = ['scan', 'explain', 'chat'];
+    var filtered = (currentFilter === 'all' ? allItems : allItems.filter(function (q) { return q.type === currentFilter; }))
+      .filter(function (q) { return aiTypes.indexOf(q.type) !== -1; });
 
     var list = document.getElementById('historyList');
     var empty = document.getElementById('emptyState');
@@ -155,8 +155,8 @@
   }
 
   function renderCard(q) {
-    var badgeClass = q.type === 'scan' ? 'badge-scan' : q.type === 'chat' ? 'badge-chat' : 'badge-explain';
-    var badgeLabel = q.type === 'scan' ? 'Scan' : q.type === 'chat' ? 'Chat' : 'Explain';
+    var badgeClass = q.type === 'scan' ? 'badge-scan' : q.type === 'chat' ? 'badge-chat' : q.type === 'explain' ? 'badge-explain' : 'badge-explain';
+    var badgeLabel = q.type === 'scan' ? 'Scan' : q.type === 'chat' ? 'Chat' : q.type === 'explain' ? 'Explain' : q.type || 'Unknown';
     var feedbackHtml = '';
 
     if (q.feedback) {

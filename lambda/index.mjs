@@ -128,7 +128,7 @@ Be specific about paths. If code is minified, note it as a medium risk.`;
 // ── Bedrock invocation ────────────────────────────────────────────────────────
 
 async function invokeClaude(systemPrompt, userMessage, maxTokens) {
-  const isNova = MODEL_ID.startsWith('amazon.nova');
+  const isNova = MODEL_ID.includes('amazon.nova');
   let bodyObj;
 
   if (isNova) {

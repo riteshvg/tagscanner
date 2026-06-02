@@ -428,7 +428,7 @@ Was this helpful? Use the 👍 👎 buttons below to rate this response — your
 
 // Multi-turn version of invokeClaude — takes a messages array instead of a single string
 async function invokeClaudeChat(messages, maxTokens) {
-  const isNova = MODEL_ID.startsWith('amazon.nova');
+  const isNova = MODEL_ID.includes('amazon.nova');
   let bodyObj;
 
   if (isNova) {
@@ -577,7 +577,7 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
 }
 
 async function invokeClaude(systemPrompt, userMessage, maxTokens) {
-  const isNova = MODEL_ID.startsWith('amazon.nova');
+  const isNova = MODEL_ID.includes('amazon.nova');
   let bodyObj;
 
   if (isNova) {

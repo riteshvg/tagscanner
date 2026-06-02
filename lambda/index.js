@@ -58,7 +58,7 @@ const ALLOWLIST      = (process.env.ALLOWED_EMAILS || '')
   .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 const ADMIN_EMAIL    = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 
-const MAX_TOKENS_SCAN    = 1500;
+const MAX_TOKENS_SCAN    = 2000;
 const MAX_TOKENS_EXPLAIN = 1000;
 const MAX_TOKENS_CHAT    = 2500;
 
@@ -79,9 +79,15 @@ const QUERIES_PROPERTY_INDEX = 'propertyKey-createdAt-index';
 const DAILY_CAP         = parseInt(process.env.DAILY_REQUEST_CAP  || '20', 10);
 const DEFAULT_COST_LIMIT = parseFloat(process.env.DEFAULT_COST_LIMIT_USD || '5.00');
 
-// AWS Bedrock Claude 3.5 Haiku on-demand pricing
+// AWS Bedrock Claude 3 Haiku pricing (explain + chat)
 const COST_INPUT_PER_TOKEN  = 0.80 / 1e6;   // $0.80 per 1M input tokens
 const COST_OUTPUT_PER_TOKEN = 4.00 / 1e6;   // $4.00 per 1M output tokens
+
+// Anthropic API Claude Sonnet 4.6 pricing (scan only)
+const ANTHROPIC_API_KEY          = (process.env.ANTHROPIC_API_KEY || '').trim();
+const SCAN_MODEL_ID              = 'claude-sonnet-4-6';
+const COST_SCAN_INPUT_PER_TOKEN  = 3.00 / 1e6;   // $3.00 per 1M input tokens
+const COST_SCAN_OUTPUT_PER_TOKEN = 15.00 / 1e6;  // $15.00 per 1M output tokens
 
 // Returns true if the caller should be blocked.
 // Uses a DynamoDB item with a TTL of 24 h and an atomic counter.
@@ -180,9 +186,11 @@ async function getTodayCost() {
 }
 
 // Atomically increments today's cost; returns the new daily total.
-async function trackCost(inputTokens, outputTokens) {
+async function trackCost(inputTokens, outputTokens, inputRate, outputRate) {
   const windowKey = new Date().toISOString().slice(0, 10);
-  const cost = inputTokens * COST_INPUT_PER_TOKEN + outputTokens * COST_OUTPUT_PER_TOKEN;
+  const inRate    = inputRate  !== undefined ? inputRate  : COST_INPUT_PER_TOKEN;
+  const outRate   = outputRate !== undefined ? outputRate : COST_OUTPUT_PER_TOKEN;
+  const cost = inputTokens * inRate + outputTokens * outRate;
   const ttl  = Math.floor(Date.now() / 1000) + 8 * 24 * 60 * 60; // keep 8 days
   try {
     const result = await ddb.send(new UpdateCommand({
@@ -614,6 +622,35 @@ async function invokeClaude(systemPrompt, userMessage, maxTokens) {
     text,
     inputTokens:  isNova ? (data.usage && data.usage.inputTokens  || 0) : (data.usage && data.usage.input_tokens  || 0),
     outputTokens: isNova ? (data.usage && data.usage.outputTokens || 0) : (data.usage && data.usage.output_tokens || 0)
+  };
+}
+
+async function invokeAnthropicDirect(systemPrompt, userMessage, maxTokens) {
+  if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured.');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key':         ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type':      'application/json'
+    },
+    body: JSON.stringify({
+      model:       SCAN_MODEL_ID,
+      max_tokens:  maxTokens,
+      temperature: 0.3,
+      system:      systemPrompt,
+      messages:    [{ role: 'user', content: userMessage }]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error('Anthropic API error ' + res.status + ': ' + ((err.error && err.error.message) || res.statusText));
+  }
+  const data = await res.json();
+  return {
+    text:         (data.content && data.content[0] && data.content[0].text) || '',
+    inputTokens:  (data.usage && data.usage.input_tokens)  || 0,
+    outputTokens: (data.usage && data.usage.output_tokens) || 0
   };
 }
 
@@ -1513,7 +1550,7 @@ exports.handler = async (event) => {
       if (!payload) return resp(400, { error: 'Missing payload for scan.' });
 
       const userMsg      = JSON.stringify({ user_context: userContext || {}, property_health: payload });
-      const result       = await invokeClaude(SCAN_SYSTEM_PROMPT, userMsg, MAX_TOKENS_SCAN);
+      const result       = await invokeAnthropicDirect(SCAN_SYSTEM_PROMPT, userMsg, MAX_TOKENS_SCAN);
       const report       = parseJSON(result.text);
       const propertyName = (payload.property && payload.property.name)        || 'Unknown property';
       const environment  = (payload.property && payload.property.environment) || 'Production';
@@ -1523,7 +1560,7 @@ exports.handler = async (event) => {
       const [queryId, newDayCost] = await Promise.all([
         logQuery(identity.userId, identity.email, session.name, 'scan', 'Property scan: ' + propertyName,
           { input: result.inputTokens, output: result.outputTokens }, report, propertyKey, siteUrl, clientId),
-        trackCost(result.inputTokens, result.outputTokens)
+        trackCost(result.inputTokens, result.outputTokens, COST_SCAN_INPUT_PER_TOKEN, COST_SCAN_OUTPUT_PER_TOKEN)
       ]);
 
       // Store in scan cache keyed by composition fingerprint

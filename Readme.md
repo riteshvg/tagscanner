@@ -1,69 +1,77 @@
-# TagScanner 1.6.5
+# TagScanner 2.5.6
 
-Hi! Thank you for trying out TagScanner. TagScanner is an utility designed to scan your Adobe Tags' property in depth. There are three main uses of TagScanner -
---Auditing
---Analyzing
---Debugging
+TagScanner is a Chrome extension that gives Adobe Tags (Launch / Data Collection) implementers a deep, instant view into their deployed property — without leaving the browser.
 
-## Changelog 03/03/25
+## What it does
 
-Added multiple features to the Extension.
+TagScanner reads your active Adobe Tags container directly from the page and surfaces the information in a structured, searchable interface. No external logins, no API keys, no property access required beyond what is already deployed on the page.
 
-#### Data Analysis
+---
 
-- Component Summary: Quick overview of all components in your Adobe Tags property
+## Features
 
-- Usage Analysis: Identifies unused data elements and rules to help optimize implementation
+### Property Overview
+- **Component Summary** — quick count of rules, data elements, and extensions at a glance
+- **Usage Analysis** — identifies unused data elements and rules that are adding payload without contributing to any active logic
+- **Size Analysis** — breaks down the size contribution of each component to help reduce library weight
 
-- Size Analysis: Shows the size contribution of each component
+### Detailed Views
+- **Data Elements** — complete list with type, extension, custom code preview, filtering, and sorting
+- **Rules** — full overview of every rule with its events, conditions, and actions
+- **Extensions** — installed extensions with version info and usage details
+- **Flow View** — visual map of how rules, data elements, and extensions interconnect
 
-#### Detailed Views
+### AI Features *(requires sign-in)*
+- **AI Health Scan** — analyses your entire property and returns a health score, grade, critical issues, warnings, and prioritised recommendations
+- **Code Explain** — paste or open any custom code block and get a plain-English explanation of what it does, what data it reads, what it returns, and any risks
+- **Ask AI** — conversational interface to ask questions about your specific property (e.g. "which rules fire on every page?", "are there any unused data elements?")
+- **AI Query History** — review past AI responses and re-open them at any time
 
-- Data Elements: Complete list with filtering and sorting capabilities
+### Export & Documentation
+- **PDF Export** — download a complete implementation summary as a PDF
+- **CSV Export** — export component details for use in spreadsheets or reports
+- **Clipboard Copy** — copy any table directly for use in presentations or documentation
 
-- Rules: Overview of all rules with their triggers, conditions, and actions
+### Developer Tools
+- **Search** — global search across all rules, data elements, and extensions
+- **Custom Code Viewer** — view and copy the raw custom code for any component with syntax highlighting
+- **Data Element References** — see exactly which rules reference each data element
 
-- Extensions: List of installed extensions with usage details
+### User Experience
+- **Interactive Tours** — built-in guided tour for first-time users
+- **Table Sorting** — click any column header to sort
 
-#### Documentation Tools
+---
 
-- PDF Export: Download a complete summary of your implementation
+## Installation
 
-- CSV Export: Export component details for further analysis
+Install directly from the [Chrome Web Store](https://chrome.google.com/webstore/detail/tagscanner/mhejdbndckkddicchjjbaehfbmjjlmjn).
 
-- Clipboard Copy: Easily copy tables and data for reports and presentations
+Once installed:
+1. Navigate to any page where an Adobe Tags property is active
+2. Click the TagScanner icon in your Chrome toolbar
+3. The extension will load your property data automatically
 
-#### User Experience
+---
 
-- Interactive Tours: Built-in tour functionality to help new users understand the interface
+## AI Features — Sign In
 
-- Accordion Interfaces: Collapsible sections for better information organization
+AI features require a free Google sign-in to prevent abuse. Your property data is analysed securely and never stored beyond what is needed to serve your request. Results are cached briefly to improve response times for shared properties.
 
-- Table Sorting: Sort any table by clicking column headers
+---
 
 ## Libraries Used
 
 - jQuery 3.2.1
 - TableSorter
-- Intro.js (for guided tours)
-- HTML2Canvas (for PDF generation)
-- Font Awesome (for icons)
+- Intro.js
+- HTML2Canvas
+- D3.js
+- Font Awesome
+- Prettier (code formatting)
 
-## Changelog 07/31
+---
 
-- This version of the extension is now under Chrome Manifest v3! The data processing was shifted from remotely reading the tags script into loading the satellite object from the page context into the extension. As a side effect, some information, like the sizes in bytes, may be incorrect.
-- Added a download button next to the tag property name that exports a CSV summary of the current property, including data elements, extensions, and rules, including custom code.
-- Visually changed the extension from a popup window to a traditional extension view.
-- Removed the login portal from the extension.
-- Removed the three second loading timeout. Information to the extension is now created on page load and when the extension button is clicked.
-- Added a framework for a sandbox file to be injected into the page where a script file can potentially be loaded without a CSP violation. Can be used in future development to gather full unminified code.
+## Feedback
 
-# About TagScanner
-
-##### With TagScanner you can get more information about your active Adobe Tags Property and answers queries such as:
-
-- How do I ascertain the size of my library impacting my website?
-- Where can I get a list of elements that are significantly larger in size?
-- How many data elements are active and not used even once in any of my rules, extensions or data elements?
-- How are different data elements mapped to multiple rules?
-- How can I determine the relationships between different elements of my library?
+Found a bug or have a suggestion? Use the feedback form inside the extension or open an issue on [GitHub](https://github.com/riteshvg/tagscanner).

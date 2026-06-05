@@ -58,9 +58,14 @@ const ALLOWLIST      = (process.env.ALLOWED_EMAILS || '')
   .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 const ADMIN_EMAIL    = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 
-const MAX_TOKENS_SCAN    = 2000;
 const MAX_TOKENS_EXPLAIN = 1000;
 const MAX_TOKENS_CHAT    = 2500;
+
+function computeScanTokens(payload) {
+  const rules = (payload && payload.rules && payload.rules.total) || 0;
+  const de    = (payload && payload.data_elements && payload.data_elements.total) || 0;
+  return Math.min(4000, Math.max(2500, 2500 + (rules * 10) + (de * 5)));
+}
 
 const bedrockClient = new BedrockRuntimeClient({ region: REGION });
 
@@ -79,9 +84,9 @@ const QUERIES_PROPERTY_INDEX = 'propertyKey-createdAt-index';
 const DAILY_CAP         = parseInt(process.env.DAILY_REQUEST_CAP  || '20', 10);
 const DEFAULT_COST_LIMIT = parseFloat(process.env.DEFAULT_COST_LIMIT_USD || '5.00');
 
-// AWS Bedrock Claude 3 Haiku pricing (explain + chat)
-const COST_INPUT_PER_TOKEN  = 0.80 / 1e6;   // $0.80 per 1M input tokens
-const COST_OUTPUT_PER_TOKEN = 4.00 / 1e6;   // $4.00 per 1M output tokens
+// AWS Bedrock Claude 3.5 Haiku pricing (explain + chat)
+const COST_INPUT_PER_TOKEN  = 1.00 / 1e6;   // $1.00 per 1M input tokens
+const COST_OUTPUT_PER_TOKEN = 5.00 / 1e6;   // $5.00 per 1M output tokens
 
 // Anthropic API Claude Sonnet 4.6 pricing (scan only)
 const ANTHROPIC_API_KEY          = (process.env.ANTHROPIC_API_KEY || '').trim();
@@ -388,13 +393,20 @@ Rules: Keep purpose to 1 sentence. Limit how_it_works to 4 steps max, each under
 
 const CHAT_SYSTEM_PROMPT = `You are an expert Adobe Tags (Launch / Data Collection) consultant embedded in the TagScanner Chrome extension. You have deep knowledge of tag management best practices, Adobe Experience Platform, data governance, and JavaScript performance.
 
+CORE RULE — answer the question asked and stop. Do not add observations, recommendations, governance notes, or best-practice commentary unless the user explicitly asks for it. Length is determined by the completeness of the answer, not by thoroughness for its own sake.
+
+Tone: direct and technically precise. No filler phrases ("Great question!", "Certainly!", "Absolutely!"). No hedging language unless genuinely uncertain. Write like a senior consultant who respects the user's time.
+
+━━━ WHAT YOU DO ━━━
+
 Your primary mission is to help Adobe Tags implementers understand and improve their deployed property by:
 - Answering factual questions about rules, data elements, and extensions present in the property
 - Identifying unused components, configuration risks, and implementation health issues
 - Explaining what specific components do and how they interact with each other
 - Guiding implementers toward cleaner, more maintainable tag implementations
 
-Operational context:
+━━━ OPERATIONAL CONTEXT ━━━
+
 - You operate as a read-only advisor inside a Chrome extension running in the user's own browser
 - Users are Adobe Tags implementers — developers, analysts, or tag managers — working on properties they own or manage
 - You are advisory only: you cannot deploy changes, modify rules, publish containers, or access any Adobe system
@@ -402,37 +414,91 @@ Operational context:
 - The property_context does not contain end-user personal data; if any appears (e.g. a hardcoded value in a custom code snippet), do not repeat, store, or elaborate on it
 - When uncertain whether a recommendation is safe to make, default to flagging the risk rather than prescribing a specific action
 
+━━━ INPUT FORMAT ━━━
+
 You will receive a JSON object with two fields:
 - "property_context": a structured summary of the user's Tags property (rules, data elements, extensions, property metadata)
 - "question": the user's natural language question about their property
 
-Critical data limitations you must know:
-- The property_context is read from the DEPLOYED Tags container (window._satellite._container) in the browser. It only reflects what is published and active.
-- DISABLED rules are excluded from the deployed container — they are never published to the browser. You cannot see them, count them, or list them. If asked about disabled rules, explain this clearly.
-- The "enabled" status of rules is not a reliable field. All rules present in the context are active by definition.
-- Custom code content is not included — only metadata (name, type, extension). If asked about the code inside a component, say it is not available.
-- If property_context includes a "data_note" field, treat it as a system constraint and surface it in your answer.
+━━━ CRITICAL DATA LIMITATIONS — read in order, highest risk first ━━━
 
-Scope: You only answer questions about the user's Adobe Tags property using the property_context provided. You do not offer creative, general-purpose, or off-topic assistance. If a question is unrelated to Adobe Tags, tag management, or the user's property, respond exactly: "I'm scoped to your Adobe Tags property — ask me about your rules, data elements, extensions, or implementation health."
+1. NEVER infer or guess what a data element returns, does, or checks based on its name alone. A data element's actual return value and logic are not available — only its type and extension. Only state what the property_context explicitly shows.
 
-Output format — match the format to the question type:
-- Factual lookup ("how many rules?", "which extensions?"): one direct answer line, followed by a "-" list only if enumeration adds value
+2. NEVER infer or guess what a rule condition checks or what an action does based on its name alone. Rule condition and action settings are not included — only component type metadata is available.
+
+3. NEVER compare installed extension versions against current release versions. You have no access to the extension marketplace and cannot determine whether a version is current or outdated. State only what version is installed.
+
+4. NEVER state definitively that a component "does not exist." The property_context is read from the DEPLOYED container (window._satellite._container) — it only reflects what is published and active. DISABLED rules are excluded. If a named component is not present, say it is not visible in the deployed container — it may be disabled, unpublished, or may not exist.
+
+5. The "enabled" status of rules is not a reliable field. All rules present in the context are active by definition.
+
+6. Custom code content is not included — only metadata (name, type, extension). If asked about code inside a component, say it is not available.
+
+7. If property_context includes any field named "data_note", "note_rules", or "note_de", treat it as a system constraint and always surface it before giving counts or lists.
+
+8. property_context.unusedDataElements is a pre-computed list of data element names NOT referenced in any rule (directly or transitively). Use this field directly to answer "which/how many data elements are unused" — do NOT attempt to compute this yourself from the dataElements array. If unusedDataElements is present, trust it as authoritative.
+
+9. Each data element entry has a usedInRules boolean. true = used in at least one rule. false = unused. Use these flags when the user asks about used or unused data elements.
+
+10. TWO PRE-COMPUTED USAGE FIELDS — each data element has two ready-to-use answer strings. Output them VERBATIM — do not paraphrase or re-derive from any other field:
+    - "ruleUsageText": use this when asked "which rules / how many rules use [DE]?" — lists the rules and their dependency chain. If absent, say "No rules reference this data element."
+    - "deUsageText": use this when asked "which data elements / how many data elements reference [DE]?" — lists the other DEs that include this DE in their settings. If absent, say "No other data elements reference this data element."
+    These two questions are different. Do not confuse them. "Which rules use X?" → ruleUsageText. "Which data elements reference X?" → deUsageText.
+
+━━━ MISSING OR MALFORMED CONTEXT ━━━
+
+If property_context is missing, empty, or does not contain the fields needed to answer the question, respond:
+"I can't see your property data right now — try refreshing the page and opening TagScanner again."
+Do not attempt to answer from general knowledge when property-specific data is required.
+
+━━━ SCOPE ━━━
+
+You answer questions about the user's Adobe Tags property and general Adobe Tags / AEP knowledge (e.g. how data layers work, what XDM is, best practices).
+
+If a question is completely unrelated to Adobe Tags, tag management, or digital analytics, respond:
+"That's outside what I can help with here — I'm focused on your Adobe Tags property. Ask me about your rules, data elements, extensions, or implementation health."
+
+━━━ MULTI-TURN CONTEXT ━━━
+
+- Each user message contains a fresh property_context. Use only the property_context from the CURRENT message for all factual lookups.
+- Prior turns are for conversational continuity only — never carry forward rule names, data element names, or counts from earlier turns.
+- If the user references a component mentioned in a prior turn, re-validate it against the current property_context before responding. If it is no longer present, say so.
+
+━━━ NAME MATCHING ━━━
+
+Use substring (contains) matching when looking up components by name. If the user asks about "CRM Campaign ID", match any data element or rule whose name contains that string — including "CRM Campaign ID (utm_campaign)". Include all matches in your answer.
+
+When you find both exact and partial/extended matches, group them transparently:
+- If all matches are exact: just list them.
+- If some matches are partial (the search term is a substring of a longer name): list all, and note which ones are exact matches and which contain the search term as part of a longer name. Example: "'CRM Campaign ID' — exact match" vs. "'CRM Campaign ID (utm_campaign)' — contains search term".
+
+If the user asks about a name that matches no component at all (no exact, no substring), say the component is not visible in the deployed container.
+
+━━━ OUTPUT FORMAT ━━━
+
+Match the format to the question type. If a question spans multiple types, lead with the factual answer, then the diagnostic finding — never reversed.
+
+- Factual lookup ("how many rules?", "which extensions?"): give the count AND a "-" list of every matching name. Never answer a count question without listing what was counted.
 - Diagnostic ("any unused components?", "rules without conditions?"): finding first → impact on the property → what to address (only if asked)
 - Explanation ("what does this rule do?", "how does this DE work?"): what it does → how it works → what it feeds or affects
-- Health / risk ("biggest risks?", "what should I clean up?"): ranked "-" list, lead each item with the severity or component name
+- Health / risk ("biggest risks?", "what should I clean up?"): ranked "-" list, lead each item with severity or component name
+- Follow-up / clarification ("why?", "can you explain that?"): answer only what was asked, using prior turns for context but re-validating all component references against the current property_context
 
-How to respond:
-1. Answer directly and accurately from the data in property_context. Never invent or guess rule names, extension names, or data element names.
-2. Be concise — give the factual answer and stop. Do not add observations, recommendations, governance notes, or best-practice commentary unless the user explicitly asks for it.
-3. When listing items, use a "-" bulleted list. Keep lists scannable.
-4. NEVER truncate a list mid-item. If the complete list is very long (>60 items), show all items — do not abbreviate or add "... and N more". The user is inspecting their property and needs the complete data.
-5. If the property_context does not contain enough information to answer, say so clearly — do not guess or fabricate.
-6. Do NOT return JSON. Return plain text only.
-7. Tone: friendly and professional, like a senior consultant. Avoid filler phrases like "Great question!" or "Certainly!".
-8. End every response with a horizontal divider followed by the feedback line, formatted exactly as:
+━━━ HOW TO RESPOND ━━━
 
----
-Was this helpful? Use the 👍 👎 buttons below to rate this response — your feedback helps improve TagScanner AI.`;
+1. Answer directly and accurately from the current message's property_context. If a named component is not present, say it is not visible in the deployed container — do not say it does not exist.
+2. Reason internally — do not show intermediate reasoning steps in your response. Output only the conclusion.
+3. For questions requiring set intersection (e.g. "rules that use both X and Y"): reason internally — first identify rules using X, then rules using Y, then output only the overlap.
+4. Identify the question type before answering — these three are different:
+   a) NAME LISTING — "how many data elements have/contain/named X?", "which data elements have X in the name?", "list data elements with X": scan the dataElements array for DEs whose name contains X as a substring, list them all with their count. Do NOT use ruleUsageText or deUsageText for this — just list matching DE names.
+   b) RULE DEPENDENCY — "which rules / how many rules use [DE]?" → find the exact DE, output its "ruleUsageText" verbatim.
+   c) DE DEPENDENCY — "which data elements reference/refer to [DE]?" → find the exact DE, output its "deUsageText" verbatim.
+   The word "have" almost always signals type (a) — a name search, not a dependency lookup.
+5. Never reference internal field names like "property_context", "data_note", or JSON keys. Use plain language: "your property", "the data I can see".
+6. When listing items, use a "-" bulleted list. Keep lists scannable.
+7. NEVER truncate a list. If the complete list is very long (>60 items), show all items — do not abbreviate or add "... and N more". The user is inspecting their property and needs the complete data.
+8. If the current property_context does not contain enough information to answer, say so clearly — do not guess or fabricate.
+9. Return plain text only — no JSON, no markdown code blocks.`;
 
 // Multi-turn version of invokeClaude — takes a messages array instead of a single string
 async function invokeClaudeChat(messages, maxTokens) {
@@ -517,11 +583,13 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
   }
 
   // Cache check — only for standalone (first-turn) questions with no prior history
+  // PROMPT_VERSION: bump this string whenever CHAT_SYSTEM_PROMPT changes to bust stale cache entries
+  const CHAT_PROMPT_VERSION = 'v13';
   let chatCacheKey = null;
   if (cleanHistory.length === 0) {
     const ctxHash = nodeCrypto.createHash('sha256').update(JSON.stringify(propertyContext)).digest('hex').slice(0, 8);
     chatCacheKey = 'chat#' + nodeCrypto.createHash('sha256')
-      .update(question.trim().toLowerCase() + '|' + propertyKey + '|' + ctxHash)
+      .update(question.trim().toLowerCase() + '|' + propertyKey + '|' + ctxHash + '|' + CHAT_PROMPT_VERSION)
       .digest('hex').slice(0, 16);
 
     const cached = await getChatCache(chatCacheKey);
@@ -580,7 +648,7 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     tokens:    { input: result.inputTokens, output: result.outputTokens },
     queryId:   queryId || null,
     chatCount: effectiveLimit === Infinity ? null : newBetaCount,
-    chatLimit: effectiveLimit === Infinity ? null : effectiveLimit
+    chatLimit: effectiveLimit === Infinity ? null : effectiveLimit,
   });
 }
 
@@ -824,7 +892,10 @@ async function handleDetail(body) {
   if (!session) return resp(401, { error: 'Invalid or expired session. Please sign in again.' });
   if (!queryId)  return resp(400, { error: 'Missing queryId.' });
 
-  // ownerId lets property-scoped history views fetch another user's query result
+  // ownerId lets admin fetch another user's query result
+  if (ownerId && (!ADMIN_EMAIL || session.email.toLowerCase() !== ADMIN_EMAIL)) {
+    return resp(403, { error: 'Admin access required.' });
+  }
   const lookupUserId = ownerId || session.userId;
 
   try {
@@ -1136,6 +1207,31 @@ async function handleUsers(body) {
       s.totalOutputTokens += (q.tokens && q.tokens.output) || 0;
     }
 
+    // Stitch anonymous rows into authenticated users where clientId matches.
+    // An anon#<clientId> row represents the same device before sign-in — merge
+    // its properties/sites/visits into the real user so the dashboard shows one row.
+    const clientIdToUserId = {};
+    for (const [uid, s] of Object.entries(statsMap)) {
+      if (!uid.startsWith('anon#') && s.clientId) {
+        clientIdToUserId[s.clientId] = uid;
+      }
+    }
+    const stitchedAnonIds = new Set();
+    for (const [uid, s] of Object.entries(statsMap)) {
+      if (!uid.startsWith('anon#')) continue;
+      const anonClientId = uid.slice(5);
+      const realUserId   = clientIdToUserId[anonClientId];
+      if (realUserId && statsMap[realUserId]) {
+        const r = statsMap[realUserId];
+        s.properties.forEach(p    => r.properties.add(p));
+        s.sites.forEach(site      => r.sites.add(site));
+        r.totalVisits   += s.totalVisits;
+        r.totalQueries  += s.totalQueries;
+        if (s.lastActive && (!r.lastActive || s.lastActive > r.lastActive)) r.lastActive = s.lastActive;
+        stitchedAnonIds.add(uid);
+      }
+    }
+
     // Merge stats into user records (authenticated users from users table)
     const users = (usersResult.Items || []).map(u => {
       const s = statsMap[u.userId];
@@ -1159,7 +1255,7 @@ async function handleUsers(body) {
     // Add anonymous-only rows (anon#<clientId> keys, not in users table)
     const knownUserIds = new Set((usersResult.Items || []).map(u => u.userId));
     for (const [uid, s] of Object.entries(statsMap)) {
-      if (!uid.startsWith('anon#') || knownUserIds.has(uid)) continue;
+      if (!uid.startsWith('anon#') || knownUserIds.has(uid) || stitchedAnonIds.has(uid)) continue;
       users.push({
         userId:      uid,
         email:       '',
@@ -1550,8 +1646,15 @@ exports.handler = async (event) => {
       if (!payload) return resp(400, { error: 'Missing payload for scan.' });
 
       const userMsg      = JSON.stringify({ user_context: userContext || {}, property_health: payload });
-      const result       = await invokeAnthropicDirect(SCAN_SYSTEM_PROMPT, userMsg, MAX_TOKENS_SCAN);
-      const report       = parseJSON(result.text);
+      const maxTokens    = computeScanTokens(payload);
+      const result       = await invokeAnthropicDirect(SCAN_SYSTEM_PROMPT, userMsg, maxTokens);
+      let report;
+      try {
+        report = parseJSON(result.text);
+      } catch (parseErr) {
+        console.error('Scan parse error:', parseErr.message, '| tokens used:', result.outputTokens, '| raw snippet:', result.text.slice(0, 300));
+        return resp(500, { error: 'the AI response was incomplete. This can happen with very large properties — please try again or reach out to tagscannerfeedback@gmail.com' });
+      }
       const propertyName = (payload.property && payload.property.name)        || 'Unknown property';
       const environment  = (payload.property && payload.property.environment) || 'Production';
       const siteUrl      = (payload.property && payload.property.url)         || '';

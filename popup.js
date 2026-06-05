@@ -354,7 +354,7 @@ chrome.runtime.onMessage.addListener(function (message) {
       }
 
       // Session ping — records website + property; includes sessionToken if signed in
-      (function () {
+      function sendSessionPing(hostname, propName, env) {
         var _devId = sessionStorage.getItem('ts_device_id');
         if (!_devId) return;
         var _sessionToken = '';
@@ -368,10 +368,19 @@ chrome.runtime.onMessage.addListener(function (message) {
           fetch('https://ihn2pz2dbcktbxvn36g6pfptda0jfnri.lambda-url.us-east-1.on.aws/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'session_ping', clientId: _devId, sessionToken: _sessionToken || null, siteHostname: scanHostname, propertyName: propertyName, environment: envName })
+            body: JSON.stringify({ type: 'session_ping', clientId: _devId, sessionToken: _sessionToken || null, siteHostname: hostname, propertyName: propName, environment: env })
           }).catch(function () {});
         } catch (_) {}
-      }());
+      }
+      sendSessionPing(scanHostname, propertyName, envName);
+
+      // Re-ping when user signs in from any iframe — stitches the anonymous visit
+      // to the now-authenticated user without requiring a rescan
+      window.addEventListener('storage', function (e) {
+        if (e.key === 'tagscanner_session' && e.newValue) {
+          sendSessionPing(scanHostname, propertyName, envName);
+        }
+      });
 
       document.getElementById('property_name').textContent =
         'PROPERTY NAME: ' + propertyName;

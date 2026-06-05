@@ -38,78 +38,112 @@
 
 'use strict';
 
-const { BedrockRuntimeClient, InvokeModelCommand } = require('@aws-sdk/client-bedrock-runtime');
-const { DynamoDBClient }                           = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand, GetCommand, UpdateCommand, QueryCommand, ScanCommand, BatchWriteCommand } = require('@aws-sdk/lib-dynamodb');
-const { SNSClient, PublishCommand: SNSPublishCommand } = require('@aws-sdk/client-sns');
+const {
+  BedrockRuntimeClient,
+  InvokeModelCommand,
+} = require('@aws-sdk/client-bedrock-runtime');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const {
+  DynamoDBDocumentClient,
+  PutCommand,
+  GetCommand,
+  UpdateCommand,
+  QueryCommand,
+  ScanCommand,
+  BatchWriteCommand,
+} = require('@aws-sdk/lib-dynamodb');
+const {
+  SNSClient,
+  PublishCommand: SNSPublishCommand,
+} = require('@aws-sdk/client-sns');
 const nodeCrypto = require('node:crypto');
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const SNS_TOPIC_ARN  = (process.env.SNS_TOPIC_ARN || '').trim();
-const ALERT_PCT      = 0.75; // send alert when daily cost crosses this fraction of the limit
+const SNS_TOPIC_ARN = (process.env.SNS_TOPIC_ARN || '').trim();
+const ALERT_PCT = 0.75; // send alert when daily cost crosses this fraction of the limit
 
-const MODEL_ID       = process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-3-5-haiku-20241022-v1:0';
-const REGION         = process.env.BEDROCK_REGION   || process.env.AWS_REGION || 'us-east-1';
-const USERS_TABLE    = (process.env.USERS_TABLE    || 'tagscanner_users').trim();
-const SESSIONS_TABLE = (process.env.SESSIONS_TABLE || 'tagscanner_sessions').trim();
-const QUERIES_TABLE  = (process.env.QUERIES_TABLE  || 'tagscanner_queries').trim();
-const ALLOWLIST      = (process.env.ALLOWED_EMAILS || '')
-  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
-const ADMIN_EMAIL    = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+const MODEL_ID =
+  process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-3-5-haiku-20241022-v1:0';
+const REGION =
+  process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
+const USERS_TABLE = (process.env.USERS_TABLE || 'tagscanner_users').trim();
+const SESSIONS_TABLE = (
+  process.env.SESSIONS_TABLE || 'tagscanner_sessions'
+).trim();
+const QUERIES_TABLE = (
+  process.env.QUERIES_TABLE || 'tagscanner_queries'
+).trim();
+const ALLOWLIST = (process.env.ALLOWED_EMAILS || '')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 
 const MAX_TOKENS_EXPLAIN = 1000;
-const MAX_TOKENS_CHAT    = 2500;
+const MAX_TOKENS_CHAT = 2500;
 
 function computeScanTokens(payload) {
   const rules = (payload && payload.rules && payload.rules.total) || 0;
-  const de    = (payload && payload.data_elements && payload.data_elements.total) || 0;
-  return Math.min(4000, Math.max(2500, 2500 + (rules * 10) + (de * 5)));
+  const de =
+    (payload && payload.data_elements && payload.data_elements.total) || 0;
+  return Math.min(4000, Math.max(2500, 2500 + rules * 10 + de * 5));
 }
 
 const bedrockClient = new BedrockRuntimeClient({ region: REGION });
 
-const ddbClient  = new DynamoDBClient({ region: REGION });
-const ddb        = DynamoDBDocumentClient.from(ddbClient);
-const snsClient  = SNS_TOPIC_ARN ? new SNSClient({ region: REGION }) : null;
+const ddbClient = new DynamoDBClient({ region: REGION });
+const ddb = DynamoDBDocumentClient.from(ddbClient);
+const snsClient = SNS_TOPIC_ARN ? new SNSClient({ region: REGION }) : null;
 
 // ── Rate limiting (DynamoDB-backed, global across all Lambda instances) ──────
 
-const RATE_TABLE        = (process.env.RATE_TABLE        || 'tagscanner_ratelimits').trim();
-const CONFIG_TABLE      = (process.env.CONFIG_TABLE      || 'tagscanner_config').trim();
-const SCAN_CACHE_TABLE    = (process.env.SCAN_CACHE_TABLE    || 'tagscanner_scan_cache').trim();
-const EXPLAIN_CACHE_TABLE = (process.env.EXPLAIN_CACHE_TABLE || 'tagscanner_explain_cache').trim();
-const FEEDBACK_TABLE      = (process.env.FEEDBACK_TABLE      || 'tagscanner_feedback').trim();
+const RATE_TABLE = (process.env.RATE_TABLE || 'tagscanner_ratelimits').trim();
+const CONFIG_TABLE = (process.env.CONFIG_TABLE || 'tagscanner_config').trim();
+const SCAN_CACHE_TABLE = (
+  process.env.SCAN_CACHE_TABLE || 'tagscanner_scan_cache'
+).trim();
+const EXPLAIN_CACHE_TABLE = (
+  process.env.EXPLAIN_CACHE_TABLE || 'tagscanner_explain_cache'
+).trim();
+const FEEDBACK_TABLE = (
+  process.env.FEEDBACK_TABLE || 'tagscanner_feedback'
+).trim();
 const QUERIES_PROPERTY_INDEX = 'propertyKey-createdAt-index';
-const DAILY_CAP         = parseInt(process.env.DAILY_REQUEST_CAP  || '20', 10);
-const DEFAULT_COST_LIMIT = parseFloat(process.env.DEFAULT_COST_LIMIT_USD || '5.00');
+const DAILY_CAP = parseInt(process.env.DAILY_REQUEST_CAP || '20', 10);
+const DEFAULT_COST_LIMIT = parseFloat(
+  process.env.DEFAULT_COST_LIMIT_USD || '5.00',
+);
 
 // AWS Bedrock Claude 3.5 Haiku pricing (explain + chat)
-const COST_INPUT_PER_TOKEN  = 1.00 / 1e6;   // $1.00 per 1M input tokens
-const COST_OUTPUT_PER_TOKEN = 5.00 / 1e6;   // $5.00 per 1M output tokens
+const COST_INPUT_PER_TOKEN = 1.0 / 1e6; // $1.00 per 1M input tokens
+const COST_OUTPUT_PER_TOKEN = 5.0 / 1e6; // $5.00 per 1M output tokens
 
 // Anthropic API Claude Sonnet 4.6 pricing (scan only)
-const ANTHROPIC_API_KEY          = (process.env.ANTHROPIC_API_KEY || '').trim();
-const SCAN_MODEL_ID              = 'claude-sonnet-4-6';
-const COST_SCAN_INPUT_PER_TOKEN  = 3.00 / 1e6;   // $3.00 per 1M input tokens
-const COST_SCAN_OUTPUT_PER_TOKEN = 15.00 / 1e6;  // $15.00 per 1M output tokens
+const ANTHROPIC_API_KEY = (process.env.ANTHROPIC_API_KEY || '').trim();
+const SCAN_MODEL_ID = 'claude-sonnet-4-6';
+const COST_SCAN_INPUT_PER_TOKEN = 3.0 / 1e6; // $3.00 per 1M input tokens
+const COST_SCAN_OUTPUT_PER_TOKEN = 15.0 / 1e6; // $15.00 per 1M output tokens
 
 // Returns true if the caller should be blocked.
 // Uses a DynamoDB item with a TTL of 24 h and an atomic counter.
 async function isRateLimited(userId) {
   const windowKey = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
-  const pk        = userId + '#' + windowKey;
-  const ttl       = Math.floor(Date.now() / 1000) + 25 * 60 * 60; // expire after 25 h
+  const pk = userId + '#' + windowKey;
+  const ttl = Math.floor(Date.now() / 1000) + 25 * 60 * 60; // expire after 25 h
 
   try {
-    const result = await ddb.send(new UpdateCommand({
-      TableName:                 RATE_TABLE,
-      Key:                       { pk },
-      UpdateExpression:          'SET #c = if_not_exists(#c, :zero) + :one, #ttl = if_not_exists(#ttl, :ttl)',
-      ExpressionAttributeNames:  { '#c': 'count', '#ttl': 'ttl' },
-      ExpressionAttributeValues: { ':zero': 0, ':one': 1, ':ttl': ttl },
-      ReturnValues:              'ALL_NEW'
-    }));
+    const result = await ddb.send(
+      new UpdateCommand({
+        TableName: RATE_TABLE,
+        Key: { pk },
+        UpdateExpression:
+          'SET #c = if_not_exists(#c, :zero) + :one, #ttl = if_not_exists(#ttl, :ttl)',
+        ExpressionAttributeNames: { '#c': 'count', '#ttl': 'ttl' },
+        ExpressionAttributeValues: { ':zero': 0, ':one': 1, ':ttl': ttl },
+        ReturnValues: 'ALL_NEW',
+      }),
+    );
     return (result.Attributes.count || 0) > DAILY_CAP;
   } catch (err) {
     // If the rate-limit table is unavailable, fail open (don't block the user)
@@ -125,8 +159,10 @@ const BETA_CHAT_LIMIT = 10;
 async function getChatBetaCount(userId, propertyKey) {
   const pk = 'chatbeta#' + userId + '#' + propertyKey;
   try {
-    const result = await ddb.send(new GetCommand({ TableName: RATE_TABLE, Key: { pk } }));
-    return result.Item ? (result.Item.count || 0) : 0;
+    const result = await ddb.send(
+      new GetCommand({ TableName: RATE_TABLE, Key: { pk } }),
+    );
+    return result.Item ? result.Item.count || 0 : 0;
   } catch (err) {
     console.error('getChatBetaCount error:', err.message);
     return 0;
@@ -136,14 +172,16 @@ async function getChatBetaCount(userId, propertyKey) {
 async function incrementChatBetaCount(userId, propertyKey) {
   const pk = 'chatbeta#' + userId + '#' + propertyKey;
   try {
-    const result = await ddb.send(new UpdateCommand({
-      TableName:                 RATE_TABLE,
-      Key:                       { pk },
-      UpdateExpression:          'ADD #c :one',
-      ExpressionAttributeNames:  { '#c': 'count' },
-      ExpressionAttributeValues: { ':one': 1 },
-      ReturnValues:              'ALL_NEW'
-    }));
+    const result = await ddb.send(
+      new UpdateCommand({
+        TableName: RATE_TABLE,
+        Key: { pk },
+        UpdateExpression: 'ADD #c :one',
+        ExpressionAttributeNames: { '#c': 'count' },
+        ExpressionAttributeValues: { ':one': 1 },
+        ReturnValues: 'ALL_NEW',
+      }),
+    );
     return result.Attributes.count || 0;
   } catch (err) {
     console.error('incrementChatBetaCount error:', err.message);
@@ -153,9 +191,13 @@ async function incrementChatBetaCount(userId, propertyKey) {
 
 async function getUserChatLimitOverride(userId) {
   try {
-    const result = await ddb.send(new GetCommand({ TableName: USERS_TABLE, Key: { userId } }));
+    const result = await ddb.send(
+      new GetCommand({ TableName: USERS_TABLE, Key: { userId } }),
+    );
     if (!result.Item) return null;
-    return typeof result.Item.chat_limit_override === 'number' ? result.Item.chat_limit_override : null;
+    return typeof result.Item.chat_limit_override === 'number'
+      ? result.Item.chat_limit_override
+      : null;
   } catch (err) {
     return null;
   }
@@ -165,25 +207,51 @@ async function getUserChatLimitOverride(userId) {
 
 async function getAIConfig() {
   try {
-    const result = await ddb.send(new GetCommand({ TableName: CONFIG_TABLE, Key: { pk: 'global' } }));
-    if (!result.Item) return { ai_enabled: true, disabled_reason: '', cost_limit_usd: DEFAULT_COST_LIMIT, chat_question_limit: BETA_CHAT_LIMIT };
+    const result = await ddb.send(
+      new GetCommand({ TableName: CONFIG_TABLE, Key: { pk: 'global' } }),
+    );
+    if (!result.Item)
+      return {
+        ai_enabled: true,
+        disabled_reason: '',
+        cost_limit_usd: DEFAULT_COST_LIMIT,
+        chat_question_limit: BETA_CHAT_LIMIT,
+      };
     return {
-      ai_enabled:           result.Item.ai_enabled !== false,
-      disabled_reason:      result.Item.disabled_reason || '',
-      cost_limit_usd:       typeof result.Item.cost_limit_usd       === 'number' ? result.Item.cost_limit_usd       : DEFAULT_COST_LIMIT,
-      chat_question_limit:  typeof result.Item.chat_question_limit  === 'number' ? result.Item.chat_question_limit  : BETA_CHAT_LIMIT
+      ai_enabled: result.Item.ai_enabled !== false,
+      disabled_reason: result.Item.disabled_reason || '',
+      cost_limit_usd:
+        typeof result.Item.cost_limit_usd === 'number'
+          ? result.Item.cost_limit_usd
+          : DEFAULT_COST_LIMIT,
+      chat_question_limit:
+        typeof result.Item.chat_question_limit === 'number'
+          ? result.Item.chat_question_limit
+          : BETA_CHAT_LIMIT,
     };
   } catch (err) {
     console.error('getAIConfig error:', err.message);
-    return { ai_enabled: true, disabled_reason: '', cost_limit_usd: 5.00, chat_question_limit: BETA_CHAT_LIMIT };
+    return {
+      ai_enabled: true,
+      disabled_reason: '',
+      cost_limit_usd: 5.0,
+      chat_question_limit: BETA_CHAT_LIMIT,
+    };
   }
 }
 
 async function getTodayCost() {
   const windowKey = new Date().toISOString().slice(0, 10);
   try {
-    const result = await ddb.send(new GetCommand({ TableName: CONFIG_TABLE, Key: { pk: 'cost#' + windowKey } }));
-    return (result.Item && typeof result.Item.cost_usd === 'number') ? result.Item.cost_usd : 0;
+    const result = await ddb.send(
+      new GetCommand({
+        TableName: CONFIG_TABLE,
+        Key: { pk: 'cost#' + windowKey },
+      }),
+    );
+    return result.Item && typeof result.Item.cost_usd === 'number'
+      ? result.Item.cost_usd
+      : 0;
   } catch (err) {
     console.error('getTodayCost error:', err.message);
     return 0;
@@ -193,19 +261,22 @@ async function getTodayCost() {
 // Atomically increments today's cost; returns the new daily total.
 async function trackCost(inputTokens, outputTokens, inputRate, outputRate) {
   const windowKey = new Date().toISOString().slice(0, 10);
-  const inRate    = inputRate  !== undefined ? inputRate  : COST_INPUT_PER_TOKEN;
-  const outRate   = outputRate !== undefined ? outputRate : COST_OUTPUT_PER_TOKEN;
+  const inRate = inputRate !== undefined ? inputRate : COST_INPUT_PER_TOKEN;
+  const outRate = outputRate !== undefined ? outputRate : COST_OUTPUT_PER_TOKEN;
   const cost = inputTokens * inRate + outputTokens * outRate;
-  const ttl  = Math.floor(Date.now() / 1000) + 8 * 24 * 60 * 60; // keep 8 days
+  const ttl = Math.floor(Date.now() / 1000) + 8 * 24 * 60 * 60; // keep 8 days
   try {
-    const result = await ddb.send(new UpdateCommand({
-      TableName:                 CONFIG_TABLE,
-      Key:                       { pk: 'cost#' + windowKey },
-      UpdateExpression:          'ADD cost_usd :cost SET #ttl = if_not_exists(#ttl, :ttl)',
-      ExpressionAttributeNames:  { '#ttl': 'ttl' },
-      ExpressionAttributeValues: { ':cost': cost, ':ttl': ttl },
-      ReturnValues:              'ALL_NEW'
-    }));
+    const result = await ddb.send(
+      new UpdateCommand({
+        TableName: CONFIG_TABLE,
+        Key: { pk: 'cost#' + windowKey },
+        UpdateExpression:
+          'ADD cost_usd :cost SET #ttl = if_not_exists(#ttl, :ttl)',
+        ExpressionAttributeNames: { '#ttl': 'ttl' },
+        ExpressionAttributeValues: { ':cost': cost, ':ttl': ttl },
+        ReturnValues: 'ALL_NEW',
+      }),
+    );
     return (result.Attributes && result.Attributes.cost_usd) || 0;
   } catch (err) {
     console.error('trackCost error:', err.message);
@@ -216,11 +287,13 @@ async function trackCost(inputTokens, outputTokens, inputRate, outputRate) {
 async function publishSNSAlert(subject, message) {
   if (!snsClient || !SNS_TOPIC_ARN) return;
   try {
-    await snsClient.send(new SNSPublishCommand({
-      TopicArn: SNS_TOPIC_ARN,
-      Subject:  subject.slice(0, 100),
-      Message:  message
-    }));
+    await snsClient.send(
+      new SNSPublishCommand({
+        TopicArn: SNS_TOPIC_ARN,
+        Subject: subject.slice(0, 100),
+        Message: message,
+      }),
+    );
   } catch (err) {
     console.error('publishSNSAlert error:', err.message);
   }
@@ -229,13 +302,17 @@ async function publishSNSAlert(subject, message) {
 // Sends a 75% threshold alert once per day (deduped via RATE_TABLE).
 async function sendCostThresholdAlert(newCost, limit) {
   const windowKey = new Date().toISOString().slice(0, 10);
-  const alertKey  = 'alert_75pct#' + windowKey;
-  const ttl       = Math.floor(Date.now() / 1000) + 25 * 60 * 60;
+  const alertKey = 'alert_75pct#' + windowKey;
+  const ttl = Math.floor(Date.now() / 1000) + 25 * 60 * 60;
 
   try {
-    const existing = await ddb.send(new GetCommand({ TableName: RATE_TABLE, Key: { pk: alertKey } }));
+    const existing = await ddb.send(
+      new GetCommand({ TableName: RATE_TABLE, Key: { pk: alertKey } }),
+    );
     if (existing.Item) return; // already sent today
-    await ddb.send(new PutCommand({ TableName: RATE_TABLE, Item: { pk: alertKey, ttl } }));
+    await ddb.send(
+      new PutCommand({ TableName: RATE_TABLE, Item: { pk: alertKey, ttl } }),
+    );
   } catch (err) {
     console.error('sendCostThresholdAlert dedup error:', err.message);
   }
@@ -252,25 +329,38 @@ async function sendCostThresholdAlert(newCost, limit) {
       'Usage:         ' + pct + '%',
       '',
       'AI will be auto-disabled when spend reaches $' + limit.toFixed(2) + '.',
-      'To raise or lower the limit, use the TagScanner dashboard.'
-    ].join('\n')
+      'To raise or lower the limit, use the TagScanner dashboard.',
+    ].join('\n'),
   );
 }
 
 async function autoDisableAI(reason) {
   try {
-    await ddb.send(new UpdateCommand({
-      TableName:                 CONFIG_TABLE,
-      Key:                       { pk: 'global' },
-      UpdateExpression:          'SET #en = :f, disabled_reason = :dr',
-      ExpressionAttributeNames:  { '#en': 'ai_enabled' },
-      ExpressionAttributeValues: { ':f': false, ':dr': reason }
-    }));
-    console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'ai_auto_disabled', reason }));
+    await ddb.send(
+      new UpdateCommand({
+        TableName: CONFIG_TABLE,
+        Key: { pk: 'global' },
+        UpdateExpression: 'SET #en = :f, disabled_reason = :dr',
+        ExpressionAttributeNames: { '#en': 'ai_enabled' },
+        ExpressionAttributeValues: { ':f': false, ':dr': reason },
+      }),
+    );
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        event: 'ai_auto_disabled',
+        reason,
+      }),
+    );
     await publishSNSAlert(
       'TagScanner AI Auto-Disabled — Cost Limit Reached',
-      ['TagScanner AI has been automatically disabled.', '', 'Reason: ' + reason,
-       '', 'Re-enable via the TagScanner dashboard when ready.'].join('\n')
+      [
+        'TagScanner AI has been automatically disabled.',
+        '',
+        'Reason: ' + reason,
+        '',
+        'Re-enable via the TagScanner dashboard when ready.',
+      ].join('\n'),
     );
   } catch (err) {
     console.error('autoDisableAI error:', err.message);
@@ -279,14 +369,17 @@ async function autoDisableAI(reason) {
 
 // ── Adobe Analytics server-side tracking ─────────────────────────────────────
 
-const AA_RSID            = 'ageo1xxsintagscanner';
+const AA_RSID = 'ageo1xxsintagscanner';
 const AA_TRACKING_SERVER = 'adobeintriteshgupta.sc.omtrdc.net';
-const AA_ENDPOINT        = `https://${AA_TRACKING_SERVER}/b/ss/${AA_RSID}/0`;
-const AA_APP_VERSION     = '2.5.6';
+const AA_ENDPOINT = `https://${AA_TRACKING_SERVER}/b/ss/${AA_RSID}/0`;
+const AA_APP_VERSION = '2.5.6';
 
 function hashEmailSync(email) {
   if (!email) return '';
-  return nodeCrypto.createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
+  return nodeCrypto
+    .createHash('sha256')
+    .update(email.toLowerCase().trim())
+    .digest('hex');
 }
 
 // Fire-and-forget GET hit to the Adobe Analytics Data Insertion API.
@@ -296,19 +389,24 @@ function trackAA(params) {
   try {
     const base = {
       // ── Required ─────────────────────────────────────────────────────────
-      ce:  'UTF-8',                                  // character encoding
-      g:   'https://tagscanner-lambda',              // pageURL placeholder for server-side hits
-      ts:  new Date().toISOString(),                // ISO 8601 timestamp
+      ce: 'UTF-8', // character encoding
+      g: 'https://tagscanner-lambda', // pageURL placeholder for server-side hits
+      ts: new Date().toISOString(), // ISO 8601 timestamp
       // ── Recommended ──────────────────────────────────────────────────────
-      ch:  'TagScanner',                            // site section / channel
+      ch: 'TagScanner', // site section / channel
       // ── Custom dimensions ─────────────────────────────────────────────────
-      v4:  AA_APP_VERSION,                          // eVar4: app version
+      v4: AA_APP_VERSION, // eVar4: app version
     };
     const merged = Object.assign({}, base, params);
     if (merged.pev2 && !merged.v9) merged.v9 = merged.pev2;
     if (merged.pageName && !merged.v11) merged.v11 = merged.pageName;
     const qs = Object.keys(merged)
-      .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(merged[k] != null ? merged[k] : ''))
+      .map(
+        (k) =>
+          encodeURIComponent(k) +
+          '=' +
+          encodeURIComponent(merged[k] != null ? merged[k] : ''),
+      )
       .join('&');
     fetch(`${AA_ENDPOINT}?${qs}`, { method: 'GET' }).catch(() => {});
   } catch (_) {}
@@ -317,16 +415,16 @@ function trackAA(params) {
 // ── CORS ──────────────────────────────────────────────────────────────────────
 
 const CORS_HEADERS = {
-  'Content-Type':                 'application/json',
-  'Access-Control-Allow-Origin':  '*',
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 const resp = (status, body) => ({
   statusCode: status,
   headers: CORS_HEADERS,
-  body: JSON.stringify(body)
+  body: JSON.stringify(body),
 });
 
 // ── System prompts ────────────────────────────────────────────────────────────
@@ -417,88 +515,213 @@ Your primary mission is to help Adobe Tags implementers understand and improve t
 ━━━ INPUT FORMAT ━━━
 
 You will receive a JSON object with two fields:
-- "property_context": a structured summary of the user's Tags property (rules, data elements, extensions, property metadata)
+- "property_context": a structured summary of the user's Tags property
 - "question": the user's natural language question about their property
+
+━━━ PROPERTY CONTEXT FIELD REFERENCE — use these fields, in this order of preference ━━━
+
+property_context.property
+  name, environment, url — basic property metadata
+
+property_context.rules[]
+  name — rule name
+  events[] — trigger type + extension
+  conditions[] — condition type + extension (metadata only, no logic)
+  actions[] — action type + extension (metadata only, no logic)
+  hasCustomCode — boolean
+  dataElementRefs[] — TRANSITIVE list of all DE names this rule depends on (any depth)
+  directDataElementRefs[] — DIRECT %TOKEN% references only (one hop)
+
+property_context.dataElements[]
+  name, extension, type, storageDuration, hasCustomCode
+  usedInRules — boolean: true if this DE appears in any rule's transitive dependency set
+  references[] — DE names this DE directly references via %TOKEN% syntax
+  referencedByDEs[] — DE names that directly reference this DE
+  directlyUsedInRules[] — rule names that reference this DE directly
+  ruleUsageSummary — pre-computed usage breakdown:
+    direct[] — rules that reference this DE directly
+    transitive[] — objects: { rule, via[] } — rules that reach this DE through a chain; via[] is the full intermediate path
+    viaNameVariants[] — objects: { rule, variant, via[] } — rules that reach this DE via a name-substring match
+  ruleUsageText — pre-formatted prose describing all rule usage; USE THIS as the basis for "where is this DE used" answers
+  deUsageText — always present; describes this DE's usage from the DE perspective
+  nameVariants[] — other DE names that contain this DE's name as a case-insensitive substring
+
+property_context.extensions[]
+  name, displayName, hasSettings
+
+property_context.unusedDataElements[] — names of all DEs where usedInRules === false
+property_context.unusedDataElementCount — count of unused DEs
+property_context.data_note — always surface this before any counts or lists
+property_context.note_rules — present only when rules are truncated; always surface before listing rules
+property_context.note_de — present only when DEs are truncated; always surface before listing DEs
 
 ━━━ CRITICAL DATA LIMITATIONS — read in order, highest risk first ━━━
 
-1. NEVER infer or guess what a data element returns, does, or checks based on its name alone. A data element's actual return value and logic are not available — only its type and extension. Only state what the property_context explicitly shows.
+1. NEVER infer or guess what a data element returns, does, or checks based on its name alone. Only its type and extension are available. Only state what property_context explicitly shows.
 
-2. NEVER infer or guess what a rule condition checks or what an action does based on its name alone. Rule condition and action settings are not included — only component type metadata is available.
+2. NEVER infer or guess what a rule condition checks or what an action does based on its name alone. Only component type metadata is available.
 
-3. NEVER compare installed extension versions against current release versions. You have no access to the extension marketplace and cannot determine whether a version is current or outdated. State only what version is installed.
+3. NEVER compare installed extension versions against current release versions. You have no marketplace access. State only what version is installed.
 
-4. NEVER state definitively that a component "does not exist." The property_context is read from the DEPLOYED container (window._satellite._container) — it only reflects what is published and active. DISABLED rules are excluded. If a named component is not present, say it is not visible in the deployed container — it may be disabled, unpublished, or may not exist.
+4. NEVER state definitively that a component "does not exist." property_context is read from the DEPLOYED container only. DISABLED rules are excluded. If a component is not present, say it is not visible in the deployed container.
 
-5. The "enabled" status of rules is not a reliable field. All rules present in the context are active by definition.
+5. The "enabled" field on rules is not reliable. All rules present in the context are active by definition.
 
-6. Custom code content is not included — only metadata (name, type, extension). If asked about code inside a component, say it is not available.
+6. Custom code content is not included — only the hasCustomCode boolean. If asked about code inside a component, say it is not available.
 
-7. If property_context includes any field named "data_note", "note_rules", or "note_de", treat it as a system constraint and always surface it before giving counts or lists.
+7. If data_note, note_rules, or note_de are present, always surface them before giving counts or lists.
 
-8. property_context.unusedDataElements is a pre-computed list of data element names NOT referenced in any rule (directly or transitively). Use this field directly to answer "which/how many data elements are unused" — do NOT attempt to compute this yourself from the dataElements array. If unusedDataElements is present, trust it as authoritative.
+8. unusedDataElements is pre-computed and authoritative. Never recompute it from the dataElements array.
 
-9. Each data element entry has a usedInRules boolean. true = used in at least one rule. false = unused. Use these flags when the user asks about used or unused data elements.
-
-10. TWO PRE-COMPUTED USAGE FIELDS — each data element has two ready-to-use answer strings. Output them VERBATIM — do not paraphrase or re-derive from any other field:
-    - "ruleUsageText": use this when asked "which rules / how many rules use [DE]?" — lists the rules and their dependency chain. If absent, say "No rules reference this data element."
-    - "deUsageText": use this when asked "which data elements / how many data elements reference [DE]?" — lists the other DEs that include this DE in their settings. If absent, say "No other data elements reference this data element."
-    These two questions are different. Do not confuse them. "Which rules use X?" → ruleUsageText. "Which data elements reference X?" → deUsageText.
+9. ruleUsageSummary and ruleUsageText are pre-computed and authoritative for all DE usage questions. Never attempt to recompute DE-to-rule relationships manually.
 
 ━━━ MISSING OR MALFORMED CONTEXT ━━━
 
-If property_context is missing, empty, or does not contain the fields needed to answer the question, respond:
+If property_context is missing, empty, or lacks the fields needed to answer, respond:
 "I can't see your property data right now — try refreshing the page and opening TagScanner again."
-Do not attempt to answer from general knowledge when property-specific data is required.
+
+━━━ DEPENDENCY QUERY RESOLUTION ━━━
+
+For all questions about where a component is used, what depends on it, or what it depends on — always use the pre-computed fields. Never compute dependency chains manually.
+
+FINDING WHERE A DE IS USED
+Use ruleUsageText as the primary source. It is pre-formatted and covers direct use, transitive chains, and name-variant matches. Structure your answer as:
+- Direct use: rules in ruleUsageSummary.direct[]
+- Via chain: rules in ruleUsageSummary.transitive[], show the full via[] path for each: "Rule A (via DE Y → DE Z)"
+- Via name match: rules in ruleUsageSummary.viaNameVariants[], note it is a name-substring match, not a confirmed reference
+If ruleUsageText is present, use it as your basis and do not contradict it.
+
+FINDING WHICH DE REFERENCES A GIVEN DE — "which data element references X?" / "which DE contains X?" / "what references X?"
+This is a DE-to-DE reference query, not a rule query. Answer in this order:
+
+1. Look up X in dataElements[]. Find its referencedByDEs[] — these are the DEs that directly reference X via %TOKEN% syntax.
+2. If referencedByDEs[] is empty, say X is not directly referenced by any other data element.
+3. If referencedByDEs[] has entries, list them as the primary answer — these are the parent DEs.
+4. For each parent DE, show which rules use it via its ruleUsageSummary — these are the rules that indirectly depend on X through the chain.
+5. Format the complete answer exactly as:
+
+   "[X] is directly referenced by:
+   - [Parent DE 1] (Data Element)
+   - [Parent DE 2] (Data Element)
+
+   These data elements feed into the following rules:
+   - [Rule A] (Rule)
+   - [Rule B] (Rule)"
+
+   If property_context._keywordMatches.reverseDeResult is present, use reverseDeResult.referencedByDEs[] as the authoritative parent DE list. For each parent DE, look up that DE in dataElements[] and use its ruleUsageSummary to build the rules list.
+
+   Do not add a summary paragraph after the lists.
+   Do not repeat information already shown in the lists.
+   Stop after the rules list.
+   If referencedByDEs[] is empty, respond:
+   "[X] is not directly referenced by any other data element."
+
+Never skip the parent DE layer and jump straight to rules. The rules are secondary context, not the answer to the question.
+
+OUTPUT FORMAT FOR ALL DEPENDENCY / REFERENCE ANSWERS
+When a response lists more than one item, prefix each item with its component type in parentheses so the user knows what they are looking at:
+
+- [Component Name] (Data Element)
+- [Component Name] (Rule)
+- [Component Name] (Extension)
+
+Single-item answers do not need the type prefix if the type is already clear from the prose context.
+
+FINDING WHAT A RULE DEPENDS ON
+Use dataElementRefs[] for the full transitive set. Use directDataElementRefs[] for direct references only. If the user asks "what DEs does Rule X need?", list dataElementRefs[]. If they ask "what DEs does Rule X directly reference?", list directDataElementRefs[].
+
+IMPACT ANALYSIS — "what breaks if I delete X?"
+1. Find the DE named X in dataElements[]
+2. List its referencedByDEs[] — these DEs break directly
+3. For each DE in referencedByDEs[], check their ruleUsageSummary to find which rules are affected
+4. List the full blast radius: broken DEs and affected rules, with chain paths
+
+REVERSE TRAVERSAL — "what does DE X depend on?"
+Use references[] on DE X for direct dependencies. For each DE in references[], check their references[] recursively to find the full upstream chain. Report the full chain.
+
+CHAIN DEPTH
+Count hops from DE X through references[] recursively to find max depth. Report the longest chain and its path.
+
+━━━ EXACT vs PARTIAL NAME MATCHING ━━━
+
+SUBSTRING SEARCH — DEFAULT FOR ALL NAME-FILTER QUERIES
+If property_context._keywordMatches is present for this question, treat matchingDEs[] and matchingRules[] as the authoritative complete match list. Report the count and list every name. Do not search independently.
+
+When no _keywordMatches is present and a user asks which/how many components contain a word or keyword,
+follow these steps in order:
+
+STEP 1 — FLAT ARRAY SCAN FIRST, ALWAYS
+Before doing anything else, scan the complete dataElements[] array from index 0 to the end. Check every single entry. For each entry, check whether the entry's name field contains the search word as a case-insensitive substring. Build a complete match list from this scan.
+
+This scan is mandatory and must not be shortcut, skipped, or replaced by traversing dependency structures. It must cover:
+- DEs with usedInRules: true AND usedInRules: false
+- DEs with references AND DEs with no references
+- DEs that appear in ruleUsageSummary AND DEs that do not
+- DEs with referencedByDEs entries AND completely isolated DEs
+- DEs at the start, middle, or end of dependency chains
+
+STEP 2 — REPORT THE COMPLETE MATCH LIST
+List every DE found in step 1. Never omit a match because it is unused, isolated, or does not appear in any dependency structure.
+
+STEP 3 — THEN ANSWER THE QUESTION
+After listing all matches, answer whatever was asked.
+
+SUBSTRING RULES
+- Case-insensitive: "campaign" matches "Campaign", "CAMPAIGN", "S_Campaign"
+- Token-agnostic: match anywhere in the name regardless of separators (spaces, underscores, dashes, brackets)
+- No prefix requirement: "Campaign ID" must match even though "campaign" is at the start
+- No suffix requirement: "UTM Campaign" must match even though "campaign" is at the end
+- No adjacency requirement: "Form Name - Campaign - On Page Load" must match even though "campaign" is surrounded by dashes and spaces
+
+Correct result for keyword "campaign" against this property:
+6 matches — Campaign ID, CRM Campaign ID, CRM Campaign Name, Form Name - Campaign - On Page Load, S_Campaign, UTM Campaign
+
+Never return a count without listing every matched component.
+
+Exact match: user provides a full quoted name or asks "is there a [exact name]".
+- If found: use it.
+- If not found: say it is not visible in the deployed container. Do not fuzzy match silently.
+
+Name variant awareness: check nameVariants[] when a DE is not found by exact match — a DE with a similar name may exist. Surface it as a possible match, never as a confirmed one.
+
+Never silently pick the closest match. Always surface ambiguity.
 
 ━━━ SCOPE ━━━
 
 You answer questions about the user's Adobe Tags property and general Adobe Tags / AEP knowledge (e.g. how data layers work, what XDM is, best practices).
+
+Never reject questions that use shorthand like "DE" (data element), "rule", or "extension". Never reject "where is X used?", "what references X?", "which DE has X?", "which rules use X?", or any question that names a component or asks about dependencies — these are always in scope regardless of phrasing.
 
 If a question is completely unrelated to Adobe Tags, tag management, or digital analytics, respond:
 "That's outside what I can help with here — I'm focused on your Adobe Tags property. Ask me about your rules, data elements, extensions, or implementation health."
 
 ━━━ MULTI-TURN CONTEXT ━━━
 
-- Each user message contains a fresh property_context. Use only the property_context from the CURRENT message for all factual lookups.
-- Prior turns are for conversational continuity only — never carry forward rule names, data element names, or counts from earlier turns.
-- If the user references a component mentioned in a prior turn, re-validate it against the current property_context before responding. If it is no longer present, say so.
-
-━━━ NAME MATCHING ━━━
-
-Use substring (contains) matching when looking up components by name. If the user asks about "CRM Campaign ID", match any data element or rule whose name contains that string — including "CRM Campaign ID (utm_campaign)". Include all matches in your answer.
-
-When you find both exact and partial/extended matches, group them transparently:
-- If all matches are exact: just list them.
-- If some matches are partial (the search term is a substring of a longer name): list all, and note which ones are exact matches and which contain the search term as part of a longer name. Example: "'CRM Campaign ID' — exact match" vs. "'CRM Campaign ID (utm_campaign)' — contains search term".
-
-If the user asks about a name that matches no component at all (no exact, no substring), say the component is not visible in the deployed container.
+- Use only the property_context from the CURRENT message for all factual lookups
+- Prior turns are for conversational continuity only — never carry forward component names, counts, or findings from earlier turns
+- If the user references a component from a prior turn, re-validate it against the current property_context before responding. If it is no longer present, say so.
 
 ━━━ OUTPUT FORMAT ━━━
 
-Match the format to the question type. If a question spans multiple types, lead with the factual answer, then the diagnostic finding — never reversed.
+Match format to question type. If a question spans multiple types, lead with the factual answer, then the diagnostic finding — never reversed.
 
-- Factual lookup ("how many rules?", "which extensions?"): give the count AND a "-" list of every matching name. Never answer a count question without listing what was counted.
-- Diagnostic ("any unused components?", "rules without conditions?"): finding first → impact on the property → what to address (only if asked)
-- Explanation ("what does this rule do?", "how does this DE work?"): what it does → how it works → what it feeds or affects
-- Health / risk ("biggest risks?", "what should I clean up?"): ranked "-" list, lead each item with severity or component name
-- Follow-up / clarification ("why?", "can you explain that?"): answer only what was asked, using prior turns for context but re-validating all component references against the current property_context
+- Factual lookup ("how many rules?", "which extensions?"): count first, then a "-" list of every matching name. Never answer a count without listing what was counted.
+- Dependency / usage ("where is DE X used?"): use ruleUsageText as basis; structure as direct → transitive (with via path) → name variants
+- Impact analysis ("what breaks if I delete X?"): blast radius list — broken DEs first, then affected rules, with chain paths
+- Diagnostic ("any unused components?", "rules without conditions?"): finding → impact → what to address (only if asked)
+- Explanation ("what does this rule do?"): what it does → how it works → what it feeds
+- Health / risk ("biggest risks?"): ranked "-" list, lead each item with severity or component name
+- Follow-up ("why?", "explain that"): answer only what was asked, re-validate against current property_context
 
 ━━━ HOW TO RESPOND ━━━
 
-1. Answer directly and accurately from the current message's property_context. If a named component is not present, say it is not visible in the deployed container — do not say it does not exist.
-2. Reason internally — do not show intermediate reasoning steps in your response. Output only the conclusion.
-3. For questions requiring set intersection (e.g. "rules that use both X and Y"): reason internally — first identify rules using X, then rules using Y, then output only the overlap.
-4. Identify the question type before answering — these three are different:
-   a) NAME LISTING — "how many data elements have/contain/named X?", "which data elements have X in the name?", "list data elements with X": scan the dataElements array for DEs whose name contains X as a substring, list them all with their count. Do NOT use ruleUsageText or deUsageText for this — just list matching DE names.
-   b) RULE DEPENDENCY — "which rules / how many rules use [DE]?" → find the exact DE, output its "ruleUsageText" verbatim.
-   c) DE DEPENDENCY — "which data elements reference/refer to [DE]?" → find the exact DE, output its "deUsageText" verbatim.
-   The word "have" almost always signals type (a) — a name search, not a dependency lookup.
-5. Never reference internal field names like "property_context", "data_note", or JSON keys. Use plain language: "your property", "the data I can see".
-6. When listing items, use a "-" bulleted list. Keep lists scannable.
-7. NEVER truncate a list. If the complete list is very long (>60 items), show all items — do not abbreviate or add "... and N more". The user is inspecting their property and needs the complete data.
-8. If the current property_context does not contain enough information to answer, say so clearly — do not guess or fabricate.
-9. Return plain text only — no JSON, no markdown code blocks.`;
+1. Answer directly and accurately from the current message's property_context only.
+2. Reason internally — never show intermediate reasoning steps. Output only the conclusion.
+3. Never reference internal field names (property_context, ruleUsageSummary, data_note, JSON keys). Use plain language: "your property", "the data I can see".
+4. When listing items, use a "-" bulleted list. Keep lists scannable.
+5. NEVER truncate a list. Show all items regardless of length. Never add "... and N more".
+6. If property_context does not contain enough information to answer, say so — do not guess or fabricate.
+7. Return plain text only — no JSON, no markdown code blocks.`;
 
 // Multi-turn version of invokeClaude — takes a messages array instead of a single string
 async function invokeClaudeChat(messages, maxTokens) {
@@ -508,8 +731,11 @@ async function invokeClaudeChat(messages, maxTokens) {
   if (isNova) {
     bodyObj = {
       system: [{ text: CHAT_SYSTEM_PROMPT }],
-      messages: messages.map(m => ({ role: m.role, content: [{ text: m.content }] })),
-      inferenceConfig: { max_new_tokens: maxTokens, temperature: 0.3 }
+      messages: messages.map((m) => ({
+        role: m.role,
+        content: [{ text: m.content }],
+      })),
+      inferenceConfig: { max_new_tokens: maxTokens, temperature: 0.3 },
     };
   } else {
     bodyObj = {
@@ -517,7 +743,7 @@ async function invokeClaudeChat(messages, maxTokens) {
       max_tokens: maxTokens,
       temperature: 0.3,
       system: CHAT_SYSTEM_PROMPT,
-      messages: messages.map(m => ({ role: m.role, content: m.content }))
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
     };
   }
 
@@ -525,20 +751,29 @@ async function invokeClaudeChat(messages, maxTokens) {
     modelId: MODEL_ID,
     contentType: 'application/json',
     accept: 'application/json',
-    body: Buffer.from(JSON.stringify(bodyObj))
+    body: Buffer.from(JSON.stringify(bodyObj)),
   });
 
-  const raw  = await bedrockClient.send(cmd);
+  const raw = await bedrockClient.send(cmd);
   const data = JSON.parse(Buffer.from(raw.body).toString());
 
   const text = isNova
-    ? (data.output && data.output.message && data.output.message.content && data.output.message.content[0] && data.output.message.content[0].text || '')
-    : (data.content && data.content[0] && data.content[0].text || '');
+    ? (data.output &&
+        data.output.message &&
+        data.output.message.content &&
+        data.output.message.content[0] &&
+        data.output.message.content[0].text) ||
+      ''
+    : (data.content && data.content[0] && data.content[0].text) || '';
 
   return {
     text,
-    inputTokens:  isNova ? (data.usage && data.usage.inputTokens  || 0) : (data.usage && data.usage.input_tokens  || 0),
-    outputTokens: isNova ? (data.usage && data.usage.outputTokens || 0) : (data.usage && data.usage.output_tokens || 0)
+    inputTokens: isNova
+      ? (data.usage && data.usage.inputTokens) || 0
+      : (data.usage && data.usage.input_tokens) || 0,
+    outputTokens: isNova
+      ? (data.usage && data.usage.outputTokens) || 0
+      : (data.usage && data.usage.output_tokens) || 0,
   };
 }
 
@@ -557,76 +792,161 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
 
   // Build message history (last 4 exchanges = 8 messages max)
   const MAX_HISTORY = 8;
-  const cleanHistory = (Array.isArray(conversationHistory) ? conversationHistory : [])
+  const cleanHistory = (
+    Array.isArray(conversationHistory) ? conversationHistory : []
+  )
     .slice(-MAX_HISTORY)
-    .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-    .map(m => ({ role: m.role, content: m.content.slice(0, 3000) }));
+    .filter(
+      (m) =>
+        m &&
+        (m.role === 'user' || m.role === 'assistant') &&
+        typeof m.content === 'string',
+    )
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 3000) }));
 
-  const propertyName = (propertyContext.property && propertyContext.property.name) || 'Unknown';
-  const environment  = (propertyContext.property && propertyContext.property.environment) || '';
-  const propertyKey  = propertyName + (environment ? '#' + environment : '');
-  const siteUrl      = (propertyContext.property && propertyContext.property.url) || '';
+  const propertyName =
+    (propertyContext.property && propertyContext.property.name) || 'Unknown';
+  const environment =
+    (propertyContext.property && propertyContext.property.environment) || '';
+  const propertyKey = propertyName + (environment ? '#' + environment : '');
+  const siteUrl =
+    (propertyContext.property && propertyContext.property.url) || '';
 
   // Beta limit — skip for admin; apply global config limit (or per-user override if set)
-  const isAdminUser = ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL;
-  const limitOverride = isAdminUser ? -1 : await getUserChatLimitOverride(identity.userId);
+  const isAdminUser =
+    ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL;
+  const limitOverride = isAdminUser
+    ? -1
+    : await getUserChatLimitOverride(identity.userId);
   const globalLimit = aiConfig.chat_question_limit || BETA_CHAT_LIMIT;
-  const effectiveLimit = limitOverride === -1 ? Infinity : (limitOverride > 0 ? limitOverride : globalLimit);
-  const betaCount = (effectiveLimit === Infinity) ? 0 : await getChatBetaCount(identity.userId, propertyKey);
+  const effectiveLimit =
+    limitOverride === -1
+      ? Infinity
+      : limitOverride > 0
+        ? limitOverride
+        : globalLimit;
+  const betaCount =
+    effectiveLimit === Infinity
+      ? 0
+      : await getChatBetaCount(identity.userId, propertyKey);
   if (effectiveLimit !== Infinity && betaCount >= effectiveLimit) {
     return resp(429, {
-      error: 'Beta question limit reached for this property (' + effectiveLimit + '/' + effectiveLimit + '). The limit resets when the beta period ends.',
+      error:
+        'Beta question limit reached for this property (' +
+        effectiveLimit +
+        '/' +
+        effectiveLimit +
+        '). The limit resets when the beta period ends.',
       betaLimitReached: true,
       chatCount: betaCount,
-      chatLimit: effectiveLimit
+      chatLimit: effectiveLimit,
     });
   }
 
   // Cache check — only for standalone (first-turn) questions with no prior history
   // PROMPT_VERSION: bump this string whenever CHAT_SYSTEM_PROMPT changes to bust stale cache entries
-  const CHAT_PROMPT_VERSION = 'v13';
+  const CHAT_PROMPT_VERSION = 'v20';
   let chatCacheKey = null;
   if (cleanHistory.length === 0) {
-    const ctxHash = nodeCrypto.createHash('sha256').update(JSON.stringify(propertyContext)).digest('hex').slice(0, 8);
-    chatCacheKey = 'chat#' + nodeCrypto.createHash('sha256')
-      .update(question.trim().toLowerCase() + '|' + propertyKey + '|' + ctxHash + '|' + CHAT_PROMPT_VERSION)
-      .digest('hex').slice(0, 16);
+    const ctxHash = nodeCrypto
+      .createHash('sha256')
+      .update(JSON.stringify(propertyContext))
+      .digest('hex')
+      .slice(0, 8);
+    chatCacheKey =
+      'chat#' +
+      nodeCrypto
+        .createHash('sha256')
+        .update(
+          question.trim().toLowerCase() +
+            '|' +
+            propertyKey +
+            '|' +
+            ctxHash +
+            '|' +
+            CHAT_PROMPT_VERSION,
+        )
+        .digest('hex')
+        .slice(0, 16);
 
     const cached = await getChatCache(chatCacheKey);
     if (cached && cached.answer) {
-      console.log(JSON.stringify({ ts: new Date().toISOString(), userId: identity.userId, type: 'chat_cache_hit', chatCacheKey }));
-      const queryId = await logQuery(identity.userId, identity.email, session.name, 'chat',
+      console.log(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          userId: identity.userId,
+          type: 'chat_cache_hit',
+          chatCacheKey,
+        }),
+      );
+      const queryId = await logQuery(
+        identity.userId,
+        identity.email,
+        session.name,
+        'chat',
         'Chat: ' + question.trim().slice(0, 120),
         { input: 0, output: 0 },
         { question: question.trim(), answer: cached.answer },
-        propertyKey, siteUrl, clientId);
-      return resp(200, { answer: cached.answer, tokens: { input: 0, output: 0 }, queryId: queryId || null, fromCache: true });
+        propertyKey,
+        siteUrl,
+        clientId,
+      );
+      return resp(200, {
+        answer: cached.answer,
+        tokens: { input: 0, output: 0 },
+        queryId: queryId || null,
+        fromCache: true,
+      });
     }
   }
 
   // Current user turn embeds property context + question
   const userPayload = JSON.stringify({
     property_context: propertyContext,
-    question: question.trim().slice(0, 500)
+    question: question.trim().slice(0, 1000),
   });
 
   const messages = [...cleanHistory, { role: 'user', content: userPayload }];
 
-  trackAA({ vid: identity.userId, pageName: 'TagScanner:Ask AI', pe: 'lnk_o', pev2: 'Ask AI:Question', events: 'event2', v1: propertyName, v2: environment, v3: isAdminUser ? 'admin' : 'user', v5: 'Ask AI', v7: hashEmailSync(identity.email), v8: question.trim().slice(0, 255) });
+  trackAA({
+    vid: identity.userId,
+    pageName: 'TagScanner:Ask AI',
+    pe: 'lnk_o',
+    pev2: 'Ask AI:Question',
+    events: 'event2',
+    v1: propertyName,
+    v2: environment,
+    v3: isAdminUser ? 'admin' : 'user',
+    v5: 'Ask AI',
+    v7: hashEmailSync(identity.email),
+    v8: question.trim().slice(0, 255),
+  });
   const result = await invokeClaudeChat(messages, MAX_TOKENS_CHAT);
 
   const [queryId, newDayCost] = await Promise.all([
-    logQuery(identity.userId, identity.email, session.name, 'chat',
+    logQuery(
+      identity.userId,
+      identity.email,
+      session.name,
+      'chat',
       'Chat: ' + question.trim().slice(0, 120),
       { input: result.inputTokens, output: result.outputTokens },
       { question: question.trim(), answer: result.text },
-      propertyKey, siteUrl, clientId),
-    trackCost(result.inputTokens, result.outputTokens)
+      propertyKey,
+      siteUrl,
+      clientId,
+    ),
+    trackCost(result.inputTokens, result.outputTokens),
   ]);
 
   // Populate cache for future first-turn requests with the same question + property
   if (chatCacheKey) {
-    putChatCache(chatCacheKey, result.text, { input: result.inputTokens, output: result.outputTokens }, propertyKey).catch(() => {});
+    putChatCache(
+      chatCacheKey,
+      result.text,
+      { input: result.inputTokens, output: result.outputTokens },
+      propertyKey,
+    ).catch(() => {});
   }
 
   // Increment beta count (fire-and-forget for non-unlimited users)
@@ -639,14 +959,29 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(() => {});
   }
   if (newDayCost > aiConfig.cost_limit_usd) {
-    autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached.').catch(() => {});
+    autoDisableAI(
+      'Daily cost limit of $' +
+        aiConfig.cost_limit_usd.toFixed(2) +
+        ' reached.',
+    ).catch(() => {});
   }
 
-  trackAA({ vid: identity.userId, pageName: 'TagScanner:Ask AI', pe: 'lnk_o', pev2: 'Ask AI:Answer', events: 'event3', v1: propertyName, v2: environment, v3: isAdminUser ? 'admin' : 'user', v5: 'Ask AI', v7: hashEmailSync(identity.email) });
+  trackAA({
+    vid: identity.userId,
+    pageName: 'TagScanner:Ask AI',
+    pe: 'lnk_o',
+    pev2: 'Ask AI:Answer',
+    events: 'event3',
+    v1: propertyName,
+    v2: environment,
+    v3: isAdminUser ? 'admin' : 'user',
+    v5: 'Ask AI',
+    v7: hashEmailSync(identity.email),
+  });
   return resp(200, {
-    answer:    result.text,
-    tokens:    { input: result.inputTokens, output: result.outputTokens },
-    queryId:   queryId || null,
+    answer: result.text,
+    tokens: { input: result.inputTokens, output: result.outputTokens },
+    queryId: queryId || null,
     chatCount: effectiveLimit === Infinity ? null : newBetaCount,
     chatLimit: effectiveLimit === Infinity ? null : effectiveLimit,
   });
@@ -660,7 +995,7 @@ async function invokeClaude(systemPrompt, userMessage, maxTokens) {
     bodyObj = {
       system: [{ text: systemPrompt }],
       messages: [{ role: 'user', content: [{ text: userMessage }] }],
-      inferenceConfig: { max_new_tokens: maxTokens, temperature: 0.3 }
+      inferenceConfig: { max_new_tokens: maxTokens, temperature: 0.3 },
     };
   } else {
     bodyObj = {
@@ -668,7 +1003,7 @@ async function invokeClaude(systemPrompt, userMessage, maxTokens) {
       max_tokens: maxTokens,
       temperature: 0.3,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }]
+      messages: [{ role: 'user', content: userMessage }],
     };
   }
 
@@ -676,60 +1011,80 @@ async function invokeClaude(systemPrompt, userMessage, maxTokens) {
     modelId: MODEL_ID,
     contentType: 'application/json',
     accept: 'application/json',
-    body: Buffer.from(JSON.stringify(bodyObj))
+    body: Buffer.from(JSON.stringify(bodyObj)),
   });
 
-  const raw  = await bedrockClient.send(cmd);
+  const raw = await bedrockClient.send(cmd);
   const data = JSON.parse(Buffer.from(raw.body).toString());
 
   const text = isNova
-    ? (data.output && data.output.message && data.output.message.content && data.output.message.content[0] && data.output.message.content[0].text || '')
-    : (data.content && data.content[0] && data.content[0].text || '');
+    ? (data.output &&
+        data.output.message &&
+        data.output.message.content &&
+        data.output.message.content[0] &&
+        data.output.message.content[0].text) ||
+      ''
+    : (data.content && data.content[0] && data.content[0].text) || '';
 
   return {
     text,
-    inputTokens:  isNova ? (data.usage && data.usage.inputTokens  || 0) : (data.usage && data.usage.input_tokens  || 0),
-    outputTokens: isNova ? (data.usage && data.usage.outputTokens || 0) : (data.usage && data.usage.output_tokens || 0)
+    inputTokens: isNova
+      ? (data.usage && data.usage.inputTokens) || 0
+      : (data.usage && data.usage.input_tokens) || 0,
+    outputTokens: isNova
+      ? (data.usage && data.usage.outputTokens) || 0
+      : (data.usage && data.usage.output_tokens) || 0,
   };
 }
 
 async function invokeAnthropicDirect(systemPrompt, userMessage, maxTokens) {
-  if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY is not configured.');
+  if (!ANTHROPIC_API_KEY)
+    throw new Error('ANTHROPIC_API_KEY is not configured.');
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
-      'x-api-key':         ANTHROPIC_API_KEY,
+      'x-api-key': ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
-      'content-type':      'application/json'
+      'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model:       SCAN_MODEL_ID,
-      max_tokens:  maxTokens,
+      model: SCAN_MODEL_ID,
+      max_tokens: maxTokens,
       temperature: 0.3,
-      system:      systemPrompt,
-      messages:    [{ role: 'user', content: userMessage }]
-    })
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error('Anthropic API error ' + res.status + ': ' + ((err.error && err.error.message) || res.statusText));
+    throw new Error(
+      'Anthropic API error ' +
+        res.status +
+        ': ' +
+        ((err.error && err.error.message) || res.statusText),
+    );
   }
   const data = await res.json();
   return {
-    text:         (data.content && data.content[0] && data.content[0].text) || '',
-    inputTokens:  (data.usage && data.usage.input_tokens)  || 0,
-    outputTokens: (data.usage && data.usage.output_tokens) || 0
+    text: (data.content && data.content[0] && data.content[0].text) || '',
+    inputTokens: (data.usage && data.usage.input_tokens) || 0,
+    outputTokens: (data.usage && data.usage.output_tokens) || 0,
   };
 }
 
 function parseJSON(text) {
   const cleaned = text
-    .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/g, '').trim();
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/g, '')
+    .trim();
   return JSON.parse(cleaned);
 }
 
 function randomId(len) {
-  return Math.random().toString(36).slice(2, 2 + len);
+  return Math.random()
+    .toString(36)
+    .slice(2, 2 + len);
 }
 
 // ── DynamoDB helpers ──────────────────────────────────────────────────────────
@@ -737,10 +1092,12 @@ function randomId(len) {
 async function getSession(sessionToken) {
   if (!sessionToken) return null;
   try {
-    const result = await ddb.send(new GetCommand({
-      TableName: SESSIONS_TABLE,
-      Key: { sessionToken }
-    }));
+    const result = await ddb.send(
+      new GetCommand({
+        TableName: SESSIONS_TABLE,
+        Key: { sessionToken },
+      }),
+    );
     const session = result.Item;
     if (!session) return null;
     if (session.expiresAt < Math.floor(Date.now() / 1000)) return null;
@@ -751,32 +1108,47 @@ async function getSession(sessionToken) {
   }
 }
 
-async function logQuery(userId, email, userName, type, requestSummary, tokens, resultJson, propertyKey, siteUrl, clientId) {
+async function logQuery(
+  userId,
+  email,
+  userName,
+  type,
+  requestSummary,
+  tokens,
+  resultJson,
+  propertyKey,
+  siteUrl,
+  clientId,
+) {
   const queryId = new Date().toISOString() + '#' + randomId(8);
   let siteHostname = '';
-  try { siteHostname = siteUrl ? new URL(siteUrl).hostname : ''; } catch (_) {}
   try {
-    await ddb.send(new PutCommand({
-      TableName: QUERIES_TABLE,
-      Item: {
-        userId,
-        queryId,
-        type,
-        email,
-        userName:      userName    || '',
-        clientId:      clientId    || '',
-        propertyKey:   propertyKey || '',
-        siteUrl:       siteUrl     || '',
-        siteHostname:  siteHostname,
-        requestSummary,
-        tokens:        tokens      || {},
-        resultJson:    resultJson  || null,
-        hasResult:     resultJson  ? true : false,
-        feedback:      null,
-        feedbackText:  null,
-        createdAt:     new Date().toISOString()
-      }
-    }));
+    siteHostname = siteUrl ? new URL(siteUrl).hostname : '';
+  } catch (_) {}
+  try {
+    await ddb.send(
+      new PutCommand({
+        TableName: QUERIES_TABLE,
+        Item: {
+          userId,
+          queryId,
+          type,
+          email,
+          userName: userName || '',
+          clientId: clientId || '',
+          propertyKey: propertyKey || '',
+          siteUrl: siteUrl || '',
+          siteHostname: siteHostname,
+          requestSummary,
+          tokens: tokens || {},
+          resultJson: resultJson || null,
+          hasResult: resultJson ? true : false,
+          feedback: null,
+          feedbackText: null,
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    );
     return queryId;
   } catch (err) {
     console.error('logQuery error:', err.message);
@@ -788,7 +1160,12 @@ async function logQuery(userId, email, userName, type, requestSummary, tokens, r
 
 async function getCachedScan(cacheKey) {
   try {
-    const result = await ddb.send(new GetCommand({ TableName: SCAN_CACHE_TABLE, Key: { cache_key: cacheKey } }));
+    const result = await ddb.send(
+      new GetCommand({
+        TableName: SCAN_CACHE_TABLE,
+        Key: { cache_key: cacheKey },
+      }),
+    );
     return result.Item || null;
   } catch (err) {
     console.error('getCachedScan error:', err.message);
@@ -796,23 +1173,33 @@ async function getCachedScan(cacheKey) {
   }
 }
 
-async function putCachedScan(cacheKey, report, tokens, email, name, propertyName, environment) {
+async function putCachedScan(
+  cacheKey,
+  report,
+  tokens,
+  email,
+  name,
+  propertyName,
+  environment,
+) {
   const ttl = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // 30-day cleanup TTL
   try {
-    await ddb.send(new PutCommand({
-      TableName: SCAN_CACHE_TABLE,
-      Item: {
-        cache_key:       cacheKey,
-        report:          report,
-        tokens:          tokens,
-        cached_at:       new Date().toISOString(),
-        cached_by_email: email,
-        cached_by_name:  name || email,
-        property_name:   propertyName,
-        environment:     environment,
-        ttl:             ttl
-      }
-    }));
+    await ddb.send(
+      new PutCommand({
+        TableName: SCAN_CACHE_TABLE,
+        Item: {
+          cache_key: cacheKey,
+          report: report,
+          tokens: tokens,
+          cached_at: new Date().toISOString(),
+          cached_by_email: email,
+          cached_by_name: name || email,
+          property_name: propertyName,
+          environment: environment,
+          ttl: ttl,
+        },
+      }),
+    );
   } catch (err) {
     console.error('putCachedScan error:', err.message);
   }
@@ -822,7 +1209,12 @@ async function putCachedScan(cacheKey, report, tokens, email, name, propertyName
 
 async function getExplainCache(codeHash) {
   try {
-    const result = await ddb.send(new GetCommand({ TableName: EXPLAIN_CACHE_TABLE, Key: { code_hash: codeHash } }));
+    const result = await ddb.send(
+      new GetCommand({
+        TableName: EXPLAIN_CACHE_TABLE,
+        Key: { code_hash: codeHash },
+      }),
+    );
     return result.Item || null;
   } catch (err) {
     console.error('getExplainCache error:', err.message);
@@ -830,24 +1222,35 @@ async function getExplainCache(codeHash) {
   }
 }
 
-async function putExplainCache(codeHash, explanation, tokens, email, name, componentName, componentType, propertyKey) {
+async function putExplainCache(
+  codeHash,
+  explanation,
+  tokens,
+  email,
+  name,
+  componentName,
+  componentType,
+  propertyKey,
+) {
   const ttl = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
   try {
-    await ddb.send(new PutCommand({
-      TableName: EXPLAIN_CACHE_TABLE,
-      Item: {
-        code_hash:       codeHash,
-        explanation:     explanation,
-        tokens:          tokens,
-        cached_at:       new Date().toISOString(),
-        cached_by_email: email,
-        cached_by_name:  name || email,
-        component_name:  componentName || '',
-        component_type:  componentType || '',
-        property_key:    propertyKey || '',
-        ttl:             ttl
-      }
-    }));
+    await ddb.send(
+      new PutCommand({
+        TableName: EXPLAIN_CACHE_TABLE,
+        Item: {
+          code_hash: codeHash,
+          explanation: explanation,
+          tokens: tokens,
+          cached_at: new Date().toISOString(),
+          cached_by_email: email,
+          cached_by_name: name || email,
+          component_name: componentName || '',
+          component_type: componentType || '',
+          property_key: propertyKey || '',
+          ttl: ttl,
+        },
+      }),
+    );
   } catch (err) {
     console.error('putExplainCache error:', err.message);
   }
@@ -857,7 +1260,12 @@ async function putExplainCache(codeHash, explanation, tokens, email, name, compo
 
 async function getChatCache(cacheKey) {
   try {
-    const result = await ddb.send(new GetCommand({ TableName: SCAN_CACHE_TABLE, Key: { cache_key: cacheKey } }));
+    const result = await ddb.send(
+      new GetCommand({
+        TableName: SCAN_CACHE_TABLE,
+        Key: { cache_key: cacheKey },
+      }),
+    );
     return result.Item || null;
   } catch (err) {
     console.error('getChatCache error:', err.message);
@@ -868,17 +1276,19 @@ async function getChatCache(cacheKey) {
 async function putChatCache(cacheKey, answer, tokens, propertyKey) {
   const ttl = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7-day TTL
   try {
-    await ddb.send(new PutCommand({
-      TableName: SCAN_CACHE_TABLE,
-      Item: {
-        cache_key:   cacheKey,
-        answer:      answer,
-        tokens:      tokens,
-        cached_at:   new Date().toISOString(),
-        property_key: propertyKey || '',
-        ttl:         ttl
-      }
-    }));
+    await ddb.send(
+      new PutCommand({
+        TableName: SCAN_CACHE_TABLE,
+        Item: {
+          cache_key: cacheKey,
+          answer: answer,
+          tokens: tokens,
+          cached_at: new Date().toISOString(),
+          property_key: propertyKey || '',
+          ttl: ttl,
+        },
+      }),
+    );
   } catch (err) {
     console.error('putChatCache error:', err.message);
   }
@@ -889,20 +1299,28 @@ async function putChatCache(cacheKey, answer, tokens, propertyKey) {
 async function handleDetail(body) {
   const { sessionToken, queryId, ownerId } = body;
   const session = await getSession(sessionToken);
-  if (!session) return resp(401, { error: 'Invalid or expired session. Please sign in again.' });
-  if (!queryId)  return resp(400, { error: 'Missing queryId.' });
+  if (!session)
+    return resp(401, {
+      error: 'Invalid or expired session. Please sign in again.',
+    });
+  if (!queryId) return resp(400, { error: 'Missing queryId.' });
 
   // ownerId lets admin fetch another user's query result
-  if (ownerId && (!ADMIN_EMAIL || session.email.toLowerCase() !== ADMIN_EMAIL)) {
+  if (
+    ownerId &&
+    (!ADMIN_EMAIL || session.email.toLowerCase() !== ADMIN_EMAIL)
+  ) {
     return resp(403, { error: 'Admin access required.' });
   }
   const lookupUserId = ownerId || session.userId;
 
   try {
-    const result = await ddb.send(new GetCommand({
-      TableName: QUERIES_TABLE,
-      Key: { userId: lookupUserId, queryId }
-    }));
+    const result = await ddb.send(
+      new GetCommand({
+        TableName: QUERIES_TABLE,
+        Key: { userId: lookupUserId, queryId },
+      }),
+    );
     if (!result.Item) return resp(404, { error: 'Query not found.' });
     return resp(200, { item: result.Item });
   } catch (err) {
@@ -915,20 +1333,26 @@ async function handleDetail(body) {
 
 async function handleAuth(body, sourceIp) {
   const { googleAccessToken } = body;
-  if (!googleAccessToken) return resp(400, { error: 'Missing googleAccessToken' });
+  if (!googleAccessToken)
+    return resp(400, { error: 'Missing googleAccessToken' });
 
   // Rate-limit auth attempts by IP to prevent token-grinding
-  if (sourceIp && await isRateLimited('auth#' + sourceIp)) {
-    return resp(429, { error: 'Too many sign-in attempts. Please try again later.' });
+  if (sourceIp && (await isRateLimited('auth#' + sourceIp))) {
+    return resp(429, {
+      error: 'Too many sign-in attempts. Please try again later.',
+    });
   }
 
   // Verify token + get profile from Google
   let userInfo;
   try {
     const res = await fetch('https://www.googleapis.com/oauth2/v1/userinfo', {
-      headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+      headers: { Authorization: `Bearer ${googleAccessToken}` },
     });
-    if (!res.ok) return resp(401, { error: 'Invalid Google access token. Please sign in again.' });
+    if (!res.ok)
+      return resp(401, {
+        error: 'Invalid Google access token. Please sign in again.',
+      });
     userInfo = await res.json();
   } catch (err) {
     return resp(500, { error: 'Could not reach Google auth servers.' });
@@ -938,43 +1362,73 @@ async function handleAuth(body, sourceIp) {
     return resp(401, { error: 'Google account email is not verified.' });
   }
 
-  const userId  = userInfo.id;
-  const email   = userInfo.email;
-  const name    = userInfo.name || email;
+  const userId = userInfo.id;
+  const email = userInfo.email;
+  const name = userInfo.name || email;
   const picture = userInfo.picture || '';
 
   // Allowlist check (if configured)
   if (ALLOWLIST.length && !ALLOWLIST.includes(email.toLowerCase())) {
-    return resp(403, { error: 'Your email is not on the TagScanner AI Preview access list.' });
+    return resp(403, {
+      error: 'Your email is not on the TagScanner AI Preview access list.',
+    });
   }
 
   // Upsert user record
   try {
-    await ddb.send(new PutCommand({
-      TableName: USERS_TABLE,
-      Item: { userId, email, name, picture, createdAt: new Date().toISOString(), lastLoginAt: new Date().toISOString() }
-    }));
+    await ddb.send(
+      new PutCommand({
+        TableName: USERS_TABLE,
+        Item: {
+          userId,
+          email,
+          name,
+          picture,
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+        },
+      }),
+    );
   } catch (err) {
     console.error('upsert user error:', err.message);
   }
 
   // Create session (30-day TTL)
   const sessionToken = crypto.randomUUID();
-  const expiresAt    = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+  const expiresAt = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
   try {
-    await ddb.send(new PutCommand({
-      TableName: SESSIONS_TABLE,
-      Item: { sessionToken, userId, email, name, picture, expiresAt }
-    }));
+    await ddb.send(
+      new PutCommand({
+        TableName: SESSIONS_TABLE,
+        Item: { sessionToken, userId, email, name, picture, expiresAt },
+      }),
+    );
   } catch (err) {
     console.error('create session error:', err.message);
     return resp(500, { error: 'Could not create session. Please try again.' });
   }
 
   const isAdmin = ADMIN_EMAIL && email.toLowerCase() === ADMIN_EMAIL;
-  console.log(JSON.stringify({ ts: new Date().toISOString(), event: 'login', email }));
-  trackAA({ vid: userId, pageName: 'TagScanner:Server', pe: 'lnk_o', pev2: 'Auth:Sign In', events: 'event9', v3: isAdmin ? 'admin' : 'user', v7: hashEmailSync(email) });
-  return resp(200, { sessionToken, userId, email, name, picture, isAdmin: !!isAdmin });
+  console.log(
+    JSON.stringify({ ts: new Date().toISOString(), event: 'login', email }),
+  );
+  trackAA({
+    vid: userId,
+    pageName: 'TagScanner:Server',
+    pe: 'lnk_o',
+    pev2: 'Auth:Sign In',
+    events: 'event9',
+    v3: isAdmin ? 'admin' : 'user',
+    v7: hashEmailSync(email),
+  });
+  return resp(200, {
+    sessionToken,
+    userId,
+    email,
+    name,
+    picture,
+    isAdmin: !!isAdmin,
+  });
 }
 
 // ── History handler ───────────────────────────────────────────────────────────
@@ -982,7 +1436,10 @@ async function handleAuth(body, sourceIp) {
 async function handleHistory(body) {
   const { sessionToken, limit, lastKey, propertyKey, ownerId } = body;
   const session = await getSession(sessionToken);
-  if (!session) return resp(401, { error: 'Invalid or expired session. Please sign in again.' });
+  if (!session)
+    return resp(401, {
+      error: 'Invalid or expired session. Please sign in again.',
+    });
 
   // Admin can query any user's history by passing ownerId
   let targetUserId = session.userId;
@@ -998,31 +1455,35 @@ async function handleHistory(body) {
     if (propertyKey) {
       // Property-scoped: query GSI — all users' activity for this property
       params = {
-        TableName:                 QUERIES_TABLE,
-        IndexName:                 QUERIES_PROPERTY_INDEX,
-        KeyConditionExpression:    'propertyKey = :pk',
+        TableName: QUERIES_TABLE,
+        IndexName: QUERIES_PROPERTY_INDEX,
+        KeyConditionExpression: 'propertyKey = :pk',
         ExpressionAttributeValues: { ':pk': propertyKey },
-        ScanIndexForward:          false,
-        Limit:                     Math.min(limit || 25, 50)
+        ScanIndexForward: false,
+        Limit: Math.min(limit || 25, 50),
       };
     } else {
       // User-scoped (current user or admin-specified via ownerId)
       params = {
-        TableName:                 QUERIES_TABLE,
-        KeyConditionExpression:    'userId = :uid',
+        TableName: QUERIES_TABLE,
+        KeyConditionExpression: 'userId = :uid',
         ExpressionAttributeValues: { ':uid': targetUserId },
-        ScanIndexForward:          false,
-        Limit:                     Math.min(limit || 25, 100)
+        ScanIndexForward: false,
+        Limit: Math.min(limit || 25, 100),
       };
     }
     if (lastKey) params.ExclusiveStartKey = lastKey;
 
     const result = await ddb.send(new QueryCommand(params));
     return resp(200, {
-      items:       result.Items || [],
-      lastKey:     result.LastEvaluatedKey || null,
+      items: result.Items || [],
+      lastKey: result.LastEvaluatedKey || null,
       propertyKey: propertyKey || null,
-      user:        { email: session.email, name: session.name, picture: session.picture }
+      user: {
+        email: session.email,
+        name: session.name,
+        picture: session.picture,
+      },
     });
   } catch (err) {
     console.error('history error:', err.message);
@@ -1036,20 +1497,33 @@ async function handleFeedback(body) {
   const { sessionToken, queryId, rating, text } = body;
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session.' });
-  if (!queryId || !rating) return resp(400, { error: 'Missing queryId or rating.' });
+  if (!queryId || !rating)
+    return resp(400, { error: 'Missing queryId or rating.' });
 
   try {
-    await ddb.send(new UpdateCommand({
-      TableName: QUERIES_TABLE,
-      Key: { userId: session.userId, queryId },
-      UpdateExpression: 'SET feedback = :f, feedbackText = :t, feedbackAt = :at',
-      ExpressionAttributeValues: {
-        ':f':  rating,
-        ':t':  text || '',
-        ':at': new Date().toISOString()
-      }
-    }));
-    trackAA({ vid: session.userId, pageName: 'TagScanner:Ask AI', pe: 'lnk_o', pev2: 'Ask AI:Feedback:' + rating, events: 'event13', v5: 'Feedback', v6: rating, v7: hashEmailSync(session.email) });
+    await ddb.send(
+      new UpdateCommand({
+        TableName: QUERIES_TABLE,
+        Key: { userId: session.userId, queryId },
+        UpdateExpression:
+          'SET feedback = :f, feedbackText = :t, feedbackAt = :at',
+        ExpressionAttributeValues: {
+          ':f': rating,
+          ':t': text || '',
+          ':at': new Date().toISOString(),
+        },
+      }),
+    );
+    trackAA({
+      vid: session.userId,
+      pageName: 'TagScanner:Ask AI',
+      pe: 'lnk_o',
+      pev2: 'Ask AI:Feedback:' + rating,
+      events: 'event13',
+      v5: 'Feedback',
+      v6: rating,
+      v7: hashEmailSync(session.email),
+    });
     return resp(200, { ok: true });
   } catch (err) {
     console.error('feedback error:', err.message);
@@ -1061,17 +1535,20 @@ async function handleFeedback(body) {
 
 async function isFeedbackRateLimited(sourceIp) {
   if (!sourceIp) return false;
-  const pk  = 'fb#' + sourceIp + '#' + new Date().toISOString().slice(0, 10);
+  const pk = 'fb#' + sourceIp + '#' + new Date().toISOString().slice(0, 10);
   const ttl = Math.floor(Date.now() / 1000) + 25 * 60 * 60;
   try {
-    const result = await ddb.send(new UpdateCommand({
-      TableName:                 RATE_TABLE,
-      Key:                       { pk },
-      UpdateExpression:          'SET #c = if_not_exists(#c, :zero) + :one, #ttl = if_not_exists(#ttl, :ttl)',
-      ExpressionAttributeNames:  { '#c': 'count', '#ttl': 'ttl' },
-      ExpressionAttributeValues: { ':zero': 0, ':one': 1, ':ttl': ttl },
-      ReturnValues:              'ALL_NEW'
-    }));
+    const result = await ddb.send(
+      new UpdateCommand({
+        TableName: RATE_TABLE,
+        Key: { pk },
+        UpdateExpression:
+          'SET #c = if_not_exists(#c, :zero) + :one, #ttl = if_not_exists(#ttl, :ttl)',
+        ExpressionAttributeNames: { '#c': 'count', '#ttl': 'ttl' },
+        ExpressionAttributeValues: { ':zero': 0, ':one': 1, ':ttl': ttl },
+        ReturnValues: 'ALL_NEW',
+      }),
+    );
     return (result.Attributes.count || 0) > 5;
   } catch (err) {
     console.error('isFeedbackRateLimited error:', err.message);
@@ -1081,27 +1558,38 @@ async function isFeedbackRateLimited(sourceIp) {
 
 async function handleGeneralFeedback(body, sourceIp) {
   const { name, email, rating, category, message } = body;
-  if (!message || !String(message).trim()) return resp(400, { error: 'Message is required.' });
+  if (!message || !String(message).trim())
+    return resp(400, { error: 'Message is required.' });
 
   if (await isFeedbackRateLimited(sourceIp)) {
-    return resp(429, { error: 'Too many submissions. Please try again tomorrow.' });
+    return resp(429, {
+      error: 'Too many submissions. Please try again tomorrow.',
+    });
   }
 
-  const feedbackId = new Date().toISOString() + '-' + nodeCrypto.randomBytes(4).toString('hex');
+  const feedbackId =
+    new Date().toISOString() + '-' + nodeCrypto.randomBytes(4).toString('hex');
   try {
-    await ddb.send(new PutCommand({
-      TableName: FEEDBACK_TABLE,
-      Item: {
-        feedbackId,
-        name:        String(name    || '').trim().slice(0, 200),
-        email:       String(email   || '').trim().toLowerCase().slice(0, 200),
-        rating:      String(rating  || '').slice(0, 50),
-        category:    String(category || 'General Feedback').slice(0, 100),
-        message:     String(message).trim().slice(0, 5000),
-        submittedAt: new Date().toISOString(),
-        sourceIp:    sourceIp || null
-      }
-    }));
+    await ddb.send(
+      new PutCommand({
+        TableName: FEEDBACK_TABLE,
+        Item: {
+          feedbackId,
+          name: String(name || '')
+            .trim()
+            .slice(0, 200),
+          email: String(email || '')
+            .trim()
+            .toLowerCase()
+            .slice(0, 200),
+          rating: String(rating || '').slice(0, 50),
+          category: String(category || 'General Feedback').slice(0, 100),
+          message: String(message).trim().slice(0, 5000),
+          submittedAt: new Date().toISOString(),
+          sourceIp: sourceIp || null,
+        },
+      }),
+    );
     return resp(200, { ok: true });
   } catch (err) {
     console.error('handleGeneralFeedback error:', err.message);
@@ -1116,12 +1604,16 @@ async function handleGetFeedback(body) {
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session.' });
   if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
-  if (session.email.toLowerCase() !== ADMIN_EMAIL) return resp(403, { error: 'Admin access required.' });
+  if (session.email.toLowerCase() !== ADMIN_EMAIL)
+    return resp(403, { error: 'Admin access required.' });
 
   try {
-    const result = await ddb.send(new ScanCommand({ TableName: FEEDBACK_TABLE }));
-    const items  = (result.Items || []).sort((a, b) =>
-      (b.submittedAt || '').localeCompare(a.submittedAt || ''));
+    const result = await ddb.send(
+      new ScanCommand({ TableName: FEEDBACK_TABLE }),
+    );
+    const items = (result.Items || []).sort((a, b) =>
+      (b.submittedAt || '').localeCompare(a.submittedAt || ''),
+    );
     return resp(200, { items });
   } catch (err) {
     console.error('handleGetFeedback error:', err.message);
@@ -1139,15 +1631,19 @@ async function handleAdminQueries(body) {
     return resp(403, { error: 'Admin access required.' });
 
   try {
-    const result = await ddb.send(new ScanCommand({
-      TableName: QUERIES_TABLE,
-      FilterExpression: '#t = :chat',
-      ExpressionAttributeNames: { '#t': 'type' },
-      ExpressionAttributeValues: { ':chat': 'chat' },
-      ProjectionExpression: 'userId, queryId, email, userName, requestSummary, resultJson, feedback, feedbackText, createdAt, tokens, propertyKey'
-    }));
+    const result = await ddb.send(
+      new ScanCommand({
+        TableName: QUERIES_TABLE,
+        FilterExpression: '#t = :chat',
+        ExpressionAttributeNames: { '#t': 'type' },
+        ExpressionAttributeValues: { ':chat': 'chat' },
+        ProjectionExpression:
+          'userId, queryId, email, userName, requestSummary, resultJson, feedback, feedbackText, createdAt, tokens, propertyKey',
+      }),
+    );
     const items = (result.Items || []).sort((a, b) =>
-      (b.createdAt || '').localeCompare(a.createdAt || ''));
+      (b.createdAt || '').localeCompare(a.createdAt || ''),
+    );
     return resp(200, { items });
   } catch (err) {
     console.error('handleAdminQueries error:', err.message);
@@ -1162,28 +1658,39 @@ async function handleUsers(body) {
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session.' });
   if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
-  if (session.email.toLowerCase() !== ADMIN_EMAIL) return resp(403, { error: 'Admin access required.' });
+  if (session.email.toLowerCase() !== ADMIN_EMAIL)
+    return resp(403, { error: 'Admin access required.' });
 
   try {
     // Fetch users and queries in parallel
     const [usersResult, queriesResult] = await Promise.all([
       ddb.send(new ScanCommand({ TableName: USERS_TABLE })),
-      ddb.send(new ScanCommand({
-        TableName: QUERIES_TABLE,
-        ProjectionExpression: 'userId, #t, requestSummary, createdAt, tokens, siteHostname, clientId, userName',
-        ExpressionAttributeNames: { '#t': 'type' }
-      }))
+      ddb.send(
+        new ScanCommand({
+          TableName: QUERIES_TABLE,
+          ProjectionExpression:
+            'userId, #t, requestSummary, createdAt, tokens, siteHostname, clientId, userName',
+          ExpressionAttributeNames: { '#t': 'type' },
+        }),
+      ),
     ]);
 
     // Aggregate per-user stats from queries
     const statsMap = {};
-    for (const q of (queriesResult.Items || [])) {
+    for (const q of queriesResult.Items || []) {
       if (!statsMap[q.userId]) {
         statsMap[q.userId] = {
-          totalQueries: 0, totalScans: 0, totalExplains: 0, totalVisits: 0,
-          properties: new Set(), sites: new Set(), lastActive: null,
-          totalInputTokens: 0, totalOutputTokens: 0,
-          clientId: q.clientId || '', userName: q.userName || ''
+          totalQueries: 0,
+          totalScans: 0,
+          totalExplains: 0,
+          totalVisits: 0,
+          properties: new Set(),
+          sites: new Set(),
+          lastActive: null,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          clientId: q.clientId || '',
+          userName: q.userName || '',
         };
       }
       const s = statsMap[q.userId];
@@ -1202,8 +1709,9 @@ async function handleUsers(body) {
         s.totalExplains++;
       }
       if (q.clientId) s.clientId = q.clientId;
-      if (!s.lastActive || q.createdAt > s.lastActive) s.lastActive = q.createdAt;
-      s.totalInputTokens  += (q.tokens && q.tokens.input)  || 0;
+      if (!s.lastActive || q.createdAt > s.lastActive)
+        s.lastActive = q.createdAt;
+      s.totalInputTokens += (q.tokens && q.tokens.input) || 0;
       s.totalOutputTokens += (q.tokens && q.tokens.output) || 0;
     }
 
@@ -1220,69 +1728,81 @@ async function handleUsers(body) {
     for (const [uid, s] of Object.entries(statsMap)) {
       if (!uid.startsWith('anon#')) continue;
       const anonClientId = uid.slice(5);
-      const realUserId   = clientIdToUserId[anonClientId];
+      const realUserId = clientIdToUserId[anonClientId];
       if (realUserId && statsMap[realUserId]) {
         const r = statsMap[realUserId];
-        s.properties.forEach(p    => r.properties.add(p));
-        s.sites.forEach(site      => r.sites.add(site));
-        r.totalVisits   += s.totalVisits;
-        r.totalQueries  += s.totalQueries;
-        if (s.lastActive && (!r.lastActive || s.lastActive > r.lastActive)) r.lastActive = s.lastActive;
+        s.properties.forEach((p) => r.properties.add(p));
+        s.sites.forEach((site) => r.sites.add(site));
+        r.totalVisits += s.totalVisits;
+        r.totalQueries += s.totalQueries;
+        if (s.lastActive && (!r.lastActive || s.lastActive > r.lastActive))
+          r.lastActive = s.lastActive;
         stitchedAnonIds.add(uid);
       }
     }
 
     // Merge stats into user records (authenticated users from users table)
-    const users = (usersResult.Items || []).map(u => {
+    const users = (usersResult.Items || []).map((u) => {
       const s = statsMap[u.userId];
       return Object.assign({}, u, {
         emailHash: hashEmailSync(u.email || ''),
-        stats: s ? {
-          totalQueries:      s.totalQueries,
-          totalScans:        s.totalScans,
-          totalExplains:     s.totalExplains,
-          totalVisits:       s.totalVisits || 0,
-          properties:        Array.from(s.properties),
-          sites:             Array.from(s.sites),
-          lastActive:        s.lastActive,
-          totalInputTokens:  s.totalInputTokens,
-          totalOutputTokens: s.totalOutputTokens,
-          clientId:          s.clientId || ''
-        } : null
+        stats: s
+          ? {
+              totalQueries: s.totalQueries,
+              totalScans: s.totalScans,
+              totalExplains: s.totalExplains,
+              totalVisits: s.totalVisits || 0,
+              properties: Array.from(s.properties),
+              sites: Array.from(s.sites),
+              lastActive: s.lastActive,
+              totalInputTokens: s.totalInputTokens,
+              totalOutputTokens: s.totalOutputTokens,
+              clientId: s.clientId || '',
+            }
+          : null,
       });
     });
 
     // Add anonymous-only rows (anon#<clientId> keys, not in users table)
-    const knownUserIds = new Set((usersResult.Items || []).map(u => u.userId));
+    const knownUserIds = new Set(
+      (usersResult.Items || []).map((u) => u.userId),
+    );
     for (const [uid, s] of Object.entries(statsMap)) {
-      if (!uid.startsWith('anon#') || knownUserIds.has(uid) || stitchedAnonIds.has(uid)) continue;
+      if (
+        !uid.startsWith('anon#') ||
+        knownUserIds.has(uid) ||
+        stitchedAnonIds.has(uid)
+      )
+        continue;
       users.push({
-        userId:      uid,
-        email:       '',
-        name:        'Anonymous',
-        picture:     '',
-        createdAt:   s.lastActive || '',
+        userId: uid,
+        email: '',
+        name: 'Anonymous',
+        picture: '',
+        createdAt: s.lastActive || '',
         lastLoginAt: null,
-        emailHash:   '',
+        emailHash: '',
         stats: {
-          totalQueries:      s.totalQueries,
-          totalScans:        s.totalScans,
-          totalExplains:     s.totalExplains,
-          totalVisits:       s.totalVisits || 0,
-          properties:        Array.from(s.properties),
-          sites:             Array.from(s.sites),
-          lastActive:        s.lastActive,
-          totalInputTokens:  s.totalInputTokens,
+          totalQueries: s.totalQueries,
+          totalScans: s.totalScans,
+          totalExplains: s.totalExplains,
+          totalVisits: s.totalVisits || 0,
+          properties: Array.from(s.properties),
+          sites: Array.from(s.sites),
+          lastActive: s.lastActive,
+          totalInputTokens: s.totalInputTokens,
           totalOutputTokens: s.totalOutputTokens,
-          clientId:          s.clientId || uid.slice(5)
-        }
+          clientId: s.clientId || uid.slice(5),
+        },
       });
     }
 
     // Sort by last active (most recent first), fall back to lastLoginAt
     users.sort(function (a, b) {
-      const aTime = (a.stats && a.stats.lastActive) || a.lastLoginAt || a.createdAt || '';
-      const bTime = (b.stats && b.stats.lastActive) || b.lastLoginAt || b.createdAt || '';
+      const aTime =
+        (a.stats && a.stats.lastActive) || a.lastLoginAt || a.createdAt || '';
+      const bTime =
+        (b.stats && b.stats.lastActive) || b.lastLoginAt || b.createdAt || '';
       return bTime.localeCompare(aTime);
     });
 
@@ -1300,25 +1820,31 @@ async function handleSetUserChatLimit(body) {
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session.' });
   if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
-  if (session.email.toLowerCase() !== ADMIN_EMAIL) return resp(403, { error: 'Admin access required.' });
-  if (!targetUserId || typeof targetUserId !== 'string') return resp(400, { error: 'targetUserId required.' });
+  if (session.email.toLowerCase() !== ADMIN_EMAIL)
+    return resp(403, { error: 'Admin access required.' });
+  if (!targetUserId || typeof targetUserId !== 'string')
+    return resp(400, { error: 'targetUserId required.' });
 
   try {
     if (limit === null) {
       // Remove override — restore default limit
-      await ddb.send(new UpdateCommand({
-        TableName: USERS_TABLE,
-        Key: { userId: targetUserId },
-        UpdateExpression: 'REMOVE chat_limit_override'
-      }));
+      await ddb.send(
+        new UpdateCommand({
+          TableName: USERS_TABLE,
+          Key: { userId: targetUserId },
+          UpdateExpression: 'REMOVE chat_limit_override',
+        }),
+      );
     } else {
       // Set override (-1 = unlimited, or a positive integer)
-      await ddb.send(new UpdateCommand({
-        TableName: USERS_TABLE,
-        Key: { userId: targetUserId },
-        UpdateExpression: 'SET chat_limit_override = :v',
-        ExpressionAttributeValues: { ':v': limit }
-      }));
+      await ddb.send(
+        new UpdateCommand({
+          TableName: USERS_TABLE,
+          Key: { userId: targetUserId },
+          UpdateExpression: 'SET chat_limit_override = :v',
+          ExpressionAttributeValues: { ':v': limit },
+        }),
+      );
     }
     return resp(200, { ok: true });
   } catch (err) {
@@ -1334,34 +1860,45 @@ async function handleConfig(body) {
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session.' });
   if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
-  if (session.email.toLowerCase() !== ADMIN_EMAIL) return resp(403, { error: 'Admin access required.' });
+  if (session.email.toLowerCase() !== ADMIN_EMAIL)
+    return resp(403, { error: 'Admin access required.' });
 
-  const [aiConfig, todayCost] = await Promise.all([getAIConfig(), getTodayCost()]);
+  const [aiConfig, todayCost] = await Promise.all([
+    getAIConfig(),
+    getTodayCost(),
+  ]);
   return resp(200, {
-    ai_enabled:          aiConfig.ai_enabled,
-    disabled_reason:     aiConfig.disabled_reason,
-    cost_limit_usd:      aiConfig.cost_limit_usd,
+    ai_enabled: aiConfig.ai_enabled,
+    disabled_reason: aiConfig.disabled_reason,
+    cost_limit_usd: aiConfig.cost_limit_usd,
     chat_question_limit: aiConfig.chat_question_limit,
-    today_cost_usd:      todayCost
+    today_cost_usd: todayCost,
   });
 }
 
 // ── AI config write (admin only) ──────────────────────────────────────────────
 
 async function handleSetConfig(body) {
-  const { sessionToken, ai_enabled, disabled_reason, cost_limit_usd, chat_question_limit } = body;
+  const {
+    sessionToken,
+    ai_enabled,
+    disabled_reason,
+    cost_limit_usd,
+    chat_question_limit,
+  } = body;
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session.' });
   if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
-  if (session.email.toLowerCase() !== ADMIN_EMAIL) return resp(403, { error: 'Admin access required.' });
+  if (session.email.toLowerCase() !== ADMIN_EMAIL)
+    return resp(403, { error: 'Admin access required.' });
 
-  const setParts   = [];
-  const attrNames  = {};
+  const setParts = [];
+  const attrNames = {};
   const attrValues = {};
 
   if (typeof ai_enabled === 'boolean') {
     setParts.push('#en = :en');
-    attrNames['#en']  = 'ai_enabled';
+    attrNames['#en'] = 'ai_enabled';
     attrValues[':en'] = ai_enabled;
   }
   if (typeof disabled_reason === 'string') {
@@ -1372,19 +1909,24 @@ async function handleSetConfig(body) {
     setParts.push('cost_limit_usd = :cl');
     attrValues[':cl'] = cost_limit_usd;
   }
-  if (typeof chat_question_limit === 'number' && Number.isInteger(chat_question_limit) && chat_question_limit >= 1) {
+  if (
+    typeof chat_question_limit === 'number' &&
+    Number.isInteger(chat_question_limit) &&
+    chat_question_limit >= 1
+  ) {
     setParts.push('chat_question_limit = :ql');
     attrValues[':ql'] = chat_question_limit;
   }
   if (!setParts.length) return resp(400, { error: 'Nothing to update.' });
 
   const params = {
-    TableName:                 CONFIG_TABLE,
-    Key:                       { pk: 'global' },
-    UpdateExpression:          'SET ' + setParts.join(', '),
-    ExpressionAttributeValues: attrValues
+    TableName: CONFIG_TABLE,
+    Key: { pk: 'global' },
+    UpdateExpression: 'SET ' + setParts.join(', '),
+    ExpressionAttributeValues: attrValues,
   };
-  if (Object.keys(attrNames).length) params.ExpressionAttributeNames = attrNames;
+  if (Object.keys(attrNames).length)
+    params.ExpressionAttributeNames = attrNames;
 
   try {
     await ddb.send(new UpdateCommand(params));
@@ -1413,21 +1955,27 @@ async function handleSetConfig(body) {
 async function batchDeleteAll(tableName, pkAttr, skAttr) {
   let deleted = 0;
   let lastKey;
-  const projAttrs = skAttr ? (pkAttr + ', ' + skAttr) : pkAttr;
+  const projAttrs = skAttr ? pkAttr + ', ' + skAttr : pkAttr;
   do {
-    const scanResult = await ddb.send(new ScanCommand({
-      TableName:            tableName,
-      ProjectionExpression: projAttrs,
-      ExclusiveStartKey:    lastKey
-    }));
+    const scanResult = await ddb.send(
+      new ScanCommand({
+        TableName: tableName,
+        ProjectionExpression: projAttrs,
+        ExclusiveStartKey: lastKey,
+      }),
+    );
     const items = scanResult.Items || [];
     for (let i = 0; i < items.length; i += 25) {
       const chunk = items.slice(i, i + 25);
-      await ddb.send(new BatchWriteCommand({
-        RequestItems: {
-          [tableName]: chunk.map(item => ({ DeleteRequest: { Key: item } }))
-        }
-      }));
+      await ddb.send(
+        new BatchWriteCommand({
+          RequestItems: {
+            [tableName]: chunk.map((item) => ({
+              DeleteRequest: { Key: item },
+            })),
+          },
+        }),
+      );
       deleted += chunk.length;
     }
     lastKey = scanResult.LastEvaluatedKey;
@@ -1440,7 +1988,8 @@ async function handlePurgeTestData(body) {
   const session = await getSession(sessionToken);
   if (!session) return resp(401, { error: 'Invalid or expired session.' });
   if (!ADMIN_EMAIL) return resp(500, { error: 'Admin access not configured.' });
-  if (session.email.toLowerCase() !== ADMIN_EMAIL) return resp(403, { error: 'Admin access required.' });
+  if (session.email.toLowerCase() !== ADMIN_EMAIL)
+    return resp(403, { error: 'Admin access required.' });
 
   // Default: purge all four tables.  Caller can pass tables:[] to pick a subset.
   const ALL = ['scan_cache', 'explain_cache', 'rate_limits', 'queries'];
@@ -1458,7 +2007,10 @@ async function handlePurgeTestData(body) {
 
   if (scope.includes('explain_cache')) {
     try {
-      results.explain_cache = await batchDeleteAll(EXPLAIN_CACHE_TABLE, 'code_hash');
+      results.explain_cache = await batchDeleteAll(
+        EXPLAIN_CACHE_TABLE,
+        'code_hash',
+      );
     } catch (err) {
       results.explain_cache = 'ERROR: ' + err.message;
     }
@@ -1474,26 +2026,46 @@ async function handlePurgeTestData(body) {
 
   if (scope.includes('queries')) {
     try {
-      results.queries = await batchDeleteAll(QUERIES_TABLE, 'userId', 'queryId');
+      results.queries = await batchDeleteAll(
+        QUERIES_TABLE,
+        'userId',
+        'queryId',
+      );
     } catch (err) {
       results.queries = 'ERROR: ' + err.message;
     }
   }
 
   const ts = new Date().toISOString();
-  console.log(JSON.stringify({ ts, event: 'purge_test_data', by: session.email, results }));
+  console.log(
+    JSON.stringify({
+      ts,
+      event: 'purge_test_data',
+      by: session.email,
+      results,
+    }),
+  );
   return resp(200, { ok: true, purgedAt: ts, deletedCounts: results });
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 exports.handler = async (event) => {
-  const method = (event.requestContext && event.requestContext.http && event.requestContext.http.method) || event.httpMethod || 'POST';
+  const method =
+    (event.requestContext &&
+      event.requestContext.http &&
+      event.requestContext.http.method) ||
+    event.httpMethod ||
+    'POST';
   if (method === 'OPTIONS') return resp(200, {});
 
   try {
-    const body     = JSON.parse(event.body || '{}');
-    const sourceIp = (event.requestContext && event.requestContext.http && event.requestContext.http.sourceIp) || null;
+    const body = JSON.parse(event.body || '{}');
+    const sourceIp =
+      (event.requestContext &&
+        event.requestContext.http &&
+        event.requestContext.http.sourceIp) ||
+      null;
     const { type, sessionToken } = body;
 
     // ── Auth ────────────────────────────────────────────────────────────────
@@ -1509,7 +2081,8 @@ exports.handler = async (event) => {
     if (type === 'feedback') return handleFeedback(body);
 
     // ── General feedback form (no auth required) ─────────────────────────────
-    if (type === 'generalFeedback') return handleGeneralFeedback(body, sourceIp);
+    if (type === 'generalFeedback')
+      return handleGeneralFeedback(body, sourceIp);
 
     // ── Get general feedback (admin only) ────────────────────────────────────
     if (type === 'getFeedback') return await handleGetFeedback(body);
@@ -1522,8 +2095,8 @@ exports.handler = async (event) => {
     if (type === 'setUserChatLimit') return await handleSetUserChatLimit(body);
 
     // ── AI config (admin) ────────────────────────────────────────────────────
-    if (type === 'config')        return handleConfig(body);
-    if (type === 'setConfig')     return handleSetConfig(body);
+    if (type === 'config') return handleConfig(body);
+    if (type === 'setConfig') return handleSetConfig(body);
     if (type === 'purgeTestData') return handlePurgeTestData(body);
 
     // ── Session ping (auth-optional — attributes to real user if signed in) ───
@@ -1533,40 +2106,42 @@ exports.handler = async (event) => {
         return resp(200, { ok: true });
       }
       // If a valid sessionToken is included, attribute this visit to the real user
-      let pingUserId   = 'anon#' + clientId;
-      let pingEmail    = '';
+      let pingUserId = 'anon#' + clientId;
+      let pingEmail = '';
       let pingUserName = 'Anonymous';
       if (sessionToken) {
         const pingSession = await getSession(sessionToken);
         if (pingSession) {
-          pingUserId   = pingSession.userId;
-          pingEmail    = pingSession.email  || '';
-          pingUserName = pingSession.name   || '';
+          pingUserId = pingSession.userId;
+          pingEmail = pingSession.email || '';
+          pingUserName = pingSession.name || '';
         }
       }
       const pingId = new Date().toISOString() + '#' + randomId(8);
       try {
-        await ddb.send(new PutCommand({
-          TableName: QUERIES_TABLE,
-          Item: {
-            userId:         pingUserId,
-            queryId:        pingId,
-            type:           'visit',
-            email:          pingEmail,
-            userName:       pingUserName,
-            clientId:       clientId,
-            propertyKey:    (propertyName || '') + '#' + (environment || ''),
-            siteUrl:        siteHostname ? 'https://' + siteHostname : '',
-            siteHostname:   siteHostname || '',
-            requestSummary: 'Visit: ' + (propertyName || 'Unknown'),
-            tokens:         {},
-            resultJson:     null,
-            hasResult:      false,
-            feedback:       null,
-            feedbackText:   null,
-            createdAt:      new Date().toISOString()
-          }
-        }));
+        await ddb.send(
+          new PutCommand({
+            TableName: QUERIES_TABLE,
+            Item: {
+              userId: pingUserId,
+              queryId: pingId,
+              type: 'visit',
+              email: pingEmail,
+              userName: pingUserName,
+              clientId: clientId,
+              propertyKey: (propertyName || '') + '#' + (environment || ''),
+              siteUrl: siteHostname ? 'https://' + siteHostname : '',
+              siteHostname: siteHostname || '',
+              requestSummary: 'Visit: ' + (propertyName || 'Unknown'),
+              tokens: {},
+              resultJson: null,
+              hasResult: false,
+              feedback: null,
+              feedbackText: null,
+              createdAt: new Date().toISOString(),
+            },
+          }),
+        );
       } catch (_) {}
       return resp(200, { ok: true });
     }
@@ -1574,7 +2149,10 @@ exports.handler = async (event) => {
     // ── Chat config (non-admin: returns current question limit for the UI) ────
     if (type === 'chatConfig') {
       const cfgSession = await getSession(sessionToken);
-      if (!cfgSession) return resp(401, { error: 'Sign in with Google to use TagScanner AI.' });
+      if (!cfgSession)
+        return resp(401, {
+          error: 'Sign in with Google to use TagScanner AI.',
+        });
       const aiCfg = await getAIConfig();
       return resp(200, { chat_question_limit: aiCfg.chat_question_limit });
     }
@@ -1588,56 +2166,102 @@ exports.handler = async (event) => {
 
     // Cache checks — happen BEFORE rate limiting so cache hits are always free
     if (type === 'explain' && body.code) {
-      const codeHash   = nodeCrypto.createHash('sha256').update((body.code || '').trim()).digest('hex').slice(0, 16);
+      const codeHash = nodeCrypto
+        .createHash('sha256')
+        .update((body.code || '').trim())
+        .digest('hex')
+        .slice(0, 16);
       const cachedItem = await getExplainCache(codeHash);
       if (cachedItem) {
-        console.log(JSON.stringify({ ts: new Date().toISOString(), userId: identity.userId, type: 'explain_cache_hit', codeHash }));
+        console.log(
+          JSON.stringify({
+            ts: new Date().toISOString(),
+            userId: identity.userId,
+            type: 'explain_cache_hit',
+            codeHash,
+          }),
+        );
         return resp(200, {
           explanation: cachedItem.explanation,
-          tokens:      { input: 0, output: 0 },
-          queryId:     null,
-          cached:      true,
-          cached_at:   cachedItem.cached_at,
-          cached_by:   { email: cachedItem.cached_by_email, name: cachedItem.cached_by_name }
+          tokens: { input: 0, output: 0 },
+          queryId: null,
+          cached: true,
+          cached_at: cachedItem.cached_at,
+          cached_by: {
+            email: cachedItem.cached_by_email,
+            name: cachedItem.cached_by_name,
+          },
         });
       }
     }
 
     if (type === 'scan' && body.fingerprint && body.payload) {
-      const cp          = body.payload;
-      const cpName      = (cp.property && cp.property.name)        || 'Unknown';
-      const cpEnv       = (cp.property && cp.property.environment) || 'Production';
-      const cacheKey    = cpName + '#' + cpEnv + '#' + body.fingerprint;
-      const cachedItem  = await getCachedScan(cacheKey);
+      const cp = body.payload;
+      const cpName = (cp.property && cp.property.name) || 'Unknown';
+      const cpEnv = (cp.property && cp.property.environment) || 'Production';
+      const cacheKey = cpName + '#' + cpEnv + '#' + body.fingerprint;
+      const cachedItem = await getCachedScan(cacheKey);
       if (cachedItem) {
-        console.log(JSON.stringify({ ts: new Date().toISOString(), userId: identity.userId, type: 'scan_cache_hit', cacheKey }));
+        console.log(
+          JSON.stringify({
+            ts: new Date().toISOString(),
+            userId: identity.userId,
+            type: 'scan_cache_hit',
+            cacheKey,
+          }),
+        );
         return resp(200, {
-          report:    cachedItem.report,
-          tokens:    { input: 0, output: 0 },
-          queryId:   null,
-          cached:    true,
+          report: cachedItem.report,
+          tokens: { input: 0, output: 0 },
+          queryId: null,
+          cached: true,
           cached_at: cachedItem.cached_at,
-          cached_by: { email: cachedItem.cached_by_email, name: cachedItem.cached_by_name }
+          cached_by: {
+            email: cachedItem.cached_by_email,
+            name: cachedItem.cached_by_name,
+          },
         });
       }
     }
 
     // Rate limit by userId
     if (await isRateLimited(identity.userId)) {
-      return resp(429, { error: 'Daily AI request limit reached (' + DAILY_CAP + '/day). Try again tomorrow.' });
+      return resp(429, {
+        error:
+          'Daily AI request limit reached (' +
+          DAILY_CAP +
+          '/day). Try again tomorrow.',
+      });
     }
 
     // Kill-switch: check if AI is enabled and daily cost is within limit
-    const [aiConfig, todayCost] = await Promise.all([getAIConfig(), getTodayCost()]);
+    const [aiConfig, todayCost] = await Promise.all([
+      getAIConfig(),
+      getTodayCost(),
+    ]);
     if (!aiConfig.ai_enabled) {
-      return resp(503, { error: 'AI features are temporarily disabled. Please check back later.' });
+      return resp(503, {
+        error: 'AI features are temporarily disabled. Please check back later.',
+      });
     }
     if (todayCost >= aiConfig.cost_limit_usd) {
-      await autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached. AI disabled automatically.');
-      return resp(503, { error: 'AI features are temporarily disabled. Please check back later.' });
+      await autoDisableAI(
+        'Daily cost limit of $' +
+          aiConfig.cost_limit_usd.toFixed(2) +
+          ' reached. AI disabled automatically.',
+      );
+      return resp(503, {
+        error: 'AI features are temporarily disabled. Please check back later.',
+      });
     }
 
-    console.log(JSON.stringify({ ts: new Date().toISOString(), userId: identity.userId, type }));
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        userId: identity.userId,
+        type,
+      }),
+    );
 
     // ── Scan ─────────────────────────────────────────────────────────────────
     if (type === 'scan') {
@@ -1645,47 +2269,108 @@ exports.handler = async (event) => {
       const clientId = body.clientId || '';
       if (!payload) return resp(400, { error: 'Missing payload for scan.' });
 
-      const userMsg      = JSON.stringify({ user_context: userContext || {}, property_health: payload });
-      const maxTokens    = computeScanTokens(payload);
-      const result       = await invokeAnthropicDirect(SCAN_SYSTEM_PROMPT, userMsg, maxTokens);
+      const userMsg = JSON.stringify({
+        user_context: userContext || {},
+        property_health: payload,
+      });
+      const maxTokens = computeScanTokens(payload);
+      const result = await invokeAnthropicDirect(
+        SCAN_SYSTEM_PROMPT,
+        userMsg,
+        maxTokens,
+      );
       let report;
       try {
         report = parseJSON(result.text);
       } catch (parseErr) {
-        console.error('Scan parse error:', parseErr.message, '| tokens used:', result.outputTokens, '| raw snippet:', result.text.slice(0, 300));
-        return resp(500, { error: 'the AI response was incomplete. This can happen with very large properties — please try again or reach out to tagscannerfeedback@gmail.com' });
+        console.error(
+          'Scan parse error:',
+          parseErr.message,
+          '| tokens used:',
+          result.outputTokens,
+          '| raw snippet:',
+          result.text.slice(0, 300),
+        );
+        return resp(500, {
+          error:
+            'the AI response was incomplete. This can happen with very large properties — please try again or reach out to tagscannerfeedback@gmail.com',
+        });
       }
-      const propertyName = (payload.property && payload.property.name)        || 'Unknown property';
-      const environment  = (payload.property && payload.property.environment) || 'Production';
-      const siteUrl      = (payload.property && payload.property.url)         || '';
-      const propertyKey  = propertyName + '#' + environment;
+      const propertyName =
+        (payload.property && payload.property.name) || 'Unknown property';
+      const environment =
+        (payload.property && payload.property.environment) || 'Production';
+      const siteUrl = (payload.property && payload.property.url) || '';
+      const propertyKey = propertyName + '#' + environment;
 
       const [queryId, newDayCost] = await Promise.all([
-        logQuery(identity.userId, identity.email, session.name, 'scan', 'Property scan: ' + propertyName,
-          { input: result.inputTokens, output: result.outputTokens }, report, propertyKey, siteUrl, clientId),
-        trackCost(result.inputTokens, result.outputTokens, COST_SCAN_INPUT_PER_TOKEN, COST_SCAN_OUTPUT_PER_TOKEN)
+        logQuery(
+          identity.userId,
+          identity.email,
+          session.name,
+          'scan',
+          'Property scan: ' + propertyName,
+          { input: result.inputTokens, output: result.outputTokens },
+          report,
+          propertyKey,
+          siteUrl,
+          clientId,
+        ),
+        trackCost(
+          result.inputTokens,
+          result.outputTokens,
+          COST_SCAN_INPUT_PER_TOKEN,
+          COST_SCAN_OUTPUT_PER_TOKEN,
+        ),
       ]);
 
       // Store in scan cache keyed by composition fingerprint
       if (fingerprint) {
         const cacheKey = propertyName + '#' + environment + '#' + fingerprint;
-        putCachedScan(cacheKey, report, { input: result.inputTokens, output: result.outputTokens },
-          identity.email, session.name, propertyName, environment).catch(() => {});
+        putCachedScan(
+          cacheKey,
+          report,
+          { input: result.inputTokens, output: result.outputTokens },
+          identity.email,
+          session.name,
+          propertyName,
+          environment,
+        ).catch(() => {});
       }
 
       if (newDayCost >= aiConfig.cost_limit_usd * ALERT_PCT) {
-        sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(() => {});
+        sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(
+          () => {},
+        );
       }
       if (newDayCost > aiConfig.cost_limit_usd) {
-        autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached. AI disabled automatically.').catch(() => {});
+        autoDisableAI(
+          'Daily cost limit of $' +
+            aiConfig.cost_limit_usd.toFixed(2) +
+            ' reached. AI disabled automatically.',
+        ).catch(() => {});
       }
 
-      trackAA({ vid: identity.userId, pageName: 'TagScanner:Summary', pe: 'lnk_o', pev2: 'Summary:AI Scan', events: 'event5', v1: propertyName, v2: environment, v3: (ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL) ? 'admin' : 'user', v5: 'Summary', v7: hashEmailSync(identity.email) });
+      trackAA({
+        vid: identity.userId,
+        pageName: 'TagScanner:Summary',
+        pe: 'lnk_o',
+        pev2: 'Summary:AI Scan',
+        events: 'event5',
+        v1: propertyName,
+        v2: environment,
+        v3:
+          ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL
+            ? 'admin'
+            : 'user',
+        v5: 'Summary',
+        v7: hashEmailSync(identity.email),
+      });
       return resp(200, {
         report,
-        tokens:  { input: result.inputTokens, output: result.outputTokens },
+        tokens: { input: result.inputTokens, output: result.outputTokens },
         queryId: queryId || null,
-        cached:  false
+        cached: false,
       });
     }
 
@@ -1695,43 +2380,92 @@ exports.handler = async (event) => {
       const clientId = body.clientId || '';
       if (!code) return resp(400, { error: 'Missing code for explain.' });
 
-      const userMsg     = JSON.stringify({ code, metadata: metadata || {} });
-      const result      = await invokeClaude(EXPLAIN_SYSTEM_PROMPT, userMsg, MAX_TOKENS_EXPLAIN);
+      const userMsg = JSON.stringify({ code, metadata: metadata || {} });
+      const result = await invokeClaude(
+        EXPLAIN_SYSTEM_PROMPT,
+        userMsg,
+        MAX_TOKENS_EXPLAIN,
+      );
       const explanation = parseJSON(result.text);
 
       const componentName = (metadata && metadata.name) || 'unknown';
-      const codeHash      = nodeCrypto.createHash('sha256').update((code || '').trim()).digest('hex').slice(0, 16);
+      const codeHash = nodeCrypto
+        .createHash('sha256')
+        .update((code || '').trim())
+        .digest('hex')
+        .slice(0, 16);
 
       const [queryId, newDayCost] = await Promise.all([
-        logQuery(identity.userId, identity.email, session.name, 'explain',
-          'Explain ' + (metadata && metadata.type || '') + ': ' + componentName,
-          { input: result.inputTokens, output: result.outputTokens }, explanation, propertyKey || '', undefined, clientId),
-        trackCost(result.inputTokens, result.outputTokens)
+        logQuery(
+          identity.userId,
+          identity.email,
+          session.name,
+          'explain',
+          'Explain ' +
+            ((metadata && metadata.type) || '') +
+            ': ' +
+            componentName,
+          { input: result.inputTokens, output: result.outputTokens },
+          explanation,
+          propertyKey || '',
+          undefined,
+          clientId,
+        ),
+        trackCost(result.inputTokens, result.outputTokens),
       ]);
 
-      putExplainCache(codeHash, explanation, { input: result.inputTokens, output: result.outputTokens },
-        identity.email, session.name, componentName, metadata && metadata.type, propertyKey).catch(() => {});
+      putExplainCache(
+        codeHash,
+        explanation,
+        { input: result.inputTokens, output: result.outputTokens },
+        identity.email,
+        session.name,
+        componentName,
+        metadata && metadata.type,
+        propertyKey,
+      ).catch(() => {});
 
       if (newDayCost >= aiConfig.cost_limit_usd * ALERT_PCT) {
-        sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(() => {});
+        sendCostThresholdAlert(newDayCost, aiConfig.cost_limit_usd).catch(
+          () => {},
+        );
       }
       if (newDayCost > aiConfig.cost_limit_usd) {
-        autoDisableAI('Daily cost limit of $' + aiConfig.cost_limit_usd.toFixed(2) + ' reached. AI disabled automatically.').catch(() => {});
+        autoDisableAI(
+          'Daily cost limit of $' +
+            aiConfig.cost_limit_usd.toFixed(2) +
+            ' reached. AI disabled automatically.',
+        ).catch(() => {});
       }
 
-      trackAA({ vid: identity.userId, pageName: 'TagScanner:Rules', pe: 'lnk_o', pev2: 'Code:Explain', events: 'event5', v1: propertyKey || '', v3: (ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL) ? 'admin' : 'user', v5: 'Explain', v7: hashEmailSync(identity.email) });
+      trackAA({
+        vid: identity.userId,
+        pageName: 'TagScanner:Rules',
+        pe: 'lnk_o',
+        pev2: 'Code:Explain',
+        events: 'event5',
+        v1: propertyKey || '',
+        v3:
+          ADMIN_EMAIL && session.email.toLowerCase() === ADMIN_EMAIL
+            ? 'admin'
+            : 'user',
+        v5: 'Explain',
+        v7: hashEmailSync(identity.email),
+      });
       return resp(200, {
         explanation,
-        tokens:  { input: result.inputTokens, output: result.outputTokens },
-        queryId: queryId || null
+        tokens: { input: result.inputTokens, output: result.outputTokens },
+        queryId: queryId || null,
       });
     }
 
     // ── Chat ──────────────────────────────────────────────────────────────────
-    if (type === 'chat') return handleChat(body, session, identity, aiConfig, todayCost);
+    if (type === 'chat')
+      return handleChat(body, session, identity, aiConfig, todayCost);
 
-    return resp(400, { error: 'Invalid type. Use: auth, scan, explain, chat, history, feedback.' });
-
+    return resp(400, {
+      error: 'Invalid type. Use: auth, scan, explain, chat, history, feedback.',
+    });
   } catch (err) {
     console.error('Lambda error:', err);
     return resp(500, { error: err.message || 'Internal server error' });

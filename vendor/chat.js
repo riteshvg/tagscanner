@@ -685,6 +685,238 @@
     });
   }
 
+  // ── Keyword search pre-processor ─────────────────────────────────────────────
+  // Detects name-filter queries and injects pre-computed match lists into
+  // propertyContext so the AI doesn't have to search the array itself.
+  function injectKeywordMatches(question, propertyContext) {
+    var patterns = [
+      /(?:have|contain(?:ing)?|with|for|about)\s+(?:the\s+)?(?:keyword\s+)?['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
+      /(?:keyword|find|search(?:ing\s+for)?)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
+      /(?:named?|called)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
+      /data\s+elements?\s+(?:for|with|contain(?:ing)?|about|related\s+to)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
+      /(?:how\s+many|which|list)\s+data\s+elements?\s+(?:have|contain|include|with)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
+      /['"]([a-zA-Z0-9_\-\s\.]{2,})['""]/i
+    ];
+
+    var keyword = null;
+    for (var i = 0; i < patterns.length; i++) {
+      var match = question.match(patterns[i]);
+      if (match && match[1] && match[1].trim().length >= 2) {
+        keyword = match[1].trim();
+        break;
+      }
+    }
+
+    if (!keyword) return propertyContext;
+
+    var lowerKeyword = keyword.toLowerCase();
+
+    var matchingDEs = [];
+    var dataElements = (propertyContext && propertyContext.dataElements) || [];
+    for (var j = 0; j < dataElements.length; j++) {
+      var de = dataElements[j];
+      if (de && de.name && de.name.toLowerCase().indexOf(lowerKeyword) !== -1) {
+        matchingDEs.push(de.name);
+      }
+    }
+
+    var matchingRules = [];
+    var rules = (propertyContext && propertyContext.rules) || [];
+    for (var k = 0; k < rules.length; k++) {
+      var rule = rules[k];
+      if (rule && rule.name && rule.name.toLowerCase().indexOf(lowerKeyword) !== -1) {
+        matchingRules.push(rule.name);
+      }
+    }
+
+    var reverseDePatterns = [
+      /which\s+data\s+elements?\s+(?:contains?\s+)?references?\s+to\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:data\s+element)?\s*\??$/i,
+      /which\s+(?:data\s+elements?|de)\s+references?\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*\??$/i,
+      /what\s+(?:data\s+elements?\s+)?references?\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:data\s+element)?\s*\??$/i,
+      /parent\s+(?:of|for)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*\??$/i,
+      /which\s+(?:data\s+elements?|de)\s+(?:has|have|contains?)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s+in\s+(?:it|them)\s*\??$/i,
+      /which\s+(?:data\s+elements?|de)\s+has\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s+in\s+it\s*\??$/i,
+      /what\s+references?\s+(?:the\s+)?['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*\??$/i
+    ];
+    var reverseDeKeyword = null;
+    for (var r = 0; r < reverseDePatterns.length; r++) {
+      var rm = question.match(reverseDePatterns[r]);
+      if (rm && rm[1] && rm[1].trim().length >= 2) {
+        reverseDeKeyword = rm[1].trim().toLowerCase();
+        break;
+      }
+    }
+    var reverseDeResult = null;
+    if (reverseDeKeyword) {
+      var targetDE = null;
+      for (var d = 0; d < dataElements.length; d++) {
+        if (dataElements[d].name &&
+            dataElements[d].name.toLowerCase() === reverseDeKeyword) {
+          targetDE = dataElements[d];
+          break;
+        }
+      }
+      if (!targetDE) {
+        for (var d2 = 0; d2 < dataElements.length; d2++) {
+          if (dataElements[d2].name &&
+              dataElements[d2].name.toLowerCase().indexOf(reverseDeKeyword) !== -1) {
+            targetDE = dataElements[d2];
+            break;
+          }
+        }
+      }
+      if (targetDE) {
+        reverseDeResult = {
+          targetDE:        targetDE.name,
+          referencedByDEs: targetDE.referencedByDEs || [],
+          deUsageText:     targetDE.deUsageText || ''
+        };
+      }
+    }
+
+    if (matchingDEs.length === 0 && matchingRules.length === 0 && !reverseDeResult) {
+      return propertyContext;
+    }
+
+    return Object.assign({}, propertyContext, {
+      _keywordMatches: {
+        keyword:           keyword,
+        matchingDEs:       matchingDEs,
+        matchingRules:     matchingRules,
+        matchingDECount:   matchingDEs.length,
+        matchingRuleCount: matchingRules.length,
+        reverseDeResult:   reverseDeResult
+      }
+    });
+  }
+
+  // ── Pre-flight local resolver ─────────────────────────────────────────────
+  // Answers deterministic queries without calling Lambda.
+  // Returns a plain-text answer string, or null to fall through to Lambda.
+  function resolveLocally(question, propertyContext) {
+    var q = question.trim().toLowerCase();
+    var rules = (propertyContext && propertyContext.rules) || [];
+    var des = (propertyContext && propertyContext.dataElements) || [];
+    var exts = (propertyContext && propertyContext.extensions) || [];
+    var unused = (propertyContext && propertyContext.unusedDataElements) || [];
+    var unusedCount = (propertyContext && propertyContext.unusedDataElementCount) || unused.length;
+    var km = propertyContext && propertyContext._keywordMatches;
+
+    // ── Keyword matches already pre-computed ───────────────────────────────
+    if (km && km.reverseDeResult) {
+      var rd = km.reverseDeResult;
+      if (rd.referencedByDEs && rd.referencedByDEs.length === 0) {
+        return '"' + rd.targetDE + '" is not directly referenced by any other data element.';
+      }
+      if (rd.referencedByDEs && rd.referencedByDEs.length > 0) {
+        var lines = ['"' + rd.targetDE + '" is directly referenced by:'];
+        rd.referencedByDEs.forEach(function(deName) {
+          lines.push('- ' + deName + ' (Data Element)');
+        });
+        var ruleLines = [];
+        rd.referencedByDEs.forEach(function(deName) {
+          var parentDE = des.find(function(d) { return d.name === deName; });
+          if (parentDE && parentDE.ruleUsageSummary) {
+            var rs = parentDE.ruleUsageSummary;
+            (rs.direct || []).forEach(function(r) {
+              if (ruleLines.indexOf(r) === -1) ruleLines.push(r);
+            });
+            (rs.transitive || []).forEach(function(t) {
+              if (ruleLines.indexOf(t.rule) === -1) ruleLines.push(t.rule);
+            });
+          }
+        });
+        if (ruleLines.length > 0) {
+          lines.push('');
+          lines.push('These data elements feed into the following rules:');
+          ruleLines.forEach(function(r) { lines.push('- ' + r + ' (Rule)'); });
+        }
+        return lines.join('\n');
+      }
+    }
+
+    if (km && !km.reverseDeResult) {
+      if (km.matchingDEs.length === 0 && km.matchingRules.length === 0) {
+        return 'No data elements or rules found containing "' + km.keyword + '".';
+      }
+      var klines = [];
+      if (km.matchingDEs.length > 0) {
+        klines.push(km.matchingDECount + ' data element' + (km.matchingDECount === 1 ? '' : 's') + ' contain "' + km.keyword + '":');
+        km.matchingDEs.forEach(function(n) { klines.push('- ' + n + ' (Data Element)'); });
+      }
+      if (km.matchingRules.length > 0) {
+        if (klines.length) klines.push('');
+        klines.push(km.matchingRuleCount + ' rule' + (km.matchingRuleCount === 1 ? '' : 's') + ' contain "' + km.keyword + '":');
+        km.matchingRules.forEach(function(n) { klines.push('- ' + n + ' (Rule)'); });
+      }
+      return klines.join('\n');
+    }
+
+    // ── Rule count ─────────────────────────────────────────────────────────
+    var asksRules = /rules/.test(q) && /how many/.test(q);
+    var asksDEs = /data elements|des\b/.test(q) && /how many/.test(q);
+
+    if (asksRules && asksDEs) {
+      var combined = [rules.length + ' rules and ' + des.length + ' data elements.\n'];
+      combined.push(rules.length + ' rules:');
+      rules.forEach(function(r) { combined.push('- ' + r.name + ' (Rule)'); });
+      combined.push('');
+      combined.push(des.length + ' data elements. See the Data Elements tab for the full list.');
+      return combined.join('\n');
+    }
+
+    if (asksRules && !asksDEs) {
+      var rlines = [rules.length + ' rules:'];
+      rules.forEach(function(r) { rlines.push('- ' + r.name + ' (Rule)'); });
+      return rlines.join('\n');
+    }
+
+    if (asksDEs && !asksRules) {
+      return des.length + ' data elements. See the Data Elements tab for the full list.';
+    }
+
+    // ── DE count ───────────────────────────────────────────────────────────
+    if (/^how many data elements/.test(q) || /^how many des/.test(q)) {
+      return des.length + ' data elements in this property.';
+    }
+
+    // ── Unused DEs ─────────────────────────────────────────────────────────
+    if (/unused data elements/.test(q) || /which d.*elements.*unused/.test(q) || /unused des/.test(q)) {
+      if (unused.length === 0) return 'No unused data elements found.';
+      var ulines = [unusedCount + ' unused data element' + (unusedCount === 1 ? '' : 's') + ':'];
+      unused.forEach(function(n) { ulines.push('- ' + n + ' (Data Element)'); });
+      return ulines.join('\n');
+    }
+
+    // ── Extensions ─────────────────────────────────────────────────────────
+    if (/which extensions/.test(q) || /list.*extensions/.test(q) || /what extensions/.test(q)) {
+      if (exts.length === 0) return 'No extensions found in this property.';
+      var elines = [exts.length + ' extensions:'];
+      exts.forEach(function(e) { elines.push('- ' + (e.displayName || e.name) + ' (Extension)'); });
+      return elines.join('\n');
+    }
+
+    // ── Custom code DEs ────────────────────────────────────────────────────
+    if (/data elements.*custom code/.test(q) || /which des.*custom code/.test(q) || /how many.*custom code/.test(q) || /custom code.*data elements/.test(q)) {
+      var ccDEs = des.filter(function(d) { return d.hasCustomCode; });
+      if (ccDEs.length === 0) return 'No data elements with custom code found.';
+      var cclines = [ccDEs.length + ' data element' + (ccDEs.length === 1 ? '' : 's') + ' with custom code:'];
+      ccDEs.forEach(function(d) { cclines.push('- ' + d.name + ' (Data Element)'); });
+      return cclines.join('\n');
+    }
+
+    // ── Custom code rules ──────────────────────────────────────────────────
+    if (/rules.*custom code/.test(q) || /which rules.*custom code/.test(q) || /how many rules.*custom code/.test(q) || /custom code.*rules/.test(q)) {
+      var ccRules = rules.filter(function(r) { return r.hasCustomCode; });
+      if (ccRules.length === 0) return 'No rules with custom code found.';
+      var ccrlines = [ccRules.length + ' rule' + (ccRules.length === 1 ? '' : 's') + ' with custom code:'];
+      ccRules.forEach(function(r) { ccrlines.push('- ' + r.name + ' (Rule)'); });
+      return ccrlines.join('\n');
+    }
+
+    return null; // not deterministic — send to LLM
+  }
+
   function doSend(question, session) {
     isLoading = true;
     btnSend.disabled = true;
@@ -707,6 +939,22 @@
     showThinking();
 
     var propertyContext = buildChatContext();
+    propertyContext = injectKeywordMatches(question, propertyContext);
+
+    var localAnswer = resolveLocally(question, propertyContext);
+    if (localAnswer) {
+      removeThinking();
+      appendBubble('assistant', renderMarkdownLite(localAnswer));
+      displayMessages.push({ role: 'assistant', text: localAnswer });
+      conversationHistory.push({ role: 'user',      content: JSON.stringify({ property_context: propertyContext, question: question }) });
+      conversationHistory.push({ role: 'assistant', content: localAnswer });
+      if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
+      saveChatState();
+      isLoading = false;
+      btnSend.disabled = false;
+      chatInput.focus();
+      return;
+    }
 
     callLambda({
       type:                'chat',

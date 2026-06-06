@@ -255,77 +255,187 @@
         transform: translateX(18px);
       }
 
-      /* ── Variable map grid ───────────────────────────────── */
+      /* ── Variable map split layout ───────────────────────── */
       #flowVariableMap {
         display: none;
-        padding: 24px 32px;
-        overflow-y: auto;
-        height: calc(100% - 60px);
+        height: 560px;
+        min-height: 320px;
       }
-      #flowVariableMap.active { display: block; }
+      #flowVariableMap.active {
+        display: flex;
+        flex-direction: row;
+      }
 
-      .var-map-section {
-        margin-bottom: 32px;
+      /* Left panel — scrollable variable list */
+      #flowVarList {
+        width: 260px;
+        flex-shrink: 0;
+        border-right: 1px solid #e2e8f0;
+        overflow-y: auto;
+        background: #f8fafc;
+        height: 100%;
       }
-      .var-map-section-title {
-        font-size: 11px;
+      #flowVarListInner {
+        padding: 12px 8px;
+      }
+
+      /* Right panel — detail view */
+      #flowVarDetail {
+        flex: 1;
+        overflow-y: auto;
+        height: 100%;
+        background: #fff;
+      }
+      #flowVarDetailInner {
+        padding: 24px 28px;
+      }
+
+      /* Variable list items */
+      .var-list-section-title {
+        font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: #64748b;
-        margin-bottom: 12px;
-        padding-bottom: 6px;
-        border-bottom: 1px solid #e2e8f0;
+        color: #94a3b8;
+        padding: 8px 8px 4px;
       }
-      .var-map-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 10px;
+      .var-list-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.12s;
       }
-      .var-map-card {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 12px 14px;
-        cursor: default;
+      .var-list-item:hover {
+        background: #e2e8f0;
       }
-      .var-map-card:hover {
-        border-color: #0d9488;
-        box-shadow: 0 1px 6px rgba(13,148,136,0.12);
+      .var-list-item.active {
+        background: #0d9488;
       }
-      .var-map-card-name {
+      .var-list-item.active .var-list-name {
+        color: #fff;
+      }
+      .var-list-item.active .var-list-pill {
+        background: rgba(255,255,255,0.2);
+        color: #fff;
+      }
+      .var-list-name {
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 500;
         color: #1e293b;
-        margin-bottom: 6px;
+        flex: 1;
       }
-      .var-map-card-pill {
-        display: inline-block;
-        font-size: 10px;
-        font-weight: 600;
+      .var-list-pill {
+        font-size: 9px;
+        font-weight: 700;
         letter-spacing: 0.04em;
-        padding: 2px 7px;
-        border-radius: 10px;
-        margin-bottom: 8px;
+        padding: 1px 5px;
+        border-radius: 8px;
+        flex-shrink: 0;
       }
-      .var-map-card-pill.evar  { background: #e0f2fe; color: #0369a1; }
-      .var-map-card-pill.prop  { background: #dcfce7; color: #15803d; }
-      .var-map-card-pill.event { background: #fef3c7; color: #b45309; }
-      .var-map-card-pill.xdm   { background: #f3e8ff; color: #7c3aed; }
-      .var-map-card-sources {
+      .var-list-pill.evar  { background: #e0f2fe; color: #0369a1; }
+      .var-list-pill.prop  { background: #dcfce7; color: #15803d; }
+      .var-list-pill.event { background: #fef3c7; color: #b45309; }
+      .var-list-pill.xdm   { background: #f3e8ff; color: #7c3aed; }
+
+      /* Detail panel */
+      .var-detail-empty {
+        color: #94a3b8;
+        font-size: 14px;
+        padding: 60px 20px;
+        text-align: center;
+      }
+      .var-detail-name {
+        font-size: 20px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 4px;
+      }
+      .var-detail-pill {
+        display: inline-block;
         font-size: 11px;
-        color: #64748b;
-        line-height: 1.5;
+        font-weight: 700;
+        padding: 2px 9px;
+        border-radius: 10px;
+        margin-bottom: 20px;
       }
-      .var-map-card-sources span {
-        display: block;
+      .var-detail-pill.evar  { background: #e0f2fe; color: #0369a1; }
+      .var-detail-pill.prop  { background: #dcfce7; color: #15803d; }
+      .var-detail-pill.event { background: #fef3c7; color: #b45309; }
+      .var-detail-pill.xdm   { background: #f3e8ff; color: #7c3aed; }
+      .var-detail-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin: 20px 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #f1f5f9;
+      }
+      .var-detail-chain {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .var-detail-chain-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0;
+        font-size: 13px;
+      }
+      .var-chain-rule {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        border-radius: 6px 0 0 6px;
+        padding: 5px 10px;
+        font-weight: 500;
+        flex: 1;
+        min-width: 0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
-      .var-map-card-sources .src-rule  { color: #2563eb; }
-      .var-map-card-sources .src-de    { color: #0d9488; }
-      .var-map-card-sources .src-empty { color: #94a3b8; font-style: italic; }
+      .var-chain-arrow {
+        background: #f1f5f9;
+        border-top: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
+        color: #94a3b8;
+        padding: 5px 6px;
+        font-size: 11px;
+        flex-shrink: 0;
+      }
+      .var-chain-de {
+        background: #f0fdf4;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+        border-radius: 0 6px 6px 0;
+        padding: 5px 10px;
+        font-weight: 500;
+        flex: 1;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .var-chain-inline {
+        background: #fafafa;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 5px 10px;
+        font-family: monospace;
+        font-size: 12px;
+        flex: 1;
+      }
+      .var-detail-no-sources {
+        color: #94a3b8;
+        font-size: 13px;
+        font-style: italic;
+      }
     </style>
   </head>
   <body>
@@ -369,7 +479,9 @@
 
         <!-- Variable mode controls (shown in variable mode) -->
         <div id="flowVariableControls" class="flow-controls-group" style="display:none">
-          <span class="flow-breadcrumb">All variables auto-populated from container</span>
+          <span class="flow-breadcrumb">
+            Click any variable to see its rule and data element sources
+          </span>
         </div>
       </div>
 
@@ -377,7 +489,18 @@
         <div class="flow-chart-container" id="flowChart"></div>
       </div>
 
-      <div id="flowVariableMap"></div>
+      <div id="flowVariableMap">
+        <div id="flowVarList">
+          <div id="flowVarListInner"></div>
+        </div>
+        <div id="flowVarDetail">
+          <div id="flowVarDetailInner">
+            <div class="var-detail-empty">
+              Select a variable from the list to see its sources
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Modal: connections for clicked node -->

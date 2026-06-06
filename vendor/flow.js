@@ -139,6 +139,20 @@
     } catch (e) { return {}; }
   }
 
+  function getAnalyticsVariables() {
+    // Primary: read from sessionStorage key written by
+    // dataElementListCombined.js after its full 5-technique
+    // extraction (trackerProperties, custom code, XDM traversal,
+    // canonical XDM paths, sendEvent scanning)
+    var raw = sessionStorage.getItem('ts_analytics_variables');
+    if (raw) {
+      try { return JSON.parse(raw) || {}; } catch(e) {}
+    }
+    // Fallback: return empty — flow.js will use its own
+    // partial extraction from buildRelationships()
+    return null;
+  }
+
   function stringContainsDERef(str, deName) {
     if (!str || typeof str !== 'string') return false;
     var v = '%' + deName + '%';
@@ -1071,81 +1085,354 @@
     var chartWrapper      = document.querySelector('.flow-chart-wrapper');
     var varMapEl          = document.getElementById('flowVariableMap');
 
-    function renderVariableMap() {
-      if (!varMapEl) return;
-      var varMeta    = rels.varMeta    || {};
-      var varToRules = rels.varToRules || {};
-      var deToVars   = rels.deToVars   || {};
+    // ── Variable map — split panel ────────────────────────────────────
 
-      // Build reverse index: varId → [deName]
-      var varToDEs = {};
-      Object.keys(deToVars).forEach(function(deName) {
-        (deToVars[deName] || []).forEach(function(v) {
-          if (!varToDEs[v.varId]) varToDEs[v.varId] = [];
-          if (varToDEs[v.varId].indexOf(deName) === -1) {
-            varToDEs[v.varId].push(deName);
-          }
+    function renderVariableMap() {
+      var listEl   = document.getElementById('flowVarListInner');
+      var detailEl = document.getElementById('flowVarDetailInner');
+      if (!listEl || !detailEl) return;
+
+      var storedVars = getAnalyticsVariables();
+      var hasStored  = storedVars && (
+        Object.keys(storedVars.eVars  || {}).length > 0 ||
+        Object.keys(storedVars.props  || {}).length > 0 ||
+        Object.keys(storedVars.events || {}).length > 0
+      );
+
+      if (hasStored) {
+        buildVarList(listEl, storedVars, detailEl);
+      } else {
+        buildVarListFromMeta(listEl, detailEl);
+      }
+    }
+
+    function numSort(a, b) {
+      return (parseInt(a.replace(/\D/g,''), 10) || 0) -
+             (parseInt(b.replace(/\D/g,''), 10) || 0);
+    }
+
+    function buildVarList(listEl, storedVars, detailEl) {
+      var groups = [
+        { key: 'eVars',  title: 'eVars',  type: 'evar'  },
+        { key: 'props',  title: 'Props',  type: 'prop'  },
+        { key: 'events', title: 'Events', type: 'event' }
+      ];
+      var html = '';
+      groups.forEach(function(g) {
+        var vars = storedVars[g.key] || {};
+        var keys = Object.keys(vars).sort(numSort);
+        if (!keys.length) return;
+        html += '<div class="var-list-section-title">' +
+                g.title + ' (' + keys.length + ')</div>';
+        keys.forEach(function(varName) {
+          html += '<div class="var-list-item" ' +
+                  'data-var="' + varName + '" ' +
+                  'data-type="' + g.type + '">' +
+                  '<span class="var-list-name">' + varName + '</span>' +
+                  '<span class="var-list-pill ' + g.type + '">' +
+                  g.type.toUpperCase() + '</span>' +
+                  '</div>';
         });
       });
+      if (!html) {
+        html = '<div style="padding:20px;color:#94a3b8;font-size:12px">' +
+               'No variables found</div>';
+      }
+      listEl.innerHTML = html;
 
-      // Group vars by type
+      listEl.addEventListener('click', function(e) {
+        var item = e.target.closest('.var-list-item');
+        if (!item) return;
+        listEl.querySelectorAll('.var-list-item').forEach(function(el) {
+          el.classList.remove('active');
+        });
+        item.classList.add('active');
+        var varName  = item.dataset.var;
+        var type     = item.dataset.type;
+        var groupKey = type === 'evar' ? 'eVars'
+                     : type === 'prop' ? 'props' : 'events';
+        var entries = (storedVars[groupKey] || {})[varName] || [];
+        renderVarDetail(detailEl, varName, type, entries);
+      });
+    }
+
+    function buildVarListFromMeta(listEl, detailEl) {
+      var varMeta    = rels.varMeta    || {};
+      var varToRules = rels.varToRules || {};
       var groups = { evar: [], prop: [], event: [], xdm: [] };
-      Object.keys(varMeta).sort().forEach(function(varId) {
+      Object.keys(varMeta).sort(numSort).forEach(function(varId) {
         var meta = varMeta[varId];
         if (groups[meta.type]) groups[meta.type].push(varId);
       });
-
-      var groupTitles = {
-        evar:  'eVars',
-        prop:  'Props',
-        event: 'Events',
-        xdm:   'XDM Fields'
-      };
-
+      var groupTitles = { evar:'eVars', prop:'Props',
+                          event:'Events', xdm:'XDM' };
       var html = '';
-      ['evar', 'prop', 'event', 'xdm'].forEach(function(type) {
-        var varIds = groups[type];
-        if (!varIds.length) return;
-
-        html += '<div class="var-map-section">';
-        html += '<div class="var-map-section-title">' + groupTitles[type] +
-                ' <span style="font-weight:400;color:#94a3b8">(' + varIds.length + ')</span></div>';
-        html += '<div class="var-map-grid">';
-
-        varIds.forEach(function(varId) {
-          var meta  = varMeta[varId];
-          var rules = varToRules[varId] || [];
-          var des   = varToDEs[varId]   || [];
-
-          html += '<div class="var-map-card">';
-          html += '<div class="var-map-card-name">' + meta.label + '</div>';
-          html += '<span class="var-map-card-pill ' + type + '">' +
-                  type.toUpperCase() + '</span>';
-          html += '<div class="var-map-card-sources">';
-
-          if (rules.length === 0 && des.length === 0) {
-            html += '<span class="src-empty">No sources mapped</span>';
-          } else {
-            rules.forEach(function(r) {
-              html += '<span class="src-rule" title="' + r + '">⚡ ' + r + '</span>';
-            });
-            des.forEach(function(d) {
-              html += '<span class="src-de" title="' + d + '">◆ ' + d + '</span>';
-            });
-          }
-
-          html += '</div></div>';
+      ['evar','prop','event','xdm'].forEach(function(type) {
+        var ids = groups[type];
+        if (!ids.length) return;
+        html += '<div class="var-list-section-title">' +
+                groupTitles[type] + ' (' + ids.length + ')</div>';
+        ids.forEach(function(varId) {
+          var meta = varMeta[varId];
+          html += '<div class="var-list-item" ' +
+                  'data-varid="' + varId + '" ' +
+                  'data-type="' + type + '">' +
+                  '<span class="var-list-name">' + meta.label + '</span>' +
+                  '<span class="var-list-pill ' + type + '">' +
+                  type.toUpperCase() + '</span>' +
+                  '</div>';
         });
-
-        html += '</div></div>';
       });
+      listEl.innerHTML = html || '<div style="padding:20px;color:#94a3b8;' +
+        'font-size:12px">Visit Combined Variable Mapping first</div>';
 
-      if (!html) {
-        html = '<div style="color:#94a3b8;font-size:14px;padding:40px;text-align:center">' +
-               'No variable mappings found in this property.</div>';
+      listEl.addEventListener('click', function(e) {
+        var item = e.target.closest('.var-list-item');
+        if (!item) return;
+        listEl.querySelectorAll('.var-list-item').forEach(function(el) {
+          el.classList.remove('active');
+        });
+        item.classList.add('active');
+        var varId  = item.dataset.varid;
+        var type   = item.dataset.type;
+        var meta   = varMeta[varId] || {};
+        var rules  = varToRules[varId] || [];
+        var entries = rules.map(function(r) {
+          return { ruleName: r, value: '', ruleId: '' };
+        });
+        renderVarDetail(detailEl, meta.label, type, entries);
+      });
+    }
+
+    function renderVarDetail(detailEl, varName, type, entries) {
+
+      // ── Helper: get human-readable trigger label from rule name ──
+      function getRuleMeta(ruleName) {
+        var rule = null;
+        for (var i = 0; i < rulesArray.length; i++) {
+          if (rulesArray[i].name === ruleName) { rule = rulesArray[i]; break; }
+        }
+        if (!rule) return { trigger: 'Unknown', conditions: 0 };
+        var trigger = 'Unknown';
+        if (rule.events && rule.events[0] && rule.events[0].modulePath) {
+          var mp = rule.events[0].modulePath;
+          trigger = mp.split('/').pop().replace('.js', '');
+          // Friendly labels
+          var labels = {
+            'dom-ready':       'DOM Ready',
+            'library-loaded':  'Library Loaded',
+            'window-loaded':   'Window Loaded',
+            'direct-call':     'Direct Call',
+            'click':           'Click',
+            'custom-event':    'Custom Event',
+            'data-pushed':     'Data Pushed',
+            'history-change':  'History Change',
+            'enter-viewport':  'Enter Viewport',
+            'element-exists':  'Element Exists',
+            'scroll-depth':    'Scroll Depth'
+          };
+          trigger = labels[trigger] || trigger;
+          if (trigger === 'Direct Call' && rule.events[0].settings &&
+              rule.events[0].settings.identifier) {
+            trigger += ' (' + rule.events[0].settings.identifier + ')';
+          }
+        }
+        return {
+          trigger:    trigger,
+          conditions: (rule.conditions || []).length
+        };
       }
 
-      varMapEl.innerHTML = html;
+      // ── Helper: get DE type label and storage duration ────────────
+      function getDEMeta(deName) {
+        var de = dataElements[deName];
+        if (!de) return null;
+        var mp = de.modulePath || '';
+        var typeLabel = mp.split('/').pop().replace('.js', '');
+        var typeMap = {
+          'javascript-variable': 'JS Variable',
+          'custom-code':         'Custom Code',
+          'cookie':              'Cookie',
+          'dom-attribute':       'DOM Attribute',
+          'local-storage-item':  'Local Storage',
+          'session-storage-item':'Session Storage',
+          'query-string-parameter': 'Query String',
+          'constant':            'Constant',
+          'random-number':       'Random Number'
+        };
+        typeLabel = typeMap[typeLabel] || typeLabel;
+        // XDM Object
+        if (mp.indexOf('xdmObject') > -1) typeLabel = 'XDM Object';
+        // Alloy variable
+        if (mp.indexOf('variable/index') > -1) typeLabel = 'Alloy Variable';
+        var s = de.settings || {};
+        var dur = s.storeDuration || s.storageDuration ||
+                  s.storage_duration || '';
+        var durMap = {
+          'pageview': 'Pageview',
+          'session':  'Session',
+          'visitor':  'Visitor',
+          'none':     'None'
+        };
+        dur = durMap[dur] || dur;
+        return { typeLabel: typeLabel, duration: dur };
+      }
+
+      // ── Build chains (rule → DE) and inline values ────────────────
+      var chains  = [];
+      var inlines = [];
+      var seen    = {};
+
+      entries.forEach(function(e) {
+        if (!e.ruleName) return;
+        var key = e.ruleName + '||' + (e.value || '');
+        if (seen[key]) return;
+        seen[key] = true;
+
+        var m     = e.value && e.value.match(/^%([^%]+)%$/);
+        var isXDM = e.value && e.value.indexOf('XDM: ') === 0;
+
+        var ruleMeta = getRuleMeta(e.ruleName);
+
+        if (m) {
+          var deMeta = getDEMeta(m[1]);
+          chains.push({
+            rule:      e.ruleName,
+            ruleMeta:  ruleMeta,
+            de:        m[1],
+            deMeta:    deMeta,
+            via:       'de'
+          });
+        } else if (isXDM) {
+          var xdmName = e.value.replace('XDM: ', '');
+          var xdmMeta = getDEMeta(xdmName);
+          chains.push({
+            rule:      e.ruleName,
+            ruleMeta:  ruleMeta,
+            de:        xdmName,
+            deMeta:    xdmMeta,
+            via:       'xdm'
+          });
+        } else if (e.value) {
+          inlines.push({
+            rule:     e.ruleName,
+            ruleMeta: ruleMeta,
+            value:    e.value
+          });
+        } else {
+          chains.push({
+            rule:     e.ruleName,
+            ruleMeta: ruleMeta,
+            de:       null,
+            deMeta:   null,
+            via:      null
+          });
+        }
+      });
+
+      // ── Conflict detection ─────────────────────────────────────────
+      var totalSources = chains.length + inlines.length;
+      var hasConflict  = totalSources > 1;
+
+      // ── Render ─────────────────────────────────────────────────────
+      var html = '';
+      html += '<div class="var-detail-name">' + varName + '</div>';
+      html += '<span class="var-detail-pill ' + type + '">' +
+              type.toUpperCase() + '</span>';
+
+      // Conflict warning
+      if (hasConflict) {
+        html += '<div style="margin:10px 0 4px;padding:8px 12px;' +
+                'background:#fef9c3;border:1px solid #fde047;' +
+                'border-radius:6px;font-size:12px;color:#854d0e">' +
+                '⚠ Set by ' + totalSources + ' sources — ' +
+                'verify execution order to avoid overwrite conflicts' +
+                '</div>';
+      }
+
+      // Chain rows
+      if (chains.length > 0) {
+        html += '<div class="var-detail-section-title">' +
+                'Rule → Data Element → ' + varName + '</div>';
+        html += '<div class="var-detail-chain">';
+
+        chains.forEach(function(c) {
+          html += '<div class="var-detail-chain-row">';
+
+          // Rule cell with trigger badge
+          html += '<span class="var-chain-rule" title="' + c.rule + '">' +
+                  '⚡ ' + c.rule +
+                  '<span style="display:block;font-size:10px;' +
+                  'font-weight:400;color:#6b91d9;margin-top:1px">' +
+                  '⏱ ' + c.ruleMeta.trigger +
+                  (c.ruleMeta.conditions > 0
+                    ? ' · ' + c.ruleMeta.conditions + ' condition' +
+                      (c.ruleMeta.conditions > 1 ? 's' : '')
+                    : ' · no conditions') +
+                  '</span></span>';
+
+          if (c.de) {
+            // DE reference resolved from %token%
+            html += '<span class="var-chain-arrow">→</span>';
+            var deIcon  = c.via === 'xdm' ? '🔷' : '◆';
+            var deExtra = '';
+            if (c.deMeta) {
+              deExtra = '<span style="display:block;font-size:10px;' +
+                        'font-weight:400;color:#4ead7a;margin-top:1px">' +
+                        c.deMeta.typeLabel +
+                        (c.deMeta.duration
+                          ? ' · ' + c.deMeta.duration : '') +
+                        '</span>';
+            }
+            html += '<span class="var-chain-de" title="' + c.de + '">' +
+                    deIcon + ' ' + c.de + deExtra + '</span>';
+          } else {
+            // Value set via custom code — source not statically readable
+            html += '<span class="var-chain-arrow">→</span>';
+            html += '<span class="var-chain-inline" ' +
+                    'style="color:#94a3b8;font-style:italic;' +
+                    'border-style:dashed">' +
+                    'Custom code — value set at runtime' +
+                    '</span>';
+          }
+
+          html += '</div>';
+        });
+
+        html += '</div>';
+      }
+
+      // Inline value rows
+      if (inlines.length > 0) {
+        html += '<div class="var-detail-section-title">' +
+                'Hardcoded values</div>';
+        html += '<div class="var-detail-chain">';
+        inlines.forEach(function(iv) {
+          html += '<div class="var-detail-chain-row">';
+          html += '<span class="var-chain-rule" title="' + iv.rule + '">' +
+                  '⚡ ' + iv.rule +
+                  '<span style="display:block;font-size:10px;' +
+                  'font-weight:400;color:#6b91d9;margin-top:1px">' +
+                  '⏱ ' + iv.ruleMeta.trigger +
+                  (iv.ruleMeta.conditions > 0
+                    ? ' · ' + iv.ruleMeta.conditions + ' condition' +
+                      (iv.ruleMeta.conditions > 1 ? 's' : '')
+                    : ' · no conditions') +
+                  '</span></span>';
+          html += '<span class="var-chain-arrow">→</span>';
+          html += '<span class="var-chain-inline">' +
+                  iv.value + '</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+
+      if (chains.length === 0 && inlines.length === 0) {
+        html += '<div class="var-detail-no-sources">' +
+                'No sources mapped for this variable.</div>';
+      }
+
+      detailEl.innerHTML = html;
     }
 
     function switchToComponentMode() {

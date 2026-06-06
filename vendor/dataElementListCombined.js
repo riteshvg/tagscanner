@@ -154,6 +154,14 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
       extractXDMVariables();
     }
+
+    // Persist full extraction to sessionStorage for flow.js variable map
+    try {
+      sessionStorage.setItem(
+        'ts_analytics_variables',
+        JSON.stringify(analyticsVariables)
+      );
+    } catch(e) {}
   }
 
   // Function to set the current variable type

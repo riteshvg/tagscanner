@@ -208,6 +208,124 @@
       }
       .fsp { animation: flow-skeleton-pulse 1.8s ease-in-out infinite; }
       .fsl { animation: flow-skeleton-pulse 2.2s ease-in-out infinite; }
+
+      /* ── Mode toggle ─────────────────────────────────────── */
+      .flow-mode-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-right: 20px;
+        flex-shrink: 0;
+      }
+      .flow-mode-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: #374151;
+        white-space: nowrap;
+      }
+      .flow-toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 22px;
+        cursor: pointer;
+      }
+      .flow-toggle-switch input { display: none; }
+      .flow-toggle-track {
+        position: absolute;
+        inset: 0;
+        background: #cbd5e1;
+        border-radius: 11px;
+        transition: background 0.2s;
+      }
+      .flow-toggle-track::after {
+        content: '';
+        position: absolute;
+        width: 16px; height: 16px;
+        top: 3px; left: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      }
+      .flow-toggle-switch input:checked + .flow-toggle-track {
+        background: #0d9488;
+      }
+      .flow-toggle-switch input:checked + .flow-toggle-track::after {
+        transform: translateX(18px);
+      }
+
+      /* ── Variable map grid ───────────────────────────────── */
+      #flowVariableMap {
+        display: none;
+        padding: 24px 32px;
+        overflow-y: auto;
+        height: calc(100% - 60px);
+      }
+      #flowVariableMap.active { display: block; }
+
+      .var-map-section {
+        margin-bottom: 32px;
+      }
+      .var-map-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #64748b;
+        margin-bottom: 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .var-map-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 10px;
+      }
+      .var-map-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px 14px;
+        cursor: default;
+      }
+      .var-map-card:hover {
+        border-color: #0d9488;
+        box-shadow: 0 1px 6px rgba(13,148,136,0.12);
+      }
+      .var-map-card-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 6px;
+      }
+      .var-map-card-pill {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        padding: 2px 7px;
+        border-radius: 10px;
+        margin-bottom: 8px;
+      }
+      .var-map-card-pill.evar  { background: #e0f2fe; color: #0369a1; }
+      .var-map-card-pill.prop  { background: #dcfce7; color: #15803d; }
+      .var-map-card-pill.event { background: #fef3c7; color: #b45309; }
+      .var-map-card-pill.xdm   { background: #f3e8ff; color: #7c3aed; }
+      .var-map-card-sources {
+        font-size: 11px;
+        color: #64748b;
+        line-height: 1.5;
+      }
+      .var-map-card-sources span {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .var-map-card-sources .src-rule  { color: #2563eb; }
+      .var-map-card-sources .src-de    { color: #0d9488; }
+      .var-map-card-sources .src-empty { color: #94a3b8; font-style: italic; }
     </style>
   </head>
   <body>
@@ -229,17 +347,37 @@
       </div>
 
       <div class="flow-config-bar">
-        <label for="flowSearch">Show flow for</label>
-        <input type="text" id="flowSearch" list="flowSearchList" placeholder="Type a data element, rule or extension name..."
-          autocomplete="off" aria-label="Search for a component to show its flow" />
-        <datalist id="flowSearchList"></datalist>
-        <button type="button" id="flowSearchClear" class="btn btn-sm btn-outline-secondary" style="display: none;">Clear</button>
-        <span class="text-muted" style="color: #94a3b8; font-size: 13px;">Data Elements → Rules → Extensions</span>
+        <!-- Mode toggle -->
+        <div class="flow-mode-toggle">
+          <span class="flow-mode-label" id="flowModeLabel">Component Map</span>
+          <label class="flow-toggle-switch">
+            <input type="checkbox" id="flowModeSwitch">
+            <span class="flow-toggle-track"></span>
+          </label>
+          <span class="flow-mode-label">Variable Map</span>
+        </div>
+
+        <!-- Component mode controls (shown in component mode) -->
+        <div id="flowComponentControls" class="flow-controls-group">
+          <input type="text" id="flowSearch" list="flowSearchList"
+                 placeholder="Search data elements, rules, extensions…"
+                 autocomplete="off" class="flow-search-input">
+          <datalist id="flowSearchList"></datalist>
+          <button id="flowSearchClear" class="flow-clear-btn">Clear</button>
+          <span class="flow-breadcrumb">Data Elements → Rules → Extensions</span>
+        </div>
+
+        <!-- Variable mode controls (shown in variable mode) -->
+        <div id="flowVariableControls" class="flow-controls-group" style="display:none">
+          <span class="flow-breadcrumb">All variables auto-populated from container</span>
+        </div>
       </div>
 
       <div class="flow-chart-wrapper">
         <div class="flow-chart-container" id="flowChart"></div>
       </div>
+
+      <div id="flowVariableMap"></div>
     </div>
 
     <!-- Modal: connections for clicked node -->

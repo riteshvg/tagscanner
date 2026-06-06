@@ -90,32 +90,52 @@
   var VERT_PADDING = 52;
 
   function getRulesArray() {
+    // Try sessionStorage first (populated by TagScanner scan)
+    var raw = sessionStorage.getItem('_satellite._container.rules');
+    if (raw) {
+      try {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+        if (parsed && Array.isArray(parsed.rules)) return parsed.rules;
+        if (parsed && typeof parsed === 'object') return Object.values(parsed);
+      } catch (e) {}
+    }
+    // Fallback: read directly from container
     try {
-      var raw = sessionStorage.getItem('_satellite._container.rules');
-      if (!raw) return [];
-      var o = JSON.parse(raw);
-      if (Array.isArray(o)) return o;
-      if (o && typeof o === 'object') {
-        if (Array.isArray(o.rules)) return o.rules;
-        return Object.values(o).filter(function (item) { return item && typeof item === 'object'; });
-      }
-      return [];
+      var container = window._satellite && window._satellite._container;
+      if (!container) return [];
+      var rules = container.rules;
+      if (!rules) return [];
+      if (Array.isArray(rules)) return rules;
+      if (Array.isArray(rules.rules)) return rules.rules;
+      return Object.values(rules);
     } catch (e) { return []; }
   }
 
   function getDataElements() {
+    // Try sessionStorage first
+    var raw = sessionStorage.getItem('_satellite._container.dataElements');
+    if (raw) {
+      try { return JSON.parse(raw) || {}; } catch (e) {}
+    }
+    // Fallback: read directly from container
     try {
-      var raw = sessionStorage.getItem('_satellite._container.dataElements');
-      if (!raw) return {};
-      return JSON.parse(raw);
+      var container = window._satellite && window._satellite._container;
+      return (container && container.dataElements) || {};
     } catch (e) { return {}; }
   }
 
   function getExtensions() {
+    // Try sessionStorage first (note: singular 'extension' key)
+    var raw = sessionStorage.getItem('_satellite._container.extension');
+    if (raw) {
+      try { return JSON.parse(raw) || {}; } catch (e) {}
+    }
+    // Fallback: read directly from container
+    // Container stores extensions as an object keyed by extension name
     try {
-      var raw = sessionStorage.getItem('_satellite._container.extension');
-      if (!raw) return {};
-      return JSON.parse(raw);
+      var container = window._satellite && window._satellite._container;
+      return (container && container.extensions) || {};
     } catch (e) { return {}; }
   }
 
@@ -222,19 +242,72 @@
       var m = val.match(/^%([^%]+)%$/);
       return m ? m[1] : null;
     }
-    function walkXDM(obj, path, rName) {
+    // Extracts eVar/prop/event keys at any nesting depth
+    // Mirrors dataElementListXDM.js processXDMPath logic
+    function extractVarsFromData(obj, rName, sourceDEName) {
       if (!obj || typeof obj !== 'object') return;
       Object.keys(obj).forEach(function(key) {
         var val = obj[key];
-        var fp  = path ? path + '.' + key : key;
-        if (typeof val === 'string') {
-          var varId = 'xdm_' + fp;
-          registerVar(varId, fp, 'xdm');
+        if (/^eVar\d+$/.test(key) || /^prop\d+$/.test(key) || /^event\d+$/.test(key)) {
+          var type = /^eVar/.test(key) ? 'evar'
+                   : /^prop/.test(key) ? 'prop' : 'event';
+          var varId = 'var_' + key;
+          registerVar(varId, key, type);
           linkRuleVar(rName, varId);
-          var de = extractToken(val);
-          if (de) linkDEVar(de, varId);
+          var deRef = extractToken(typeof val === 'string' ? val : '');
+          if (deRef) linkDEVar(deRef, varId);
+          if (sourceDEName) linkDEVar(sourceDEName, varId);
         } else if (val && typeof val === 'object') {
-          walkXDM(val, fp, rName);
+          extractVarsFromData(val, rName, sourceDEName);
+        }
+      });
+    }
+
+    // Walks settings.xdm — handles three shapes:
+    // (a) string token: settings.xdm = "%xdmObject - travellerPage%"
+    // (b) object with %token% keys: { "%xdmObject - travellerPage%": true }
+    // (c) direct nested XDM object with eVar/prop keys
+    function walkXDM(obj, rName) {
+      // Case A — settings.xdm is a plain string token reference
+      if (typeof obj === 'string') {
+        var deName = extractToken(obj);
+        if (deName) {
+          var xdmDE = dataElements[deName];
+          if (xdmDE && xdmDE.settings && xdmDE.settings.data) {
+            extractVarsFromData(xdmDE.settings.data, rName, deName);
+          }
+        }
+        return;
+      }
+
+      if (!obj || typeof obj !== 'object') return;
+
+      Object.keys(obj).forEach(function(key) {
+        var val = obj[key];
+
+        // Case B — key is a %token% reference to an XDM Object DE
+        var deName = extractToken(key);
+        if (deName) {
+          var xdmDE = dataElements[deName];
+          if (xdmDE && xdmDE.settings && xdmDE.settings.data) {
+            extractVarsFromData(xdmDE.settings.data, rName, deName);
+          }
+          return;
+        }
+
+        // Case C — direct XDM object with nested eVar/prop keys
+        if (val && typeof val === 'object') {
+          extractVarsFromData(val, rName, null);
+        } else if (typeof val === 'string') {
+          if (/^eVar\d+$/.test(key) || /^prop\d+$/.test(key) || /^event\d+$/.test(key)) {
+            var type = /^eVar/.test(key) ? 'evar'
+                     : /^prop/.test(key) ? 'prop' : 'event';
+            var varId = 'var_' + key;
+            registerVar(varId, key, type);
+            linkRuleVar(rName, varId);
+            var de = extractToken(val);
+            if (de) linkDEVar(de, varId);
+          }
         }
       });
     }
@@ -286,8 +359,34 @@
 
         // Web SDK sendEvent XDM
         if (mp.indexOf('sendEvent') > -1 || mp.indexOf('web-sdk') > -1) {
-          if (c.settings.xdm)  walkXDM(c.settings.xdm,  '', rName);
-          if (c.settings.data) walkXDM(c.settings.data, '', rName);
+
+          // Handle plain string token: settings.xdm = "%xdmObject - travellerPage%"
+          function resolveXDMToken(val, rName) {
+            if (!val) return;
+            // Case A — plain string token e.g. "%xdmObject - travellerPage%"
+            if (typeof val === 'string') {
+              var deName = extractToken(val);
+              if (deName && dataElements[deName]) {
+                var xdmDE = dataElements[deName];
+                // Link the XDM DE to this rule
+                if (!dataElementToRule[deName]) dataElementToRule[deName] = {};
+                dataElementToRule[deName][rName] = (dataElementToRule[deName][rName] || 0) + 1;
+                if (!ruleToDataElement[rName]) ruleToDataElement[rName] = {};
+                ruleToDataElement[rName][deName] = (ruleToDataElement[rName][deName] || 0) + 1;
+                // Traverse the DE's settings.data for eVar/prop/event keys
+                if (xdmDE.settings && xdmDE.settings.data) {
+                  extractVarsFromData(xdmDE.settings.data, rName, deName);
+                }
+              }
+            }
+            // Case B — object with token keys: { "%xdmObject%": true }
+            else if (typeof val === 'object') {
+              walkXDM(val, rName);
+            }
+          }
+
+          resolveXDMToken(c.settings.xdm,  rName);
+          resolveXDMToken(c.settings.data, rName);
         }
       });
     });
@@ -492,6 +591,53 @@
       });
       var disp = (extensions[extId] && extensions[extId].displayName) ? extensions[extId].displayName : extId;
       addNode(Ext, 'ext_' + extId, disp, 'ext');
+    }
+
+    // ── Variable selected — reverse mapping ────────────────────────
+    // Show: all rules that set this variable + all DEs that feed it
+    // Uses addNode/addLink so the standard assembly and var-layer section
+    // below pick everything up naturally.
+    else if (selectedType === 'var') {
+      var varId   = selectedKey;
+      var varInfo = (rels.varMeta || {})[varId];
+      if (!varInfo) return { nodes: [], links: [], nodeById: {} };
+
+      var rulesForVar = (rels.varToRules || {})[varId] || [];
+      if (!rulesForVar.length) return { nodes: [], links: [], nodeById: {} };
+
+      // Add each rule that sets this variable into R so the var-layer
+      // section below finds it and adds the Rule→Var edges automatically
+      rulesForVar.forEach(function(rName) {
+        if (!nodeById['rule_' + rName]) addNode(R, 'rule_' + rName, rName, 'rule');
+
+        // DEs referenced by this rule
+        var deRefs = (rels.ruleToDataElement || {})[rName] || {};
+        Object.keys(deRefs).forEach(function(deName) {
+          if (!nodeById['de_' + deName]) addNode(DE, 'de_' + deName, deName, 'de');
+          addLink('de_' + deName, 'rule_' + rName, deRefs[deName],
+                  deName + ' → ' + rName);
+        });
+
+        // Extensions used by this rule
+        var extRefs = (rels.ruleToExtension || {})[rName] || {};
+        Object.keys(extRefs).forEach(function(extId) {
+          var extDisp = (extensions[extId] && extensions[extId].displayName)
+                        ? extensions[extId].displayName : extId;
+          if (!nodeById['ext_' + extId]) addNode(Ext, 'ext_' + extId, extDisp, 'ext');
+          addLink('rule_' + rName, 'ext_' + extId, extRefs[extId],
+                  rName + ' → ' + extDisp);
+        });
+      });
+
+      // Also add DEs that directly supply this variable (deToVars mapping)
+      // DE→Var edges are added by the var-layer section below
+      var deToVarsMap = rels.deToVars || {};
+      Object.keys(deToVarsMap).forEach(function(deName) {
+        var deVarIds = deToVarsMap[deName].map(function(v){ return v.varId; });
+        if (deVarIds.indexOf(varId) > -1 && !nodeById['de_' + deName]) {
+          addNode(DE, 'de_' + deName, deName, 'de');
+        }
+      });
     }
 
     var nodes = [];
@@ -891,12 +1037,139 @@
       var disp = (extensions[extId] && extensions[extId].displayName) ? extensions[extId].displayName : extId;
       optionsList.push({ value: '[Extension] ' + disp, type: 'ext', key: extId });
     });
+    // Analytics variables — eVars, props, events, XDM fields
+    var varMeta = rels.varMeta || {};
+    var evarOpts  = [];
+    var propOpts  = [];
+    var eventOpts = [];
+    var xdmOpts   = [];
+    Object.keys(varMeta).sort().forEach(function(varId) {
+      var meta = varMeta[varId];
+      if (meta.type === 'evar')  evarOpts.push({ value: '[eVar] '  + meta.label, type: 'var', key: varId });
+      if (meta.type === 'prop')  propOpts.push({ value: '[prop] '  + meta.label, type: 'var', key: varId });
+      if (meta.type === 'event') eventOpts.push({ value: '[event] ' + meta.label, type: 'var', key: varId });
+      if (meta.type === 'xdm')  xdmOpts.push({ value: '[XDM] '   + meta.label, type: 'var', key: varId });
+    });
+    optionsList = optionsList
+      .concat(evarOpts)
+      .concat(propOpts)
+      .concat(eventOpts)
+      .concat(xdmOpts);
 
     if (searchList) {
       optionsList.forEach(function (opt) {
         var op = document.createElement('option');
         op.value = opt.value;
         searchList.appendChild(op);
+      });
+    }
+
+    // ── Mode toggle ───────────────────────────────────────────────────
+    var modeSwitch        = document.getElementById('flowModeSwitch');
+    var componentControls = document.getElementById('flowComponentControls');
+    var variableControls  = document.getElementById('flowVariableControls');
+    var chartWrapper      = document.querySelector('.flow-chart-wrapper');
+    var varMapEl          = document.getElementById('flowVariableMap');
+
+    function renderVariableMap() {
+      if (!varMapEl) return;
+      var varMeta    = rels.varMeta    || {};
+      var varToRules = rels.varToRules || {};
+      var deToVars   = rels.deToVars   || {};
+
+      // Build reverse index: varId → [deName]
+      var varToDEs = {};
+      Object.keys(deToVars).forEach(function(deName) {
+        (deToVars[deName] || []).forEach(function(v) {
+          if (!varToDEs[v.varId]) varToDEs[v.varId] = [];
+          if (varToDEs[v.varId].indexOf(deName) === -1) {
+            varToDEs[v.varId].push(deName);
+          }
+        });
+      });
+
+      // Group vars by type
+      var groups = { evar: [], prop: [], event: [], xdm: [] };
+      Object.keys(varMeta).sort().forEach(function(varId) {
+        var meta = varMeta[varId];
+        if (groups[meta.type]) groups[meta.type].push(varId);
+      });
+
+      var groupTitles = {
+        evar:  'eVars',
+        prop:  'Props',
+        event: 'Events',
+        xdm:   'XDM Fields'
+      };
+
+      var html = '';
+      ['evar', 'prop', 'event', 'xdm'].forEach(function(type) {
+        var varIds = groups[type];
+        if (!varIds.length) return;
+
+        html += '<div class="var-map-section">';
+        html += '<div class="var-map-section-title">' + groupTitles[type] +
+                ' <span style="font-weight:400;color:#94a3b8">(' + varIds.length + ')</span></div>';
+        html += '<div class="var-map-grid">';
+
+        varIds.forEach(function(varId) {
+          var meta  = varMeta[varId];
+          var rules = varToRules[varId] || [];
+          var des   = varToDEs[varId]   || [];
+
+          html += '<div class="var-map-card">';
+          html += '<div class="var-map-card-name">' + meta.label + '</div>';
+          html += '<span class="var-map-card-pill ' + type + '">' +
+                  type.toUpperCase() + '</span>';
+          html += '<div class="var-map-card-sources">';
+
+          if (rules.length === 0 && des.length === 0) {
+            html += '<span class="src-empty">No sources mapped</span>';
+          } else {
+            rules.forEach(function(r) {
+              html += '<span class="src-rule" title="' + r + '">⚡ ' + r + '</span>';
+            });
+            des.forEach(function(d) {
+              html += '<span class="src-de" title="' + d + '">◆ ' + d + '</span>';
+            });
+          }
+
+          html += '</div></div>';
+        });
+
+        html += '</div></div>';
+      });
+
+      if (!html) {
+        html = '<div style="color:#94a3b8;font-size:14px;padding:40px;text-align:center">' +
+               'No variable mappings found in this property.</div>';
+      }
+
+      varMapEl.innerHTML = html;
+    }
+
+    function switchToComponentMode() {
+      if (componentControls) componentControls.style.display = '';
+      if (variableControls)  variableControls.style.display  = 'none';
+      if (chartWrapper)      chartWrapper.style.display      = '';
+      if (varMapEl)          varMapEl.classList.remove('active');
+    }
+
+    function switchToVariableMode() {
+      if (componentControls) componentControls.style.display = 'none';
+      if (variableControls)  variableControls.style.display  = '';
+      if (chartWrapper)      chartWrapper.style.display      = 'none';
+      if (varMapEl)          varMapEl.classList.add('active');
+      renderVariableMap();
+    }
+
+    if (modeSwitch) {
+      modeSwitch.addEventListener('change', function() {
+        if (this.checked) {
+          switchToVariableMode();
+        } else {
+          switchToComponentMode();
+        }
       });
     }
 

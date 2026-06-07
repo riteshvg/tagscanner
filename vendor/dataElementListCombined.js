@@ -155,9 +155,10 @@ document.addEventListener('DOMContentLoaded', function () {
       extractXDMVariables();
     }
 
-    // Persist full extraction to sessionStorage for flow.js variable map
+    // Persist full extraction to localStorage for flow.js variable map
+    // (localStorage is shared across all extension-origin tabs; sessionStorage is not)
     try {
-      sessionStorage.setItem(
+      localStorage.setItem(
         'ts_analytics_variables',
         JSON.stringify(analyticsVariables)
       );
@@ -610,8 +611,18 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       if (typeof obj[key] === 'object' && obj[key] !== null) {
-        const newPath = currentPath ? `${currentPath}.${key}` : key;
-        processXDMPath(deName, obj[key], newPath);
+        if (key === 'productListItems' && Array.isArray(obj[key])) {
+          obj[key].forEach(function(item, idx) {
+            if (item && typeof item === 'object') {
+              // Walk each product item for nested eVar keys
+              processXDMPath(deName, item,
+                (currentPath ? currentPath + '.' : '') + 'productListItems[' + idx + ']');
+            }
+          });
+        } else {
+          const newPath = currentPath ? `${currentPath}.${key}` : key;
+          processXDMPath(deName, obj[key], newPath);
+        }
       }
     }
   }
@@ -742,6 +753,82 @@ document.addEventListener('DOMContentLoaded', function () {
               });
             }
           }
+        }
+      }
+    });
+  }
+
+  function processAdobeAnalyticsObject(obj, ruleName, ruleId) {
+    if (!obj || typeof obj !== 'object') return;
+
+    // Extract eVars: { eVar1: "%pageName%", eVar3: "..." }
+    Object.keys(obj).forEach(function(key) {
+      var val = obj[key];
+      if (val === null || val === undefined) return;
+      var strVal = String(val);
+
+      if (/^eVar\d+$/.test(key)) {
+        if (!analyticsVariables.eVars[key]) {
+          analyticsVariables.eVars[key] = [];
+        }
+        if (!entryExists(analyticsVariables.eVars[key], ruleName, strVal, ruleId)) {
+          analyticsVariables.eVars[key].push({
+            ruleName: ruleName,
+            value:    strVal,
+            ruleId:   ruleId
+          });
+        }
+      } else if (/^prop\d+$/.test(key)) {
+        if (!analyticsVariables.props[key]) {
+          analyticsVariables.props[key] = [];
+        }
+        if (!entryExists(analyticsVariables.props[key], ruleName, strVal, ruleId)) {
+          analyticsVariables.props[key].push({
+            ruleName: ruleName,
+            value:    strVal,
+            ruleId:   ruleId
+          });
+        }
+      } else if (key === 'events' && typeof val === 'string' && val.length > 0) {
+        // Split comma-separated event string: "event1,event3,event10"
+        val.split(',').forEach(function(evtRaw) {
+          var evt = evtRaw.trim();
+          if (!evt) return;
+          // Strip any =value suffix (e.g. "event5=10")
+          var evtName = evt.split('=')[0].trim();
+          if (!analyticsVariables.events[evtName]) {
+            analyticsVariables.events[evtName] = [];
+          }
+          if (!entryExists(analyticsVariables.events[evtName], ruleName, '', ruleId)) {
+            analyticsVariables.events[evtName].push({
+              ruleName: ruleName,
+              value:    '',
+              ruleId:   ruleId
+            });
+          }
+        });
+      } else if (key === 'campaign') {
+        if (!analyticsVariables.eVars['campaign']) {
+          analyticsVariables.eVars['campaign'] = [];
+        }
+        if (!entryExists(analyticsVariables.eVars['campaign'], ruleName, strVal, ruleId)) {
+          analyticsVariables.eVars['campaign'].push({
+            ruleName: ruleName,
+            value:    strVal,
+            ruleId:   ruleId
+          });
+        }
+      } else if (key === 'products') {
+        // products string contains embedded eVars — register as-is
+        if (!analyticsVariables.eVars['products']) {
+          analyticsVariables.eVars['products'] = [];
+        }
+        if (!entryExists(analyticsVariables.eVars['products'], ruleName, strVal.slice(0, 80), ruleId)) {
+          analyticsVariables.eVars['products'].push({
+            ruleName: ruleName,
+            value:    strVal.slice(0, 80),
+            ruleId:   ruleId
+          });
         }
       }
     });
@@ -1083,30 +1170,50 @@ document.addEventListener('DOMContentLoaded', function () {
         xdmValue.startsWith('%') &&
         xdmValue.endsWith('%')
       ) {
-        // This is a data element reference
         const deName = xdmValue.substring(1, xdmValue.length - 1);
 
-        // Add this to eVars for now (we can refine this later)
-        const eVarName = 'XDM: ' + deName;
-
-        if (!analyticsVariables.eVars[eVarName]) {
-          analyticsVariables.eVars[eVarName] = [];
+        // Resolve the XDM DE from sessionStorage and traverse
+        // its settings.data for eVar/prop/event keys
+        const resolvedDE = dataElements && dataElements[deName];
+        if (resolvedDE && resolvedDE.settings && resolvedDE.settings.data) {
+          // Use existing processXDMPath to walk the DE's data
+          processXDMPath(deName, resolvedDE.settings.data, '');
+          // Also try specific canonical paths
+          processSpecificXDMPaths(deName, resolvedDE.settings.data);
+          // Walk productListItems if present
+          const pli = resolvedDE.settings.data.productListItems;
+          if (Array.isArray(pli)) {
+            pli.forEach(function(item) {
+              if (item && typeof item === 'object') {
+                processXDMPath(deName, item, '');
+              }
+            });
+          }
+        } else {
+          // Fallback: store as synthetic key if DE not resolvable
+          // (Alloy Variable type or missing DE)
+          const eVarName = 'XDM: ' + deName;
+          if (!analyticsVariables.eVars[eVarName]) {
+            analyticsVariables.eVars[eVarName] = [];
+          }
+          analyticsVariables.eVars[eVarName].push({ ruleName, value: deName, ruleId });
         }
 
-        if (
-          !entryExists(
-            analyticsVariables.eVars[eVarName],
-            ruleName,
-            deName,
-            ruleId
-          )
-        ) {
-          // Store the rule ID to be used for looking up the actual rule name in updateUI
-          analyticsVariables.eVars[eVarName].push({
-            ruleName: ruleName, // This is the actual rule name from the rule object
-            value: deName,
-            ruleId: ruleId,
-          });
+        // Also handle action.settings.data token the same way
+        // (data.__adobe.analytics pattern)
+        const dataValue = action.settings && action.settings.data;
+        if (dataValue && typeof dataValue === 'string' &&
+            dataValue.startsWith('%') && dataValue.endsWith('%')) {
+          const dataDE_name = dataValue.substring(1, dataValue.length - 1);
+          const dataDE = dataElements && dataElements[dataDE_name];
+          if (dataDE && dataDE.settings && dataDE.settings.data) {
+            // Walk __adobe.analytics for eVar/prop/event keys
+            const adobeAnalytics = dataDE.settings.data.__adobe &&
+                                   dataDE.settings.data.__adobe.analytics;
+            if (adobeAnalytics && typeof adobeAnalytics === 'object') {
+              processAdobeAnalyticsObject(adobeAnalytics, ruleName, ruleId);
+            }
+          }
         }
       } else if (typeof xdmValue === 'object') {
         // This is an inline XDM object

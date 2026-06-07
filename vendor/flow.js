@@ -140,15 +140,17 @@
   }
 
   function getAnalyticsVariables() {
-    // Primary: read from sessionStorage key written by
+    // Primary: read from localStorage key written by
     // dataElementListCombined.js after its full 5-technique
     // extraction (trackerProperties, custom code, XDM traversal,
-    // canonical XDM paths, sendEvent scanning)
-    var raw = sessionStorage.getItem('ts_analytics_variables');
+    // canonical XDM paths, sendEvent scanning).
+    // localStorage is used (not sessionStorage) because both pages
+    // run in separate tabs of the same extension origin.
+    var raw = localStorage.getItem('ts_analytics_variables');
     if (raw) {
       try { return JSON.parse(raw) || {}; } catch(e) {}
     }
-    // Fallback: return empty — flow.js will use its own
+    // Fallback: return null — flow.js will use its own
     // partial extraction from buildRelationships()
     return null;
   }
@@ -369,6 +371,62 @@
             var de = extractToken(tp[f]);
             if (de) linkDEVar(de, vid);
           });
+        }
+
+        // ── Alloy updateVariable ──────────────────────────────────
+        // updateVariable stores analytics mappings directly in
+        // action.settings.data.__adobe.analytics as eVar/prop/event
+        // keys with %token% or inline values
+        if (mp.indexOf('updateVariable') > -1) {
+          var uvData = c.settings && c.settings.data;
+          if (uvData && uvData.__adobe && uvData.__adobe.analytics) {
+            var aa = uvData.__adobe.analytics;
+            Object.keys(aa).forEach(function(key) {
+              var val = aa[key];
+              if (val === null || val === undefined) return;
+              var strVal = String(val);
+
+              if (/^eVar\d+$/.test(key)) {
+                var varId = 'var_' + key;
+                registerVar(varId, key, 'evar');
+                linkRuleVar(rName, varId);
+                var de = extractToken(strVal);
+                if (de) linkDEVar(de, varId);
+
+              } else if (/^prop\d+$/.test(key)) {
+                var varId = 'var_' + key;
+                registerVar(varId, key, 'prop');
+                linkRuleVar(rName, varId);
+                var de = extractToken(strVal);
+                if (de) linkDEVar(de, varId);
+
+              } else if (key === 'events' &&
+                         typeof val === 'string' && val.length > 0) {
+                // Split comma-separated: "event1,event4,event10"
+                val.split(',').forEach(function(evtRaw) {
+                  var evtName = evtRaw.trim().split('=')[0].trim();
+                  if (!evtName) return;
+                  var varId = 'var_' + evtName;
+                  registerVar(varId, evtName, 'event');
+                  linkRuleVar(rName, varId);
+                });
+
+              } else if (key === 'campaign') {
+                var varId = 'var_campaign';
+                registerVar(varId, 'campaign', 'prop');
+                linkRuleVar(rName, varId);
+                var de = extractToken(strVal);
+                if (de) linkDEVar(de, varId);
+
+              } else if (key === 'products') {
+                var varId = 'var_products';
+                registerVar(varId, 'products', 'prop');
+                linkRuleVar(rName, varId);
+                var de = extractToken(strVal);
+                if (de) linkDEVar(de, varId);
+              }
+            });
+          }
         }
 
         // Web SDK sendEvent XDM
@@ -664,63 +722,6 @@
       return { source: l.source, target: l.target, value: l.value, label: l.labels.length ? l.labels[0] : '' };
     });
 
-    // ── Variable layer (column 3) ───────────────────────────────────
-    var ruleToVars = rels.ruleToVars || {};
-    var deToVars   = rels.deToVars   || {};
-    var varMeta    = rels.varMeta    || {};
-    var varToRules = rels.varToRules || {};
-
-    // Collect varIds relevant to visible rules
-    var relevantVarIds = {};
-    R.forEach(function(rNode) {
-      (ruleToVars[rNode.name] || []).forEach(function(v) {
-        relevantVarIds[v.varId] = true;
-      });
-    });
-
-    // Add variable nodes
-    var varIdx = 0;
-    Object.keys(relevantVarIds).forEach(function(varId) {
-      var meta = varMeta[varId];
-      if (!meta) return;
-      var vNode = {
-        id:     varId,
-        name:   meta.label,
-        type:   meta.type,
-        total:  (varToRules[varId] || []).length,
-        column: 3,
-        index:  varIdx++
-      };
-      nodes.push(vNode);
-      nodeById[varId] = vNode;
-    });
-
-    // Add Rule → Variable edges
-    R.forEach(function(rNode) {
-      (ruleToVars[rNode.name] || []).forEach(function(v) {
-        if (!relevantVarIds[v.varId]) return;
-        links.push({
-          source: rNode.id,
-          target: v.varId,
-          value:  1,
-          label:  rNode.name + ' → ' + (varMeta[v.varId] || {}).label
-        });
-      });
-    });
-
-    // Add DE → Variable edges (when DE is the value source)
-    DE.forEach(function(deNode) {
-      (deToVars[deNode.name] || []).forEach(function(v) {
-        if (!relevantVarIds[v.varId]) return;
-        links.push({
-          source: deNode.id,
-          target: v.varId,
-          value:  1,
-          label:  deNode.name + ' → ' + (varMeta[v.varId] || {}).label
-        });
-      });
-    });
-
     return { nodes: nodes, links: links, nodeById: nodeById };
   }
 
@@ -841,24 +842,19 @@
 
     var padding = { top: VERT_PADDING, right: HORIZ_PADDING, bottom: VERT_PADDING, left: HORIZ_PADDING };
     var chartWidth = width - padding.left - padding.right;
-    var hasVarNodes = flowData.nodes.some(function(n) {
-      return n.column === 3;
-    });
-    var numCols  = hasVarNodes ? 4 : 3;
-    var colWidth = (chartWidth - (numCols - 1) * COLUMN_GAP) / numCols;
+    var colWidth = (chartWidth - 2 * COLUMN_GAP) / 3;
     var col0X = padding.left;
     var col1X = padding.left + colWidth + COLUMN_GAP;
     var col2X = padding.left + 2 * (colWidth + COLUMN_GAP);
-    var col3X = padding.left + 3 * (colWidth + COLUMN_GAP);
-    var colXPositions = hasVarNodes ? [col0X, col1X, col2X, col3X] : [col0X, col1X, col2X];
+    var colXPositions = [col0X, col1X, col2X];
 
-    var cols = [[], [], [], []];
+    var cols = [[], [], []];
     nodes.forEach(function (n) {
       if (!cols[n.column]) cols[n.column] = [];
       cols[n.column].push(n);
     });
     cols.forEach(function (col, c) {
-      var x = c === 0 ? col0X : c === 1 ? col1X : c === 2 ? col2X : col3X;
+      var x = c === 0 ? col0X : c === 1 ? col1X : col2X;
       col.forEach(function (n, i) {
         n.x = x;
         n.y = padding.top + i * (NODE_HEIGHT + NODE_GAP);
@@ -931,7 +927,6 @@
     });
 
     var dividerXs = [col0X + colWidth, col1X + colWidth, col2X + colWidth];
-    if (hasVarNodes) dividerXs.push(col3X + colWidth);
     dividerXs.forEach(function(dx) {
       g.append('line').attr('class', 'flow-column-divider').attr('x1', dx).attr('y1', padding.top).attr('x2', dx).attr('y2', height - padding.bottom);
     });
@@ -1005,9 +1000,7 @@
       });
     });
 
-    var colLabels = hasVarNodes
-      ? ['Data Elements', 'Rules', 'Extensions', 'AA Variables / XDM']
-      : ['Data Elements', 'Rules', 'Extensions'];
+    var colLabels = ['Data Elements', 'Rules', 'Extensions'];
     colXPositions.forEach(function (x, i) {
       g.append('text').attr('class', 'flow-column-label').attr('x', x).attr('y', padding.top - 10).attr('text-anchor', 'start').text(colLabels[i]);
     });
@@ -1039,6 +1032,10 @@
     }
 
     var rels = buildRelationships(rulesArray, dataElements, extensions);
+    console.log('[Flow] rules:', rulesArray.length,
+      '| DEs:', Object.keys(dataElements).length,
+      '| varMeta keys:', Object.keys(rels.varMeta||{}).length,
+      '| ruleToVars keys:', Object.keys(rels.ruleToVars||{}).length);
 
     var optionsList = [];
     Object.keys(rels.dataElementToRule).sort().forEach(function (name) {
@@ -1159,15 +1156,86 @@
     function buildVarListFromMeta(listEl, detailEl) {
       var varMeta    = rels.varMeta    || {};
       var varToRules = rels.varToRules || {};
+
+      // Build reverse index: varId → [deName] from deToVars
+      var varToDEs = {};
+      Object.keys(rels.deToVars || {}).forEach(function(deName) {
+        (rels.deToVars[deName] || []).forEach(function(v) {
+          if (!varToDEs[v.varId]) varToDEs[v.varId] = [];
+          if (varToDEs[v.varId].indexOf(deName) === -1) {
+            varToDEs[v.varId].push(deName);
+          }
+        });
+      });
+
+      // Build entries with proper %token% values
+      // Each entry is one rule × DE combination
+      function buildEntries(varId) {
+        var rules = varToRules[varId] || [];
+        var des   = varToDEs[varId]   || [];
+        var entries = [];
+        var seen = {};
+
+        if (des.length > 0) {
+          // Cross rules × DEs — find which rule uses which DE
+          // via ruleToDataElement to make connected pairs
+          rules.forEach(function(rName) {
+            var ruleDEs = Object.keys(
+              (rels.ruleToDataElement || {})[rName] || {}
+            );
+            var matched = des.filter(function(d) {
+              return ruleDEs.indexOf(d) > -1;
+            });
+            if (matched.length > 0) {
+              matched.forEach(function(deName) {
+                var k = rName + '||%' + deName + '%';
+                if (!seen[k]) {
+                  seen[k] = true;
+                  entries.push({
+                    ruleName: rName,
+                    value:    '%' + deName + '%',
+                    ruleId:   ''
+                  });
+                }
+              });
+            } else {
+              // Rule sets this var but no DE match — custom code
+              var k = rName + '||';
+              if (!seen[k]) {
+                seen[k] = true;
+                entries.push({ ruleName: rName, value: '', ruleId: '' });
+              }
+            }
+          });
+        } else {
+          // No DEs mapped — all rules use custom code or inline
+          rules.forEach(function(rName) {
+            var k = rName + '||';
+            if (!seen[k]) {
+              seen[k] = true;
+              entries.push({ ruleName: rName, value: '', ruleId: '' });
+            }
+          });
+        }
+        return entries;
+      }
+
+      // Build variable list grouped by type
       var groups = { evar: [], prop: [], event: [], xdm: [] };
       Object.keys(varMeta).sort(numSort).forEach(function(varId) {
         var meta = varMeta[varId];
         if (groups[meta.type]) groups[meta.type].push(varId);
       });
-      var groupTitles = { evar:'eVars', prop:'Props',
-                          event:'Events', xdm:'XDM' };
+
+      var groupTitles = {
+        evar:  'eVars',
+        prop:  'Props',
+        event: 'Events',
+        xdm:   'XDM'
+      };
+
       var html = '';
-      ['evar','prop','event','xdm'].forEach(function(type) {
+      ['evar', 'prop', 'event', 'xdm'].forEach(function(type) {
         var ids = groups[type];
         if (!ids.length) return;
         html += '<div class="var-list-section-title">' +
@@ -1183,9 +1251,12 @@
                   '</div>';
         });
       });
-      listEl.innerHTML = html || '<div style="padding:20px;color:#94a3b8;' +
-        'font-size:12px">Visit Combined Variable Mapping first</div>';
 
+      listEl.innerHTML = html ||
+        '<div style="padding:20px;color:#94a3b8;font-size:12px">' +
+        'No variables found in this property.</div>';
+
+      // Click handler
       listEl.addEventListener('click', function(e) {
         var item = e.target.closest('.var-list-item');
         if (!item) return;
@@ -1196,10 +1267,7 @@
         var varId  = item.dataset.varid;
         var type   = item.dataset.type;
         var meta   = varMeta[varId] || {};
-        var rules  = varToRules[varId] || [];
-        var entries = rules.map(function(r) {
-          return { ruleName: r, value: '', ruleId: '' };
-        });
+        var entries = buildEntries(varId);
         renderVarDetail(detailEl, meta.label, type, entries);
       });
     }
@@ -1389,10 +1457,13 @@
           } else {
             // Value set via custom code — source not statically readable
             html += '<span class="var-chain-arrow">→</span>';
+            var noSourceLabel = (type === 'event')
+              ? 'Fired directly — no data element source'
+              : 'Custom code — value set at runtime';
             html += '<span class="var-chain-inline" ' +
                     'style="color:#94a3b8;font-style:italic;' +
                     'border-style:dashed">' +
-                    'Custom code — value set at runtime' +
+                    noSourceLabel +
                     '</span>';
           }
 
@@ -1489,7 +1560,7 @@
         flowData = buildFlowDataForSelection(rels, extensions, sel.type, sel.key);
       }
       var w = Math.max(container.clientWidth || 900, container.getBoundingClientRect().width || 900);
-      var h = Math.max(400, (flowData.nodes.length ? Math.max(flowData.nodes.filter(function (n) { return n.column === 0; }).length, flowData.nodes.filter(function (n) { return n.column === 1; }).length, flowData.nodes.filter(function (n) { return n.column === 2; }).length, flowData.nodes.filter(function (n) { return n.column === 3; }).length) * (NODE_HEIGHT + NODE_GAP) + VERT_PADDING * 2 + 24 : 400));
+      var h = Math.max(400, (flowData.nodes.length ? Math.max(flowData.nodes.filter(function (n) { return n.column === 0; }).length, flowData.nodes.filter(function (n) { return n.column === 1; }).length, flowData.nodes.filter(function (n) { return n.column === 2; }).length) * (NODE_HEIGHT + NODE_GAP) + VERT_PADDING * 2 + 24 : 400));
       if (!flowData.nodes.length) {
         container.innerHTML = generateFlowSkeleton();
       } else {

@@ -463,6 +463,23 @@
       });
     });
 
+    // ── Register XDM Object DEs as browseable entries ──────────────
+    Object.keys(dataElements).forEach(function(deName) {
+      var de = dataElements[deName];
+      if (!de || !de.modulePath) return;
+      if (de.modulePath.indexOf('xdmObject') === -1) return;
+      if (!de.settings || !de.settings.data) return;
+
+      var varId = 'xdmde_' + deName;
+      registerVar(varId, deName, 'xdmde');
+
+      Object.keys(ruleToDataElement).forEach(function(rName) {
+        if (ruleToDataElement[rName][deName]) {
+          linkRuleVar(rName, varId);
+        }
+      });
+    });
+
     return {
       ruleToDataElement: ruleToDataElement,
       dataElementToRule: dataElementToRule,
@@ -1221,7 +1238,7 @@
       }
 
       // Build variable list grouped by type
-      var groups = { evar: [], prop: [], event: [], xdm: [] };
+      var groups = { evar: [], prop: [], event: [], xdm: [], xdmde: [] };
       Object.keys(varMeta).sort(numSort).forEach(function(varId) {
         var meta = varMeta[varId];
         if (groups[meta.type]) groups[meta.type].push(varId);
@@ -1231,11 +1248,12 @@
         evar:  'eVars',
         prop:  'Props',
         event: 'Events',
-        xdm:   'XDM'
+        xdm:   'XDM Fields',
+        xdmde: 'XDM Objects'
       };
 
       var html = '';
-      ['evar', 'prop', 'event', 'xdm'].forEach(function(type) {
+      ['evar', 'prop', 'event', 'xdm', 'xdmde'].forEach(function(type) {
         var ids = groups[type];
         if (!ids.length) return;
         html += '<div class="var-list-section-title">' +
@@ -1247,7 +1265,7 @@
                   'data-type="' + type + '">' +
                   '<span class="var-list-name">' + meta.label + '</span>' +
                   '<span class="var-list-pill ' + type + '">' +
-                  type.toUpperCase() + '</span>' +
+                  (type === 'xdmde' ? 'XDM OBJ' : type.toUpperCase()) + '</span>' +
                   '</div>';
         });
       });
@@ -1344,6 +1362,99 @@
         };
         dur = durMap[dur] || dur;
         return { typeLabel: typeLabel, duration: dur };
+      }
+
+      // ── XDM Object DE — special rendering path ────────────────────
+      if (type === 'xdmde') {
+        var html = '';
+        html += '<div class="var-detail-name">' + varName + '</div>';
+        html += '<span class="var-detail-pill xdmde">XDM OBJECT</span>';
+
+        var xdmDE = dataElements[varName];
+        if (xdmDE && xdmDE.settings && xdmDE.settings.data) {
+          var fieldRows = [];
+
+          function collectXDMFields(obj, path) {
+            if (!obj || typeof obj !== 'object') return;
+            Object.keys(obj).forEach(function(key) {
+              var val = obj[key];
+              var fp  = path ? path + '.' + key : key;
+              if (/^eVar\d+$/.test(key) || /^prop\d+$/.test(key) ||
+                  /^event\d+$/.test(key)) {
+                fieldRows.push({
+                  field: key,
+                  path:  fp,
+                  value: typeof val === 'string' ? val : JSON.stringify(val)
+                });
+              } else if (val && typeof val === 'object') {
+                collectXDMFields(val, fp);
+              }
+            });
+          }
+          collectXDMFields(xdmDE.settings.data, '');
+
+          if (fieldRows.length > 0) {
+            html += '<div class="var-detail-section-title">' +
+                    'Analytics fields mapped in this XDM Object</div>';
+            html += '<div class="var-detail-chain">';
+            fieldRows.forEach(function(row) {
+              var tokenMatch = row.value.match(/^%([^%]+)%$/);
+              html += '<div class="var-detail-chain-row">';
+              html += '<span class="var-chain-rule" ' +
+                      'style="background:#fef9c3;border-color:#fde047;' +
+                      'color:#854d0e" title="' + row.field + '">' +
+                      row.field + '</span>';
+              html += '<span class="var-chain-arrow">→</span>';
+              if (tokenMatch) {
+                var deMeta = getDEMeta(tokenMatch[1]);
+                html += '<span class="var-chain-de" title="' +
+                        tokenMatch[1] + '">◆ ' + tokenMatch[1] +
+                        (deMeta ? '<span style="display:block;font-size:10px;' +
+                        'font-weight:400;color:#4ead7a;margin-top:1px">' +
+                        deMeta.typeLabel +
+                        (deMeta.duration ? ' · ' + deMeta.duration : '') +
+                        '</span>' : '') +
+                        '</span>';
+              } else {
+                html += '<span class="var-chain-inline">' +
+                        row.value + '</span>';
+              }
+              html += '</div>';
+            });
+            html += '</div>';
+
+            var rulesUsing = (rels.varToRules || {})['xdmde_' + varName] || [];
+            if (rulesUsing.length > 0) {
+              html += '<div class="var-detail-section-title">' +
+                      'Used by these rules</div>';
+              html += '<div class="var-detail-chain">';
+              rulesUsing.forEach(function(rName) {
+                var rm = getRuleMeta(rName);
+                html += '<div class="var-detail-chain-row">';
+                html += '<span class="var-chain-rule" title="' + rName + '">' +
+                        '⚡ ' + rName +
+                        '<span style="display:block;font-size:10px;' +
+                        'font-weight:400;color:#6b91d9;margin-top:1px">' +
+                        '⏱ ' + rm.trigger +
+                        (rm.conditions > 0 ? ' · ' + rm.conditions +
+                        ' condition' + (rm.conditions > 1 ? 's' : '') :
+                        ' · no conditions') +
+                        '</span></span>';
+                html += '</div>';
+              });
+              html += '</div>';
+            }
+          } else {
+            html += '<div class="var-detail-no-sources">' +
+                    'No Analytics field mappings found in this XDM Object.</div>';
+          }
+        } else {
+          html += '<div class="var-detail-no-sources">' +
+                  'XDM Object settings not readable from the deployed container.</div>';
+        }
+
+        detailEl.innerHTML = html;
+        return;
       }
 
       // ── Build chains (rule → DE) and inline values ────────────────
@@ -1511,6 +1622,10 @@
       if (variableControls)  variableControls.style.display  = 'none';
       if (chartWrapper)      chartWrapper.style.display      = '';
       if (varMapEl)          varMapEl.classList.remove('active');
+      var infoEl = document.getElementById('flowVarInfo');
+      if (infoEl) infoEl.style.display = 'none';
+      var betaEl = document.getElementById('flowVarMapBeta');
+      if (betaEl) betaEl.style.display = 'none';
     }
 
     function switchToVariableMode() {
@@ -1518,7 +1633,20 @@
       if (variableControls)  variableControls.style.display  = '';
       if (chartWrapper)      chartWrapper.style.display      = 'none';
       if (varMapEl)          varMapEl.classList.add('active');
+      var infoEl = document.getElementById('flowVarInfo');
+      if (infoEl) infoEl.style.display = 'block';
+      var betaEl = document.getElementById('flowVarMapBeta');
+      if (betaEl) betaEl.style.display = 'inline';
       renderVariableMap();
+    }
+
+    var varInfoToggle = document.getElementById('flowVarInfoToggle');
+    if (varInfoToggle) {
+      varInfoToggle.addEventListener('click', function() {
+        this.classList.toggle('open');
+        var body = document.getElementById('flowVarInfoBody');
+        if (body) body.classList.toggle('open');
+      });
     }
 
     if (modeSwitch) {

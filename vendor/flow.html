@@ -339,6 +339,7 @@
       .var-list-pill.prop  { background: #dcfce7; color: #15803d; }
       .var-list-pill.event { background: #fef3c7; color: #b45309; }
       .var-list-pill.xdm   { background: #f3e8ff; color: #7c3aed; }
+      .var-list-pill.xdmde { background: #fef3c7; color: #92400e; }
 
       /* Detail panel */
       .var-detail-empty {
@@ -365,6 +366,7 @@
       .var-detail-pill.prop  { background: #dcfce7; color: #15803d; }
       .var-detail-pill.event { background: #fef3c7; color: #b45309; }
       .var-detail-pill.xdm   { background: #f3e8ff; color: #7c3aed; }
+      .var-detail-pill.xdmde { background: #fef3c7; color: #92400e; }
       .var-detail-section-title {
         font-size: 11px;
         font-weight: 700;
@@ -436,6 +438,65 @@
         font-size: 13px;
         font-style: italic;
       }
+      /* ── Variable Map info panel ─────────────────────────── */
+      #flowVarInfo {
+        display: none;
+        margin: 0 0 0 0;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+      }
+      #flowVarInfoToggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 16px;
+        cursor: pointer;
+        font-size: 12px;
+        color: #64748b;
+        user-select: none;
+        border: none;
+        background: none;
+        width: 100%;
+        text-align: left;
+      }
+      #flowVarInfoToggle:hover { color: #0d9488; }
+      #flowVarInfoToggle .info-chevron {
+        margin-left: auto;
+        font-size: 10px;
+        transition: transform 0.2s;
+      }
+      #flowVarInfoToggle.open .info-chevron {
+        transform: rotate(180deg);
+      }
+      #flowVarInfoBody {
+        display: none;
+        padding: 0 16px 14px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #475569;
+      }
+      #flowVarInfoBody.open { display: block; }
+      .var-info-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 5px 0;
+        border-bottom: 1px solid #f1f5f9;
+      }
+      .var-info-row:last-child { border-bottom: none; }
+      .var-info-icon {
+        flex-shrink: 0;
+        width: 16px;
+        text-align: center;
+        margin-top: 1px;
+      }
+      .var-info-text strong {
+        color: #1e293b;
+        font-weight: 600;
+      }
+      .var-info-text .tag-yes  { color: #15803d; font-weight: 600; }
+      .var-info-text .tag-no   { color: #b91c1c; font-weight: 600; }
+      .var-info-text .tag-part { color: #b45309; font-weight: 600; }
     </style>
   </head>
   <body>
@@ -465,6 +526,10 @@
             <span class="flow-toggle-track"></span>
           </label>
           <span class="flow-mode-label">Variable Map</span>
+          <span id="flowVarMapBeta" style="display:none;margin-left:6px;
+            padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;
+            letter-spacing:.5px;background:#fef3c7;color:#92400e;
+            border:1px solid #fde68a;vertical-align:middle">BETA</span>
         </div>
 
         <!-- Component mode controls (shown in component mode) -->
@@ -487,6 +552,93 @@
 
       <div class="flow-chart-wrapper">
         <div class="flow-chart-container" id="flowChart"></div>
+      </div>
+
+      <div id="flowVarInfo">
+        <button id="flowVarInfoToggle">
+          ℹ What this map can and can't show
+          <span class="info-chevron">▼</span>
+        </button>
+        <div id="flowVarInfoBody">
+          <div class="var-info-row">
+            <span class="var-info-icon">✅</span>
+            <span class="var-info-text">
+              <strong>Alloy updateVariable actions</strong> —
+              eVars, props, and events set via
+              <em>data.__adobe.analytics</em> are fully extracted
+              including which data element feeds each variable.
+            </span>
+          </div>
+          <div class="var-info-row">
+            <span class="var-info-icon">✅</span>
+            <span class="var-info-text">
+              <strong>XDM Object data elements</strong> —
+              eVars and props mapped under
+              <em>_experience.analytics.customDimensions</em>
+              are extracted. XDM objects appear both as the DE source
+              in the chain view AND as browseable entries in the XDM
+              Objects section — click any XDM Object to see its field
+              mappings and which rules use it.
+            </span>
+          </div>
+          <div class="var-info-row">
+            <span class="var-info-icon">✅</span>
+            <span class="var-info-text">
+              <strong>Classic AA Set Variables actions</strong> —
+              eVars and props set via
+              <em>trackerProperties.eVars[]</em> are fully
+              extracted with DE source links.
+            </span>
+          </div>
+          <div class="var-info-row">
+            <span class="var-info-icon">⚠️</span>
+            <span class="var-info-text">
+              <strong>Custom code actions</strong> —
+              the variable name is detected but the data element
+              source cannot be read. These show as
+              <em>"Custom code — value set at runtime"</em>.
+            </span>
+          </div>
+          <div class="var-info-row">
+            <span class="var-info-icon">⚠️</span>
+            <span class="var-info-text">
+              <strong>Product list item variables</strong> —
+              eVars nested inside <em>productListItems[]</em>
+              arrays are partially extracted via recursive
+              traversal but may not appear for all product
+              schemas.
+            </span>
+          </div>
+          <div class="var-info-row">
+            <span class="var-info-icon">❌</span>
+            <span class="var-info-text">
+              <strong>Alloy Variable data elements</strong> —
+              DEs of type <em>variable/index.js</em> store values
+              at runtime via a <em>dataElementId</em> reference.
+              Their contents cannot be read from the deployed
+              container and will not appear here.
+            </span>
+          </div>
+          <div class="var-info-row">
+            <span class="var-info-icon">❌</span>
+            <span class="var-info-text">
+              <strong>Variables set via adobeDataLayer.push()</strong> —
+              values pushed to the data layer and consumed by
+              listener rules are resolved at runtime only and
+              cannot be statically mapped.
+            </span>
+          </div>
+          <div class="var-info-row">
+            <span class="var-info-icon">ℹ️</span>
+            <span class="var-info-text">
+              <strong>This map is site-wide</strong> —
+              it shows all variables configured across all rules
+              in the deployed container, not filtered by the
+              current page or whether a rule fired during this
+              visit.
+            </span>
+          </div>
+        </div>
       </div>
 
       <div id="flowVariableMap">

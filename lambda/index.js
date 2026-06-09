@@ -66,6 +66,8 @@ const ALERT_PCT = 0.75; // send alert when daily cost crosses this fraction of t
 const MODEL_ID =
   process.env.BEDROCK_MODEL_ID || 'amazon.nova-lite-v1:0';
 const CHAT_PROMPT_VERSION = 'v21';
+const ENABLE_LOCAL_RESOLUTION =
+  (process.env.ENABLE_LOCAL_RESOLUTION || 'true').toLowerCase() === 'true';
 const REGION =
   process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
 const USERS_TABLE = (process.env.USERS_TABLE || 'tagscanner_users').trim();
@@ -917,6 +919,7 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
         tokens: { input: 0, output: 0 },
         queryId: queryId || null,
         fromCache: true,
+        enableLocalResolution: ENABLE_LOCAL_RESOLUTION,
       });
     }
   }
@@ -1005,6 +1008,7 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
     queryId: queryId || null,
     chatCount: effectiveLimit === Infinity ? null : newBetaCount,
     chatLimit: effectiveLimit === Infinity ? null : effectiveLimit,
+    enableLocalResolution: ENABLE_LOCAL_RESOLUTION,
   });
 }
 

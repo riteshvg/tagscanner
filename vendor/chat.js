@@ -8,6 +8,7 @@
   var displayMessages     = []; // { role, text } for session restore
   var isLoading           = false;
   var consentGiven        = false;
+  var enableLocalResolution = true; // default on, can be disabled by Lambda
 
   var CHAT_HISTORY_KEY  = 'ts_chat_history';
   var CHAT_MESSAGES_KEY = 'ts_chat_messages';
@@ -1134,7 +1135,9 @@
             ' | reverseDE: ' + (km.reverseDeResult ?
               km.reverseDeResult.targetDE : 'none')) : 'no matches');
 
-    var localAnswer = resolveLocally(question, propertyContext);
+    var localAnswer = enableLocalResolution
+      ? resolveLocally(question, propertyContext)
+      : null;
     console.log('[Ask AI] Stage 4 — resolveLocally:',
       localAnswer ? 'RESOLVED locally' : 'pass to Lambda',
       localAnswer ? '| answer length: ' + localAnswer.length : '');
@@ -1177,6 +1180,9 @@
         '| answer length:', (data.answer || '').length);
       removeThinking();
       var answer = data.answer || '';
+      if (typeof data.enableLocalResolution === 'boolean') {
+        enableLocalResolution = data.enableLocalResolution;
+      }
       var qId = data.queryId || null;
       if (_tsA) {
         _tsA.track('Ask AI:Answer', {

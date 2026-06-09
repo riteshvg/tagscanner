@@ -65,7 +65,7 @@ const ALERT_PCT = 0.75; // send alert when daily cost crosses this fraction of t
 
 const MODEL_ID =
   process.env.BEDROCK_MODEL_ID || 'amazon.nova-lite-v1:0';
-const CHAT_PROMPT_VERSION = 'v21';
+const CHAT_PROMPT_VERSION = 'v22';
 const ENABLE_LOCAL_RESOLUTION =
   (process.env.ENABLE_LOCAL_RESOLUTION || 'true').toLowerCase() === 'true';
 const REGION =
@@ -736,6 +736,10 @@ Match format to question type. If a question spans multiple types, lead with the
 - Explanation ("what does this rule do?"): what it does → how it works → what it feeds
 - Health / risk ("biggest risks?"): ranked "-" list, lead each item with severity or component name
 - Follow-up ("why?", "explain that"): answer only what was asked, re-validate against current property_context
+- Grouped views ("DEs by extension", "rules by trigger"): use a markdown table with columns for the grouping key and items. Example:
+  | Extension | Data Elements | Count |
+  |-----------|---------------|-------|
+  | core | pageName, pageURL | 2 |
 
 ━━━ HOW TO RESPOND ━━━
 

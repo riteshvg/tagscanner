@@ -461,8 +461,40 @@
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // Convert "-" bullet lists and double newlines to basic HTML
+  // Convert "-" bullet lists, tables, and double newlines to basic HTML
   function renderMarkdownLite(text) {
+    // ── Table detection ────────────────────────────────────────────
+    var tablePattern = /\n(\|.+\|)\n(\|[\s\-:]+\|)\n((?:\|.+\|\n?)+)/g;
+    if (tablePattern.test(text)) {
+      tablePattern.lastIndex = 0;
+      text = text.replace(tablePattern, function(match, header, sep, body) {
+        var headers = header.split('|')
+          .map(function(h) { return h.trim(); })
+          .filter(Boolean);
+        var rows = body.trim().split('\n')
+          .map(function(row) {
+            return row.split('|')
+              .map(function(c) { return c.trim(); })
+              .filter(Boolean);
+          });
+        var html = '<table style="border-collapse:collapse;margin:10px 0;width:100%;font-size:13px">';
+        html += '<thead><tr>';
+        headers.forEach(function(h) {
+          html += '<th style="border:1px solid #e2e8f0;padding:6px 10px;background:#f8fafc;text-align:left;font-weight:600">' + esc(h) + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        rows.forEach(function(row) {
+          html += '<tr>';
+          row.forEach(function(cell) {
+            html += '<td style="border:1px solid #e2e8f0;padding:6px 10px">' + esc(cell) + '</td>';
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        return html;
+      });
+    }
+
     var lines = text.split('\n');
     var html  = '';
     var inList = false;
@@ -689,7 +721,9 @@
     'audience manager','aam','ecid','mcid','visitor id','custom code','javascript',
     'pageview','page view','click','link','direct call','sequence','order',
     'enabled','disabled','paused','active','unused','bloat','performance',
-    'property','workspace','environment','host','staging','production'
+    'property','workspace','environment','host','staging','production',
+    'delete','remove','break','breaks','impact','blast radius',
+    'depends','dependency','chain','reference','affect'
   ];
 
   function checkUIDeflect(question) {

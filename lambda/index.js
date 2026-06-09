@@ -22,7 +22,7 @@
  *   tagscanner_feedback      — PK: feedbackId (String)
  *
  * Environment variables:
- *   BEDROCK_MODEL_ID  (default: us.anthropic.claude-3-5-haiku-20241022-v1:0)
+ *   BEDROCK_MODEL_ID  (default: amazon.nova-lite-v1:0)
  *   BEDROCK_REGION    (default: us-east-1)
  *   USERS_TABLE       (default: tagscanner_users)
  *   SESSIONS_TABLE    (default: tagscanner_sessions)
@@ -64,7 +64,7 @@ const SNS_TOPIC_ARN = (process.env.SNS_TOPIC_ARN || '').trim();
 const ALERT_PCT = 0.75; // send alert when daily cost crosses this fraction of the limit
 
 const MODEL_ID =
-  process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-3-5-haiku-20241022-v1:0';
+  process.env.BEDROCK_MODEL_ID || 'amazon.nova-lite-v1:0';
 const CHAT_PROMPT_VERSION = 'v21';
 const REGION =
   process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
@@ -119,9 +119,15 @@ const DEFAULT_COST_LIMIT = parseFloat(
   process.env.DEFAULT_COST_LIMIT_USD || '5.00',
 );
 
-// AWS Bedrock Claude 3.5 Haiku pricing (explain + chat)
-const COST_INPUT_PER_TOKEN = 1.0 / 1e6; // $1.00 per 1M input tokens
-const COST_OUTPUT_PER_TOKEN = 5.0 / 1e6; // $5.00 per 1M output tokens
+// Cost rates — Nova Lite vs Claude Haiku (explain + chat only)
+const isNovaModel = MODEL_ID.includes('amazon.nova');
+const COST_INPUT_PER_TOKEN = isNovaModel ? 0.06 / 1e6 : 1.0 / 1e6;
+const COST_OUTPUT_PER_TOKEN = isNovaModel ? 0.24 / 1e6 : 5.0 / 1e6;
+// Pricing reference (as of 2025):
+// Amazon Nova Lite:  $0.06/M input,  $0.24/M output
+// Amazon Nova Micro: $0.035/M input, $0.14/M output
+// Claude Haiku 3.5:  $1.00/M input,  $5.00/M output
+// Claude Sonnet 4.6: $3.00/M input, $15.00/M output (scan only)
 
 // Anthropic API Claude Sonnet 4.6 pricing (scan only)
 const ANTHROPIC_API_KEY = (process.env.ANTHROPIC_API_KEY || '').trim();

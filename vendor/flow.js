@@ -25,7 +25,7 @@
 
     var parts = [];
 
-    parts.push('<svg width="100%" viewBox="0 0 1200 320" preserveAspectRatio="xMidYMid meet" style="display:block;overflow:visible">');
+    parts.push('<svg width="100%" viewBox="0 0 900 320" preserveAspectRatio="xMidYMid meet" style="display:block;overflow:visible">');
 
     // Column dividers
     parts.push('<line x1="' + DIV1 + '" y1="18" x2="' + DIV1 + '" y2="292" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 4"/>');
@@ -420,7 +420,7 @@
 
               } else if (key === 'products') {
                 var varId = 'var_products';
-                registerVar(varId, 'products', 'prop');
+                registerVar(varId, 'products', 'products');
                 linkRuleVar(rName, varId);
                 var de = extractToken(strVal);
                 if (de) linkDEVar(de, varId);
@@ -1054,6 +1054,35 @@
       '| varMeta keys:', Object.keys(rels.varMeta||{}).length,
       '| ruleToVars keys:', Object.keys(rels.ruleToVars||{}).length);
 
+    // ── TEMP DIAGNOSTIC ──────────────────────────────────
+    var _actionTypeCounts = {};
+    var _ccActionCount = 0;
+    var _svRuleCount = 0;
+    var _uvRuleCount = 0;
+    rulesArray.forEach(function(r) {
+      (r.actions || []).forEach(function(a) {
+        if (!a.modulePath) return;
+        var key = a.modulePath.split('/').pop();
+        _actionTypeCounts[key] = (_actionTypeCounts[key] || 0) + 1;
+        if (a.settings && a.settings.source) _ccActionCount++;
+        if (a.modulePath.indexOf('setVariables') > -1) {
+          _svRuleCount++;
+          if (_svRuleCount === 1) {
+            console.log('[DIAG] First setVariables trackerProperties:',
+              JSON.stringify(a.settings && a.settings.trackerProperties, null, 2).slice(0, 800));
+          }
+        }
+        if (a.modulePath.indexOf('updateVariable') > -1) _uvRuleCount++;
+      });
+    });
+    console.log('[DIAG] Total rules:', rulesArray.length);
+    console.log('[DIAG] Action types:', JSON.stringify(_actionTypeCounts));
+    console.log('[DIAG] setVariables rules:', _svRuleCount);
+    console.log('[DIAG] updateVariable rules:', _uvRuleCount);
+    console.log('[DIAG] custom code actions:', _ccActionCount);
+    console.log('[DIAG] varMeta count:', Object.keys(rels.varMeta || {}).length);
+    // ── END DIAGNOSTIC ───────────────────────────────────
+
     var optionsList = [];
     Object.keys(rels.dataElementToRule).sort().forEach(function (name) {
       optionsList.push({ value: '[Data Element] ' + name, type: 'de', key: name });
@@ -1101,6 +1130,11 @@
 
     // ── Variable map — split panel ────────────────────────────────────
 
+    function numSort(a, b) {
+      return (parseInt(a.replace(/\D/g,''), 10) || 0) -
+             (parseInt(b.replace(/\D/g,''), 10) || 0);
+    }
+
     function renderVariableMap() {
       var listEl   = document.getElementById('flowVarListInner');
       var detailEl = document.getElementById('flowVarDetailInner');
@@ -1120,16 +1154,12 @@
       }
     }
 
-    function numSort(a, b) {
-      return (parseInt(a.replace(/\D/g,''), 10) || 0) -
-             (parseInt(b.replace(/\D/g,''), 10) || 0);
-    }
-
     function buildVarList(listEl, storedVars, detailEl) {
       var groups = [
-        { key: 'eVars',  title: 'eVars',  type: 'evar'  },
-        { key: 'props',  title: 'Props',  type: 'prop'  },
-        { key: 'events', title: 'Events', type: 'event' }
+        { key: 'eVars',    title: 'eVars',    type: 'evar'     },
+        { key: 'props',    title: 'Props',    type: 'prop'     },
+        { key: 'events',   title: 'Events',   type: 'event'    },
+        { key: 'products', title: 'Products', type: 'products' }
       ];
       var html = '';
       groups.forEach(function(g) {
@@ -1154,7 +1184,10 @@
       }
       listEl.innerHTML = html;
 
-      listEl.addEventListener('click', function(e) {
+      if (listEl._varClickHandler) {
+        listEl.removeEventListener('click', listEl._varClickHandler);
+      }
+      listEl._varClickHandler = function(e) {
         var item = e.target.closest('.var-list-item');
         if (!item) return;
         listEl.querySelectorAll('.var-list-item').forEach(function(el) {
@@ -1164,10 +1197,12 @@
         var varName  = item.dataset.var;
         var type     = item.dataset.type;
         var groupKey = type === 'evar' ? 'eVars'
-                     : type === 'prop' ? 'props' : 'events';
+                     : type === 'prop' ? 'props'
+                     : type === 'products' ? 'products' : 'events';
         var entries = (storedVars[groupKey] || {})[varName] || [];
         renderVarDetail(detailEl, varName, type, entries);
-      });
+      };
+      listEl.addEventListener('click', listEl._varClickHandler);
     }
 
     function buildVarListFromMeta(listEl, detailEl) {
@@ -1238,22 +1273,26 @@
       }
 
       // Build variable list grouped by type
-      var groups = { evar: [], prop: [], event: [], xdm: [], xdmde: [] };
+      var groups = {
+        evar: [], prop: [], event: [],
+        products: [], xdm: [], xdmde: []
+      };
       Object.keys(varMeta).sort(numSort).forEach(function(varId) {
         var meta = varMeta[varId];
         if (groups[meta.type]) groups[meta.type].push(varId);
       });
 
       var groupTitles = {
-        evar:  'eVars',
-        prop:  'Props',
-        event: 'Events',
-        xdm:   'XDM Fields',
-        xdmde: 'XDM Objects'
+        evar:     'eVars',
+        prop:     'Props',
+        event:    'Events',
+        products: 'Products',
+        xdm:      'XDM Fields',
+        xdmde:    'XDM Objects'
       };
 
       var html = '';
-      ['evar', 'prop', 'event', 'xdm', 'xdmde'].forEach(function(type) {
+      ['evar', 'prop', 'event', 'products', 'xdm', 'xdmde'].forEach(function(type) {
         var ids = groups[type];
         if (!ids.length) return;
         html += '<div class="var-list-section-title">' +
@@ -1275,7 +1314,10 @@
         'No variables found in this property.</div>';
 
       // Click handler
-      listEl.addEventListener('click', function(e) {
+      if (listEl._varClickHandler) {
+        listEl.removeEventListener('click', listEl._varClickHandler);
+      }
+      listEl._varClickHandler = function(e) {
         var item = e.target.closest('.var-list-item');
         if (!item) return;
         listEl.querySelectorAll('.var-list-item').forEach(function(el) {
@@ -1287,7 +1329,8 @@
         var meta   = varMeta[varId] || {};
         var entries = buildEntries(varId);
         renderVarDetail(detailEl, meta.label, type, entries);
-      });
+      };
+      listEl.addEventListener('click', listEl._varClickHandler);
     }
 
     function renderVarDetail(detailEl, varName, type, entries) {
@@ -1423,7 +1466,18 @@
             });
             html += '</div>';
 
-            var rulesUsing = (rels.varToRules || {})['xdmde_' + varName] || [];
+            var rulesUsing = ((rels.varToRules || {})['xdmde_' + varName] || []).slice();
+            if (rulesUsing.length === 0) {
+              Object.keys(rels.ruleToDataElement || {}).forEach(
+                function(rName) {
+                  if ((rels.ruleToDataElement[rName] || {})[varName]) {
+                    if (rulesUsing.indexOf(rName) === -1) {
+                      rulesUsing.push(rName);
+                    }
+                  }
+                }
+              );
+            }
             if (rulesUsing.length > 0) {
               html += '<div class="var-detail-section-title">' +
                       'Used by these rules</div>';
@@ -1511,7 +1565,17 @@
 
       // ── Conflict detection ─────────────────────────────────────────
       var totalSources = chains.length + inlines.length;
-      var hasConflict  = totalSources > 1;
+
+      var uniqueValues = {};
+      chains.forEach(function(c) {
+        var val = c.de ? ('%' + c.de + '%') : '__custom__';
+        uniqueValues[val] = (uniqueValues[val] || 0) + 1;
+      });
+      inlines.forEach(function(iv) {
+        uniqueValues[iv.value] = (uniqueValues[iv.value] || 0) + 1;
+      });
+      var distinctValues = Object.keys(uniqueValues).length;
+      var hasConflict = distinctValues > 1;
 
       // ── Render ─────────────────────────────────────────────────────
       var html = '';
@@ -1521,11 +1585,16 @@
 
       // Conflict warning
       if (hasConflict) {
+        var conflictValues = Object.keys(uniqueValues);
         html += '<div style="margin:10px 0 4px;padding:8px 12px;' +
                 'background:#fef9c3;border:1px solid #fde047;' +
                 'border-radius:6px;font-size:12px;color:#854d0e">' +
-                '⚠ Set by ' + totalSources + ' sources — ' +
-                'verify execution order to avoid overwrite conflicts' +
+                '⚠ Set to ' + distinctValues + ' different values ' +
+                'across ' + totalSources + ' rules — ' +
+                'verify execution order: ' +
+                conflictValues.map(function(v) {
+                  return v === '__custom__' ? 'custom code' : v;
+                }).join(', ') +
                 '</div>';
       }
 

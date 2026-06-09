@@ -819,12 +819,17 @@ document.addEventListener('DOMContentLoaded', function () {
           });
         }
       } else if (key === 'products') {
-        // products string contains embedded eVars — register as-is
-        if (!analyticsVariables.eVars['products']) {
-          analyticsVariables.eVars['products'] = [];
+        if (!analyticsVariables.products) {
+          analyticsVariables.products = {};
         }
-        if (!entryExists(analyticsVariables.eVars['products'], ruleName, strVal.slice(0, 80), ruleId)) {
-          analyticsVariables.eVars['products'].push({
+        if (!analyticsVariables.products['products']) {
+          analyticsVariables.products['products'] = [];
+        }
+        if (!entryExists(
+          analyticsVariables.products['products'],
+          ruleName, strVal, ruleId
+        )) {
+          analyticsVariables.products['products'].push({
             ruleName: ruleName,
             value:    strVal.slice(0, 80),
             ruleId:   ruleId

@@ -510,6 +510,8 @@ chrome.runtime.onMessage.addListener(function (message) {
         : (typeof dataElements === 'object' ? Object.keys(dataElements).length : 0);
       document.getElementById('dataelement').innerHTML = deCount;
       sessionStorage.setItem('dataelement-length', deCount);
+      // Scan token: updated last so chat.js knows all data is fresh
+      sessionStorage.setItem('ts_scan_token', Date.now().toString());
       if (document.getElementById('topbar-de')) {
         document.getElementById('topbar-de').innerHTML = '<i class="fas fa-database mr-1"></i>Data Elements: ' + deCount;
       }

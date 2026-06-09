@@ -12,6 +12,38 @@
   var CHAT_HISTORY_KEY  = 'ts_chat_history';
   var CHAT_MESSAGES_KEY = 'ts_chat_messages';
   var BETA_LIMIT        = 10;
+
+  // ── Client-side answer cache ───────────────────────────────────────────────
+  // Keyed by (question + property scan token). Prevents duplicate LLM calls
+  // for repeated questions and is invalidated automatically when the extension
+  // rescans a new property (ts_scan_token changes).
+  var _answerCache      = {};  // { [key]: { answer, queryId } }
+  var _answerCacheToken = null;
+
+  function _getScanToken() {
+    return (sessionStorage.getItem('ts_scan_token') || '') +
+      '|' + (sessionStorage.getItem('launch_property_name') || '') +
+      '|' + (sessionStorage.getItem('launch_property_environment') || '') +
+      '|' + (sessionStorage.getItem('dataelement-length') || '');
+  }
+
+  function lookupAnswerCache(question) {
+    var token = _getScanToken();
+    if (token !== _answerCacheToken) {
+      _answerCache = {};
+      _answerCacheToken = token;
+    }
+    return _answerCache[question.trim().toLowerCase()] || null;
+  }
+
+  function storeAnswerCache(question, answer, queryId) {
+    var token = _getScanToken();
+    if (token !== _answerCacheToken) {
+      _answerCache = {};
+      _answerCacheToken = token;
+    }
+    _answerCache[question.trim().toLowerCase()] = { answer: answer, queryId: queryId || null };
+  }
   // Persistent beta count stored in localStorage, keyed by userId + propertyKey
   function betaCountKey(session, propKey) {
     return 'ts_beta_count_' + (session.userId || '') + '_' + (propKey || '');
@@ -136,9 +168,38 @@
     var propUrl  = propHostname ? 'https://' + propHostname : '';
 
     var rulesRaw, deRaw, extRaw;
-    try { rulesRaw = JSON.parse(sessionStorage.getItem('_satellite._container.rules') || 'null'); } catch(e) { rulesRaw = null; }
-    try { deRaw    = JSON.parse(sessionStorage.getItem('_satellite._container.dataElements') || 'null'); } catch(e) { deRaw = null; }
-    try { extRaw   = JSON.parse(sessionStorage.getItem('_satellite._container.extension') || 'null'); } catch(e) { extRaw = null; }
+    try {
+      rulesRaw = JSON.parse(sessionStorage.getItem(
+        '_satellite._container.rules') || 'null');
+    } catch(e) { rulesRaw = null; }
+    if (!rulesRaw) {
+      try {
+        var _sc = window._satellite && window._satellite._container;
+        rulesRaw = (_sc && _sc.rules) || null;
+      } catch(e) {}
+    }
+
+    try {
+      deRaw = JSON.parse(sessionStorage.getItem(
+        '_satellite._container.dataElements') || 'null');
+    } catch(e) { deRaw = null; }
+    if (!deRaw) {
+      try {
+        var _sc2 = window._satellite && window._satellite._container;
+        deRaw = (_sc2 && _sc2.dataElements) || null;
+      } catch(e) {}
+    }
+
+    try {
+      extRaw = JSON.parse(sessionStorage.getItem(
+        '_satellite._container.extension') || 'null');
+    } catch(e) { extRaw = null; }
+    if (!extRaw) {
+      try {
+        var _sc3 = window._satellite && window._satellite._container;
+        extRaw = (_sc3 && _sc3.extensions) || null;
+      } catch(e) {}
+    }
 
     var rulesArr = Array.isArray(rulesRaw)
       ? rulesRaw
@@ -653,6 +714,9 @@
 
     // Deflect questions the UI already answers — zero tokens consumed
     var deflectMsg = checkUIDeflect(question);
+    console.log('[Ask AI] Stage 1 — UI deflection:',
+      deflectMsg ? 'DEFLECTED' : 'pass-through',
+      deflectMsg ? '| msg: ' + deflectMsg.slice(0, 100) : '');
     if (deflectMsg) {
       chatInput.value = '';
       chatInput.style.height = '';
@@ -689,13 +753,18 @@
   // Detects name-filter queries and injects pre-computed match lists into
   // propertyContext so the AI doesn't have to search the array itself.
   function injectKeywordMatches(question, propertyContext) {
+    var QO = "['\"\\u2018\\u2019\\u201C\\u201D]";  // opening quote chars (straight + curly)
+    var QC = "['\"\\u2018\\u2019\\u201C\\u201D]";  // closing quote chars (straight + curly)
     var patterns = [
+      /(?:contain(?:s|ing)?|have|with|reference(?:s)?)\s+(?:the\s+)?(?:word|keyword|term|string)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
+      // "contain the word 'X'" — explicitly handles "the word" prefix before quoted keyword
+      new RegExp('(?:have|contain(?:ing)?|with|for|about)\\s+(?:the\\s+)?(?:word\\s+|keyword\\s+)?' + QO + '([a-zA-Z0-9_\\-\\s\\.]+?)' + QC + '\\s*(?:\\?|$)', 'i'),
       /(?:have|contain(?:ing)?|with|for|about)\s+(?:the\s+)?(?:keyword\s+)?['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
       /(?:keyword|find|search(?:ing\s+for)?)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
       /(?:named?|called)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
       /data\s+elements?\s+(?:for|with|contain(?:ing)?|about|related\s+to)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
       /(?:how\s+many|which|list)\s+data\s+elements?\s+(?:have|contain|include|with)\s+['"]?([a-zA-Z0-9_\-\s\.]+?)['"]?\s*(?:\?|$)/i,
-      /['"]([a-zA-Z0-9_\-\s\.]{2,})['""]/i
+      new RegExp(QO + '([a-zA-Z0-9_\\-\\s\\.]{2,})' + QC, 'i')
     ];
 
     var keyword = null;
@@ -839,17 +908,35 @@
       if (km.matchingDEs.length === 0 && km.matchingRules.length === 0) {
         return 'No data elements or rules found containing "' + km.keyword + '".';
       }
-      var klines = [];
-      if (km.matchingDEs.length > 0) {
-        klines.push(km.matchingDECount + ' data element' + (km.matchingDECount === 1 ? '' : 's') + ' contain "' + km.keyword + '":');
-        km.matchingDEs.forEach(function(n) { klines.push('- ' + n + ' (Data Element)'); });
-      }
-      if (km.matchingRules.length > 0) {
-        if (klines.length) klines.push('');
-        klines.push(km.matchingRuleCount + ' rule' + (km.matchingRuleCount === 1 ? '' : 's') + ' contain "' + km.keyword + '":');
-        km.matchingRules.forEach(function(n) { klines.push('- ' + n + ' (Rule)'); });
-      }
+      var totalMatches = km.matchingDECount + km.matchingRuleCount;
+      var klines = [totalMatches + ' match' + (totalMatches === 1 ? '' : 'es') + ':'];
+      km.matchingDEs.forEach(function(n) { klines.push('- ' + n + ' (Data Element)'); });
+      km.matchingRules.forEach(function(n) { klines.push('- ' + n + ' (Rule)'); });
       return klines.join('\n');
+    }
+
+    // ── Direct substring search for "the word X" phrasing ──────────
+    var wordMatch = q.match(/(?:contain(?:s|ing)?|have|with|reference(?:s)?|include(?:s)?|mention(?:s)?)\s+(?:the\s+)?(?:word|keyword|term|string|text|name)\s+['"]([a-zA-Z0-9_\-\s\.]+?)['"]|(?:contain(?:s|ing)?|have|with|reference(?:s)?|include(?:s)?|mention(?:s)?)\s+(?:the\s+)?(?:word|keyword|term|string|text|name)\s+([a-zA-Z0-9_\-\s\.]+?)(?:\s|$|\?)/i);
+    var capturedKeyword = (wordMatch && wordMatch[1]) ||
+                          (wordMatch && wordMatch[2]);
+    if (capturedKeyword && capturedKeyword.trim().length >= 2) {
+      var kw = capturedKeyword.trim().toLowerCase();
+      var kwDEs = [];
+      des.forEach(function(de) {
+        if (de.name && de.name.toLowerCase().indexOf(kw) !== -1) {
+          kwDEs.push(de.name);
+        }
+      });
+      if (kwDEs.length === 0) {
+        return 'No data elements found containing "' + capturedKeyword + '".';
+      }
+      var kwlines = [kwDEs.length + ' data element' +
+        (kwDEs.length === 1 ? '' : 's') + ' contain "' +
+        capturedKeyword + '":'];
+      kwDEs.forEach(function(n) {
+        kwlines.push('- ' + n + ' (Data Element)');
+      });
+      return kwlines.join('\n');
     }
 
     // ── Rule count ─────────────────────────────────────────────────────────
@@ -918,6 +1005,9 @@
   }
 
   function doSend(question, session) {
+    console.log('[Ask AI] ──────────────────────────────────');
+    console.log('[Ask AI] Question:', question.slice(0, 200));
+    console.log('[Ask AI] History depth:', conversationHistory.length);
     isLoading = true;
     btnSend.disabled = true;
     chatInput.value  = '';
@@ -936,16 +1026,53 @@
 
     appendBubble('user', esc(question));
     displayMessages.push({ role: 'user', text: question });
+
+    // Cache check — only for first-turn standalone questions
+    var _isFreshTurn = conversationHistory.length === 0;
+    if (_isFreshTurn) {
+      var cached = lookupAnswerCache(question);
+      if (cached) {
+        appendBubble('assistant', renderMarkdownLite(cached.answer), false, cached.queryId);
+        displayMessages.push({ role: 'assistant', text: cached.answer, queryId: cached.queryId });
+        var _propCtxCache = buildChatContext();
+        _propCtxCache = injectKeywordMatches(question, _propCtxCache);
+        conversationHistory.push({ role: 'user',      content: JSON.stringify({ property_context: _propCtxCache, question: question }) });
+        conversationHistory.push({ role: 'assistant', content: cached.answer });
+        if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
+        saveChatState();
+        isLoading = false;
+        btnSend.disabled = false;
+        chatInput.focus();
+        return;
+      }
+    }
+
     showThinking();
 
     var propertyContext = buildChatContext();
+    console.log('[Ask AI] Stage 2 — buildChatContext:',
+      'rules:', (propertyContext.rules || []).length,
+      '| DEs:', (propertyContext.dataElements || []).length,
+      '| extensions:', (propertyContext.extensions || []).length,
+      '| data_note:', !!(propertyContext.data_note));
     propertyContext = injectKeywordMatches(question, propertyContext);
+    var km = propertyContext._keywordMatches;
+    console.log('[Ask AI] Stage 3 — injectKeywordMatches:',
+      km ? ('keyword: "' + km.keyword + '"' +
+            ' | matchingDEs: ' + km.matchingDECount +
+            ' | matchingRules: ' + km.matchingRuleCount +
+            ' | reverseDE: ' + (km.reverseDeResult ?
+              km.reverseDeResult.targetDE : 'none')) : 'no matches');
 
     var localAnswer = resolveLocally(question, propertyContext);
+    console.log('[Ask AI] Stage 4 — resolveLocally:',
+      localAnswer ? 'RESOLVED locally' : 'pass to Lambda',
+      localAnswer ? '| answer length: ' + localAnswer.length : '');
     if (localAnswer) {
       removeThinking();
       appendBubble('assistant', renderMarkdownLite(localAnswer));
       displayMessages.push({ role: 'assistant', text: localAnswer });
+      if (_isFreshTurn) storeAnswerCache(question, localAnswer, null);
       conversationHistory.push({ role: 'user',      content: JSON.stringify({ property_context: propertyContext, question: question }) });
       conversationHistory.push({ role: 'assistant', content: localAnswer });
       if (conversationHistory.length > 8) conversationHistory = conversationHistory.slice(-8);
@@ -956,6 +1083,15 @@
       return;
     }
 
+    var deNames = (propertyContext.dataElements || [])
+      .map(function(de){ return de.name; });
+    console.log('[Ask AI] Stage 5 — propertyContext DEs:',
+      deNames.length, 'total');
+    console.log('[Ask AI] DEs containing "campaign":',
+      deNames.filter(function(n){
+        return n.toLowerCase().indexOf('campaign') > -1;
+      }));
+
     callLambda({
       type:                'chat',
       sessionToken:        session.sessionToken,
@@ -965,6 +1101,10 @@
       conversationHistory: conversationHistory
     })
     .then(function (data) {
+      console.log('[Ask AI] Stage 6 — Lambda response:',
+        'fromCache:', !!data.fromCache,
+        '| tokens:', JSON.stringify(data.tokens),
+        '| answer length:', (data.answer || '').length);
       removeThinking();
       var answer = data.answer || '';
       var qId = data.queryId || null;
@@ -978,6 +1118,7 @@
       }
       appendBubble('assistant', renderMarkdownLite(answer), false, qId);
       displayMessages.push({ role: 'assistant', text: answer, queryId: qId });
+      if (_isFreshTurn) storeAnswerCache(question, answer, qId);
 
       // Update history for follow-up questions
       conversationHistory.push({ role: 'user',      content: JSON.stringify({ property_context: propertyContext, question: question }) });

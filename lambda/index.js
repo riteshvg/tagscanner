@@ -65,6 +65,7 @@ const ALERT_PCT = 0.75; // send alert when daily cost crosses this fraction of t
 
 const MODEL_ID =
   process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-3-5-haiku-20241022-v1:0';
+const CHAT_PROMPT_VERSION = 'v21';
 const REGION =
   process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-1';
 const USERS_TABLE = (process.env.USERS_TABLE || 'tagscanner_users').trim();
@@ -105,6 +106,9 @@ const SCAN_CACHE_TABLE = (
 ).trim();
 const EXPLAIN_CACHE_TABLE = (
   process.env.EXPLAIN_CACHE_TABLE || 'tagscanner_explain_cache'
+).trim();
+const CHAT_CACHE_TABLE = (
+  process.env.CHAT_CACHE_TABLE || 'tagscanner_chat_cache'
 ).trim();
 const FEEDBACK_TABLE = (
   process.env.FEEDBACK_TABLE || 'tagscanner_feedback'
@@ -663,6 +667,16 @@ This scan is mandatory and must not be shortcut, skipped, or replaced by travers
 STEP 2 — REPORT THE COMPLETE MATCH LIST
 List every DE found in step 1. Never omit a match because it is unused, isolated, or does not appear in any dependency structure.
 
+CRITICAL — NEVER INVENT COMPONENT NAMES
+If the scan finds zero matches, respond:
+"No data elements found containing '[keyword]'."
+
+Do not suggest component names that "might" exist.
+Do not list examples from other properties.
+Do not fabricate plausible-sounding names.
+Only list components that actually appear in
+property_context.dataElements[].
+
 STEP 3 — THEN ANSWER THE QUESTION
 After listing all matches, answer whatever was asked.
 
@@ -673,8 +687,10 @@ SUBSTRING RULES
 - No suffix requirement: "UTM Campaign" must match even though "campaign" is at the end
 - No adjacency requirement: "Form Name - Campaign - On Page Load" must match even though "campaign" is surrounded by dashes and spaces
 
-Correct result for keyword "campaign" against this property:
-6 matches — Campaign ID, CRM Campaign ID, CRM Campaign Name, Form Name - Campaign - On Page Load, S_Campaign, UTM Campaign
+Example substring matching:
+- Keyword "page" matches: "pageName", "Page URL", "Previous Page"
+- Keyword "email" matches: "Email Address", "Hashed Email", "CRM_Email_ID"
+- If zero matches found, respond: "No data elements found containing '[keyword]'."
 
 Never return a count without listing every matched component.
 
@@ -720,7 +736,7 @@ Match format to question type. If a question spans multiple types, lead with the
 3. Never reference internal field names (property_context, ruleUsageSummary, data_note, JSON keys). Use plain language: "your property", "the data I can see".
 4. When listing items, use a "-" bulleted list. Keep lists scannable.
 5. NEVER truncate a list. Show all items regardless of length. Never add "... and N more".
-6. If property_context does not contain enough information to answer, say so — do not guess or fabricate.
+6. If property_context does not contain enough information to answer, say so — do not guess or fabricate. NEVER invent component names, counts, or field values. Only state what property_context explicitly shows. If a component is not in the array, it does not exist in the deployed container — do not suggest it "might" exist or list it as an example.
 7. Return plain text only — no JSON, no markdown code blocks.`;
 
 // Multi-turn version of invokeClaude — takes a messages array instead of a single string
@@ -845,14 +861,13 @@ async function handleChat(body, session, identity, aiConfig, todayCost) {
 
   // Cache check — only for standalone (first-turn) questions with no prior history
   // PROMPT_VERSION: bump this string whenever CHAT_SYSTEM_PROMPT changes to bust stale cache entries
-  const CHAT_PROMPT_VERSION = 'v20';
   let chatCacheKey = null;
   if (cleanHistory.length === 0) {
     const ctxHash = nodeCrypto
       .createHash('sha256')
       .update(JSON.stringify(propertyContext))
       .digest('hex')
-      .slice(0, 8);
+      .slice(0, 16);
     chatCacheKey =
       'chat#' +
       nodeCrypto
@@ -1262,7 +1277,7 @@ async function getChatCache(cacheKey) {
   try {
     const result = await ddb.send(
       new GetCommand({
-        TableName: SCAN_CACHE_TABLE,
+        TableName: CHAT_CACHE_TABLE,
         Key: { cache_key: cacheKey },
       }),
     );
@@ -1278,7 +1293,7 @@ async function putChatCache(cacheKey, answer, tokens, propertyKey) {
   try {
     await ddb.send(
       new PutCommand({
-        TableName: SCAN_CACHE_TABLE,
+        TableName: CHAT_CACHE_TABLE,
         Item: {
           cache_key: cacheKey,
           answer: answer,
@@ -1394,7 +1409,7 @@ async function handleAuth(body, sourceIp) {
   }
 
   // Create session (30-day TTL)
-  const sessionToken = crypto.randomUUID();
+  const sessionToken = nodeCrypto.randomUUID();
   const expiresAt = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
   try {
     await ddb.send(
@@ -1992,7 +2007,7 @@ async function handlePurgeTestData(body) {
     return resp(403, { error: 'Admin access required.' });
 
   // Default: purge all four tables.  Caller can pass tables:[] to pick a subset.
-  const ALL = ['scan_cache', 'explain_cache', 'rate_limits', 'queries'];
+  const ALL = ['scan_cache', 'chat_cache', 'explain_cache', 'rate_limits', 'queries'];
   const scope = Array.isArray(tables) && tables.length ? tables : ALL;
 
   const results = {};
@@ -2002,6 +2017,15 @@ async function handlePurgeTestData(body) {
       results.scan_cache = await batchDeleteAll(SCAN_CACHE_TABLE, 'cache_key');
     } catch (err) {
       results.scan_cache = 'ERROR: ' + err.message;
+    }
+  }
+
+  if (scope.includes('chat_cache')) {
+    try {
+      results.chat_cache = await batchDeleteAll(
+        CHAT_CACHE_TABLE, 'cache_key');
+    } catch (err) {
+      results.chat_cache = 'ERROR: ' + err.message;
     }
   }
 

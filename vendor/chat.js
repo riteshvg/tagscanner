@@ -544,7 +544,7 @@
         if (trimmed === '') {
           html += '<br>';
         } else {
-          html += trimmed + ' ';
+          html += esc(trimmed) + ' ';
         }
       }
     });
@@ -791,9 +791,6 @@
 
     // Deflect questions the UI already answers — zero tokens consumed
     var deflectMsg = checkUIDeflect(question);
-    console.log('[Ask AI] Stage 1 — UI deflection:',
-      deflectMsg ? 'DEFLECTED' : 'pass-through',
-      deflectMsg ? '| msg: ' + deflectMsg.slice(0, 100) : '');
     if (deflectMsg) {
       chatInput.value = '';
       chatInput.style.height = '';
@@ -1143,9 +1140,6 @@
   }
 
   function doSend(question, session) {
-    console.log('[Ask AI] ──────────────────────────────────');
-    console.log('[Ask AI] Question:', question.slice(0, 200));
-    console.log('[Ask AI] History depth:', conversationHistory.length);
     isLoading = true;
     btnSend.disabled = true;
     chatInput.value  = '';
@@ -1188,26 +1182,12 @@
     showThinking();
 
     var propertyContext = buildChatContext();
-    console.log('[Ask AI] Stage 2 — buildChatContext:',
-      'rules:', (propertyContext.rules || []).length,
-      '| DEs:', (propertyContext.dataElements || []).length,
-      '| extensions:', (propertyContext.extensions || []).length,
-      '| data_note:', !!(propertyContext.data_note));
     propertyContext = injectKeywordMatches(question, propertyContext);
     var km = propertyContext._keywordMatches;
-    console.log('[Ask AI] Stage 3 — injectKeywordMatches:',
-      km ? ('keyword: "' + km.keyword + '"' +
-            ' | matchingDEs: ' + km.matchingDECount +
-            ' | matchingRules: ' + km.matchingRuleCount +
-            ' | reverseDE: ' + (km.reverseDeResult ?
-              km.reverseDeResult.targetDE : 'none')) : 'no matches');
 
     var localAnswer = enableLocalResolution
       ? resolveLocally(question, propertyContext)
       : null;
-    console.log('[Ask AI] Stage 4 — resolveLocally:',
-      localAnswer ? 'RESOLVED locally' : 'pass to Lambda',
-      localAnswer ? '| answer length: ' + localAnswer.length : '');
     if (localAnswer) {
       removeThinking();
       appendBubble('assistant', renderMarkdownLite(localAnswer));
@@ -1223,15 +1203,6 @@
       return;
     }
 
-    var deNames = (propertyContext.dataElements || [])
-      .map(function(de){ return de.name; });
-    console.log('[Ask AI] Stage 5 — propertyContext DEs:',
-      deNames.length, 'total');
-    console.log('[Ask AI] DEs containing "campaign":',
-      deNames.filter(function(n){
-        return n.toLowerCase().indexOf('campaign') > -1;
-      }));
-
     callLambda({
       type:                'chat',
       sessionToken:        session.sessionToken,
@@ -1241,10 +1212,6 @@
       conversationHistory: conversationHistory
     })
     .then(function (data) {
-      console.log('[Ask AI] Stage 6 — Lambda response:',
-        'fromCache:', !!data.fromCache,
-        '| tokens:', JSON.stringify(data.tokens),
-        '| answer length:', (data.answer || '').length);
       removeThinking();
       var answer = data.answer || '';
       if (typeof data.enableLocalResolution === 'boolean') {

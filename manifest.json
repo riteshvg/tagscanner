@@ -2,7 +2,7 @@
   "name": "TagScanner",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsy5HqMNzPkep8obGVW1X1urgoJVj+g0kqzxh6FD2+/Wa1YxtJw6XYprFp+Toz7Nn3M6Cp+9YjwmbkBza0FD9yTHHYDK5KDD7yJLtrU0SI4pF2iz64XFio3vz8jKaxQrfdAfZvTPk/j6nShfCWNjOBUV0FA6Q5C2TJiBZcxuJV2Dcf9cQpxAzb6FN6a978KHAYX+GStRGlGvwXQ4mO/AuBVtDKIFRdYWCsMmSKHMosp8M8zgtX3MIhaBHEz1ISIJlLO9nejBDtap+w/oxOwMszaEQpeO2Vqef5LwwpTlNjxdtIoXpQgOmhv7m9NXyJx/igYxwYpf3egyKzOVOi0IU6QIDAQAB",
   "description": "Scan your Adobe Tag property and export your library output with custom code.",
-  "version": "2.5.6",
+  "version": "2.5.7",
   "homepage_url": "https://github.com/riteshg-adobe/tagscanner",
   "manifest_version": 3,
   "permissions": ["activeTab", "storage", "scripting", "identity", "declarativeNetRequest"],

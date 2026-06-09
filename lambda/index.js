@@ -63,8 +63,7 @@ const nodeCrypto = require('node:crypto');
 const SNS_TOPIC_ARN = (process.env.SNS_TOPIC_ARN || '').trim();
 const ALERT_PCT = 0.75; // send alert when daily cost crosses this fraction of the limit
 
-const MODEL_ID =
-  process.env.BEDROCK_MODEL_ID || 'amazon.nova-lite-v1:0';
+const MODEL_ID = process.env.BEDROCK_MODEL_ID || 'amazon.nova-lite-v1:0';
 const CHAT_PROMPT_VERSION = 'v22';
 const ENABLE_LOCAL_RESOLUTION =
   (process.env.ENABLE_LOCAL_RESOLUTION || 'true').toLowerCase() === 'true';
@@ -384,7 +383,7 @@ async function autoDisableAI(reason) {
 const AA_RSID = 'ageo1xxsintagscanner';
 const AA_TRACKING_SERVER = 'adobeintriteshgupta.sc.omtrdc.net';
 const AA_ENDPOINT = `https://${AA_TRACKING_SERVER}/b/ss/${AA_RSID}/0`;
-const AA_APP_VERSION = '2.5.6';
+const AA_APP_VERSION = '2.5.7';
 
 function hashEmailSync(email) {
   if (!email) return '';
@@ -2021,7 +2020,13 @@ async function handlePurgeTestData(body) {
     return resp(403, { error: 'Admin access required.' });
 
   // Default: purge all four tables.  Caller can pass tables:[] to pick a subset.
-  const ALL = ['scan_cache', 'chat_cache', 'explain_cache', 'rate_limits', 'queries'];
+  const ALL = [
+    'scan_cache',
+    'chat_cache',
+    'explain_cache',
+    'rate_limits',
+    'queries',
+  ];
   const scope = Array.isArray(tables) && tables.length ? tables : ALL;
 
   const results = {};
@@ -2036,8 +2041,7 @@ async function handlePurgeTestData(body) {
 
   if (scope.includes('chat_cache')) {
     try {
-      results.chat_cache = await batchDeleteAll(
-        CHAT_CACHE_TABLE, 'cache_key');
+      results.chat_cache = await batchDeleteAll(CHAT_CACHE_TABLE, 'cache_key');
     } catch (err) {
       results.chat_cache = 'ERROR: ' + err.message;
     }

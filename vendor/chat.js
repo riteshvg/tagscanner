@@ -638,16 +638,25 @@
       message:  function() { var n = _extCount(); return n !== null ? 'This property has <strong>' + n + ' extensions</strong> installed. See them all in the <strong>Extensions tab</strong>.' : null; }
     },
     {
-      patterns: [/^list\s+(all\s+)?rules\b/i, /^(show|give|get)\s+(me\s+)?(all\s+|a\s+list\s+of\s+)?rules\b/i, /^what\s+rules\s+are\s+(in|available|there)/i],
-      message:  function() { var n = _ruleCount(); return 'This property has ' + (n !== null ? '<strong>' + n + ' rules</strong>' : 'rules') + ' — see the full list in your <strong>Rules tab</strong>.'; }
+      patterns: [
+        /(?:where|how)\s+(?:can|do)\s+(?:i|we)\s+(?:see|find|view|access)\s+(?:the\s+)?rules/i,
+        /which\s+(?:tab|page|section|panel)\s+(?:has|shows?)\s+rules/i
+      ],
+      message:  function() { return 'See the <strong>Rules tab</strong> for the browsable list.'; }
     },
     {
-      patterns: [/^list\s+(all\s+)?data\s+elem/i, /^(show|give|get)\s+(me\s+)?(all\s+|a\s+list\s+of\s+)?data\s+elem/i, /^what\s+data\s+elements\s+are\s+(in|available|there)/i],
-      message:  function() { var n = _deCount(); return 'This property has ' + (n !== null ? '<strong>' + n + ' data elements</strong>' : 'data elements') + ' — see the full list in your <strong>Data Elements tab</strong>.'; }
+      patterns: [
+        /(?:where|how)\s+(?:can|do)\s+(?:i|we)\s+(?:see|find|view|access)\s+(?:the\s+)?data\s+elem/i,
+        /which\s+(?:tab|page|section|panel)\s+(?:has|shows?)\s+data\s+elem/i
+      ],
+      message:  function() { return 'See the <strong>Data Elements tab</strong> for the browsable list.'; }
     },
     {
-      patterns: [/^list\s+(all\s+)?ext/i, /^(show|give|get)\s+(me\s+)?(all\s+|a\s+list\s+of\s+)?ext/i, /^what\s+extensions\s+are\s+(in|installed|available|there)/i],
-      message:  function() { var n = _extCount(); return 'This property has ' + (n !== null ? '<strong>' + n + ' extensions</strong> installed' : 'extensions installed') + ' — see the full list in your <strong>Extensions tab</strong>.'; }
+      patterns: [
+        /(?:where|how)\s+(?:can|do)\s+(?:i|we)\s+(?:see|find|view|access)\s+(?:the\s+)?ext/i,
+        /which\s+(?:tab|page|section|panel)\s+(?:has|shows?)\s+ext/i
+      ],
+      message:  function() { return 'See the <strong>Extensions tab</strong> for the browsable list.'; }
     },
     {
       patterns: [/custom\s+code\s+in\s+(all\s+)?(data\s+elem|rules|the\s+prop)/i, /list\s+(all\s+)?custom\s+code/i, /show\s+(all\s+)?custom\s+code/i, /which\s+(data\s+elem|rules)\s+have\s+custom\s+code/i],
@@ -999,6 +1008,67 @@
       var ccrlines = [ccRules.length + ' rule' + (ccRules.length === 1 ? '' : 's') + ' with custom code:'];
       ccRules.forEach(function(r) { ccrlines.push('- ' + r.name + ' (Rule)'); });
       return ccrlines.join('\n');
+    }
+
+    // ── List all data elements ────────────────────────────────────
+    if (/^(?:list|show|give|get|generate|display|print)(?:\s+me)?(?:\s+(?:all|the|every))?\s+(?:the\s+)?data\s+elements?/i.test(q) ||
+        /^(?:what|which)\s+(?:are\s+)?(?:all|the)\s+data\s+elements?/i.test(q) ||
+        /^(?:can\s+you\s+)?(?:list|show|generate)\s+(?:the\s+)?(?:full\s+)?(?:list\s+of\s+)?data\s+elements?/i.test(q) ||
+        /data\s+elements?\s+(?:configured|loading|on\s+(?:my\s+)?website)/i.test(q)) {
+      if (/(?:grouped?|categorize|organize|sort|arrange|order)\s+by/i.test(q) ||
+          /by\s+(?:extension|type|category|usage|name)/i.test(q)) {
+        return null;
+      }
+      if (des.length === 0) return 'No data elements found in this property.';
+      var allDElines = [des.length + ' data elements:'];
+      des.forEach(function(d) {
+        allDElines.push('- ' + d.name + ' (Data Element)');
+      });
+      return allDElines.join('\n');
+    }
+
+    // ── List all rules ─────────────────────────────────────────────
+    if (/^(?:list|show|give|get|generate|display|print)(?:\s+me)?(?:\s+(?:all|the|every))?\s+(?:the\s+)?rules?/i.test(q) ||
+        /^(?:what|which)\s+(?:are\s+)?(?:all|the)\s+rules?/i.test(q) ||
+        /^(?:can\s+you\s+)?(?:list|show|generate)\s+(?:the\s+)?(?:full\s+)?(?:list\s+of\s+)?rules?/i.test(q)) {
+      if (/(?:grouped?|categorize|organize|sort|arrange|order)\s+by/i.test(q) ||
+          /by\s+(?:extension|type|category|usage|name)/i.test(q)) {
+        return null;
+      }
+      if (rules.length === 0) return 'No rules found in this property.';
+      var allRlines = [rules.length + ' rules:'];
+      rules.forEach(function(r) {
+        allRlines.push('- ' + r.name + ' (Rule)');
+      });
+      return allRlines.join('\n');
+    }
+
+    // ── List all extensions ────────────────────────────────────────
+    if (/^(?:list|show|give|get|generate|display|print)(?:\s+me)?(?:\s+(?:all|the|every))?\s+(?:the\s+)?extensions?/i.test(q) ||
+        /^(?:what|which)\s+(?:are\s+)?(?:all|the)\s+extensions?/i.test(q) ||
+        /^(?:can\s+you\s+)?(?:list|show|generate)\s+(?:the\s+)?(?:full\s+)?(?:list\s+of\s+)?extensions?/i.test(q)) {
+      if (/(?:grouped?|categorize|organize|sort|arrange|order)\s+by/i.test(q) ||
+          /by\s+(?:extension|type|category|usage|name)/i.test(q)) {
+        return null;
+      }
+      if (exts.length === 0) return 'No extensions found in this property.';
+      var allElines = [exts.length + ' extensions:'];
+      exts.forEach(function(e) {
+        allElines.push('- ' + (e.displayName || e.name) + ' (Extension)');
+      });
+      return allElines.join('\n');
+    }
+
+    // ── Usage stats summary ────────────────────────────────────────
+    if (/(?:usage|utilization)\s+(?:stats|statistics|summary|insights|overview)/i.test(q) ||
+        /how\s+many\s+(?:data\s+elements?\s+)?(?:are\s+)?(?:used|unused)/i.test(q) ||
+        /(?:total|overall)\s+(?:and\s+)?(?:used|unused)\s+data\s+elements?/i.test(q) ||
+        /data\s+elements?\s+(?:configured|on\s+(?:my\s+)?website)\s+and\s+how\s+many/i.test(q)) {
+      var usedCount = des.filter(function(d) {
+        return d.usedInRules;
+      }).length;
+      return des.length + ' total data elements: ' + usedCount +
+             ' used in rules, ' + unusedCount + ' unused.';
     }
 
     return null; // not deterministic — send to LLM

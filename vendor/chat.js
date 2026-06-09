@@ -463,42 +463,75 @@
 
   // Convert "-" bullet lists, tables, and double newlines to basic HTML
   function renderMarkdownLite(text) {
-    // ── Table detection ────────────────────────────────────────────
-    var tablePattern = /\n(\|.+\|)\n(\|[\s\-:]+\|)\n((?:\|.+\|\n?)+)/g;
-    if (tablePattern.test(text)) {
-      tablePattern.lastIndex = 0;
-      text = text.replace(tablePattern, function(match, header, sep, body) {
-        var headers = header.split('|')
+    // ── Detect and parse markdown tables (aggressive matching) ────
+    var lines = text.split('\n');
+    var tableStart = -1;
+    var tableEnd = -1;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line.indexOf('|') === 0 && (line.match(/\|/g) || []).length >= 2) {
+        if (tableStart === -1) tableStart = i;
+        tableEnd = i;
+      } else if (tableStart !== -1) {
+        break;
+      }
+    }
+
+    if (tableStart !== -1 && tableEnd > tableStart) {
+      var tableLines = lines.slice(tableStart, tableEnd + 1);
+
+      if (tableLines.length <= 2) {
+        var fullTable = tableLines.join(' ');
+        tableLines = fullTable.split(/\s*\|\s*\|\s*/)
+          .map(function(s) { return s.trim(); })
+          .filter(function(s) { return s.indexOf('|') > -1; });
+      }
+
+      if (tableLines.length >= 3) {
+        var headers = tableLines[0].split('|')
           .map(function(h) { return h.trim(); })
           .filter(Boolean);
-        var rows = body.trim().split('\n')
+
+        var rows = tableLines.slice(2)
           .map(function(row) {
             return row.split('|')
               .map(function(c) { return c.trim(); })
               .filter(Boolean);
-          });
-        var html = '<table style="border-collapse:collapse;margin:10px 0;width:100%;font-size:13px">';
-        html += '<thead><tr>';
+          })
+          .filter(function(row) { return row.length > 0; });
+
+        var tableHTML = '<table style="border-collapse:collapse;' +
+          'margin:14px 0;width:100%;font-size:13px;background:#fff;' +
+          'box-shadow:0 1px 3px rgba(0,0,0,0.08);border-radius:6px;' +
+          'overflow:hidden">';
+        tableHTML += '<thead><tr>';
         headers.forEach(function(h) {
-          html += '<th style="border:1px solid #e2e8f0;padding:6px 10px;background:#f8fafc;text-align:left;font-weight:600">' + esc(h) + '</th>';
+          tableHTML += '<th style="border-bottom:2px solid #e2e8f0;' +
+            'padding:10px 14px;background:#f8fafc;text-align:left;' +
+            'font-weight:600;color:#1e293b;font-size:12px">' + esc(h) + '</th>';
         });
-        html += '</tr></thead><tbody>';
-        rows.forEach(function(row) {
-          html += '<tr>';
+        tableHTML += '</tr></thead><tbody>';
+        rows.forEach(function(row, idx) {
+          tableHTML += '<tr style="' + (idx % 2 === 1 ? 'background:#fafafa' : '') + '">';
           row.forEach(function(cell) {
-            html += '<td style="border:1px solid #e2e8f0;padding:6px 10px">' + esc(cell) + '</td>';
+            tableHTML += '<td style="border:1px solid #e2e8f0;' +
+              'padding:9px 14px;color:#475569;vertical-align:top;' +
+              'max-width:600px;word-wrap:break-word;white-space:normal">' + esc(cell) + '</td>';
           });
-          html += '</tr>';
+          tableHTML += '</tr>';
         });
-        html += '</tbody></table>';
-        return html;
-      });
+        tableHTML += '</tbody></table>';
+
+        lines.splice(tableStart, tableEnd - tableStart + 1, tableHTML);
+        text = lines.join('\n');
+      }
     }
 
-    var lines = text.split('\n');
-    var html  = '';
+    var processedLines = text.split('\n');
+    var html = '';
     var inList = false;
-    lines.forEach(function (line) {
+    processedLines.forEach(function(line) {
       var trimmed = line.trim();
       if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
         if (inList) { html += '</ul>'; inList = false; }
@@ -511,7 +544,7 @@
         if (trimmed === '') {
           html += '<br>';
         } else {
-          html += esc(trimmed) + ' ';
+          html += trimmed + ' ';
         }
       }
     });
